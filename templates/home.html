@@ -1,118 +1,114 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/ %3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
-    </div>
-
-    <div class="min-h-screen flex flex-col items-center justify-center w-full px-4 py-12">
-        <div class="flex flex-col items-center justify-center mb-4">
-            <div class="flex items-center justify-center space-x-3">
-                <svg class="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
-                </svg>
-                <span class="text-5xl font-extrabold text-white tracking-tight">Nexus<span class="text-blue-400">Trace</span></span>
-            </div>
+<div class="flex flex-col items-center justify-center min-h-[80vh] text-center px-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+            Welcome to NexusTrace
+        </h1>
+        <p class="text-lg md:text-xl text-gray-300 mb-10">
+            Your comprehensive OSINT and threat intelligence platform for analyzing IP addresses, domains, and URLs.
+        </p>
+        <!-- Unified Search Bar -->
+        <div class="unified-search mt-4 mb-10">
+          <form action="/analyze" method="POST" class="search-form flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="search-input input-field w-full sm:w-96" required>
+            <button type="submit" class="btn btn-primary">Analyze</button>
+          </form>
         </div>
-        <h2 class="text-2xl font-bold text-white mb-2 text-center">The Open Source Intelligence Tool</h2>
-        <p class="text-gray-300 mb-10 text-lg text-center max-w-2xl mx-auto">Unlock powerful insights with our comprehensive suite of analysis tools</p>
-        <div class="flex flex-col items-center w-full">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-4xl mx-auto mb-20">
-                <!-- IP Analysis Card -->
-                <a href="{{ url_for('home.ip_section') }}" class="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-gray-700/50 hover:border-blue-500/50 flex flex-col items-center">
-                    <div class="text-center">
-                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                            <svg class="w-10 h-10 text-white transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-white mb-3 group-hover:text-blue-400 transition-colors duration-300">IP Analysis</h3>
-                        <p class="text-gray-300 group-hover:text-gray-200 transition-colors duration-300">Analyze IP addresses for security threats, location data, and network information</p>
-                    </div>
-                </a>
-                <!-- Domain Analysis Card -->
-                <a href="{{ url_for('home.domain_section') }}" class="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-gray-700/50 hover:border-green-500/50 flex flex-col items-center">
-                    <div class="text-center">
-                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                            <svg class="w-10 h-10 text-white transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-white mb-3 group-hover:text-green-400 transition-colors duration-300">Domain Analysis</h3>
-                        <p class="text-gray-300 group-hover:text-gray-200 transition-colors duration-300">Investigate domain registrations, DNS records, and SSL certificates</p>
-                    </div>
-                </a>
-                <!-- URL Analysis Card -->
-                <a href="{{ url_for('home.url_section') }}" class="group bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border border-gray-700/50 hover:border-purple-500/50 flex flex-col items-center">
-                    <div class="text-center">
-                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-5 w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                            <svg class="w-10 h-10 text-white transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-white mb-3 group-hover:text-purple-400 transition-colors duration-300">URL Analysis</h3>
-                        <p class="text-gray-300 group-hover:text-gray-200 transition-colors duration-300">Examine URLs for security headers, technologies, and potential threats</p>
-                    </div>
-                </a>
-            </div>
+        <div class="card-grid">
+            <a href="/ip" class="feature-card group">
+                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
+                    <!-- Shield/Check SVG -->
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">IP Analysis</h3>
+                <p class="text-gray-400 mb-4">Comprehensive analysis of IP addresses including geolocation, reputation, and threat intelligence.</p>
+                <span class="arrow">→</span>
+            </a>
+            <a href="/domain" class="feature-card group">
+                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
+                    <!-- Globe SVG -->
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Domain Analysis</h3>
+                <p class="text-gray-400 mb-4">In-depth domain investigation including WHOIS data, DNS records, and security metrics.</p>
+                <span class="arrow">→</span>
+            </a>
+            <a href="/url" class="feature-card group">
+                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
+                    <!-- Link SVG -->
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">URL Analysis</h3>
+                <p class="text-gray-400 mb-4">Detailed URL scanning for malicious content, redirects, and security vulnerabilities.</p>
+                <span class="arrow">→</span>
+            </a>
         </div>
-        <div class="mt-20 w-full flex flex-col items-center">
-            <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-12 text-center">Powered by:</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto w-full place-items-center">
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-blue-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- VPNAPI.io: shield-check -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-blue-400 transition-colors duration-300">VPNAPI.io</span>
-                    <p class="text-gray-400 text-xs">VPN & Proxy Detection</p>
-                </div>
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-green-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- IPInfo.io: globe-alt -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12h19.5M12 2.25v19.5"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-green-400 transition-colors duration-300">IPInfo.io</span>
-                    <p class="text-gray-400 text-xs">IP Geolocation & Privacy</p>
-                </div>
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- ProxyCheck.io: server -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15m-15 0A2.25 2.25 0 016.75 4.5h10.5A2.25 2.25 0 0120 6.75v2.25a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 9V6.75zm0 10.5h15m-15 0A2.25 2.25 0 016.75 19.5h10.5A2.25 2.25 0 0120 17.25v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75v2.25z"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-purple-400 transition-colors duration-300">ProxyCheck.io</span>
-                    <p class="text-gray-400 text-xs">VPN/Proxy Detection</p>
-                </div>
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-blue-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- AlienVault: eye -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5 9.75 7.5 9.75 7.5-3.75 7.5-9.75 7.5S2.25 12 2.25 12z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-blue-400 transition-colors duration-300">AlienVault</span>
-                    <p class="text-gray-400 text-xs">Threat Intelligence</p>
-                </div>
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-green-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- AbuseIPDB: flag -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18m0 0h18m-18 0V3m0 0h18"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-green-400 transition-colors duration-300">AbuseIPDB</span>
-                    <p class="text-gray-400 text-xs">Abuse & Reputation Data</p>
-                </div>
-                <div class="bg-gray-800/30 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center shadow-lg border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group text-center w-full max-w-[220px]">
-                    <div class="w-10 h-10 mb-2 flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 mx-auto">
-                        <!-- Intezer: beaker -->
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3v4.5m4.5-4.5v4.5m-7.5 0h10.5m-10.5 0a2.25 2.25 0 002.25 2.25h6a2.25 2.25 0 002.25-2.25m-10.5 0v10.5a2.25 2.25 0 002.25 2.25h6a2.25 2.25 0 002.25-2.25V7.5"/></svg>
-                    </div>
-                    <span class="font-semibold text-white text-base group-hover:text-purple-400 transition-colors duration-300">Intezer</span>
-                    <p class="text-gray-400 text-xs">Threat Intelligence</p>
-                </div>
+        <!-- Features/Benefits section -->
+        <div class="features-section mt-12">
+          <h2 class="text-2xl font-bold mb-6 text-blue-400">Why NexusTrace?</h2>
+          <div class="features-grid">
+            <div class="feature">
+              <div class="feature-icon">⚡</div>
+              <h4>Automated Enrichment</h4>
+              <p>Instantly gather threat intelligence from multiple sources for any indicator.</p>
             </div>
+            <div class="feature">
+              <div class="feature-icon">🔗</div>
+              <h4>Centralized Investigation</h4>
+              <p>Correlate and pivot on data from IPs, domains, URLs, and more—all in one place.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">🛠️</div>
+              <h4>Customizable Playbooks</h4>
+              <p>Automate repetitive investigation steps and integrate with your security stack.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">🤝</div>
+              <h4>Collaboration</h4>
+              <p>Share findings, notes, and reports with your team for faster response.</p>
+            </div>
+          </div>
+        </div>
+        <!-- How it works section -->
+        <div class="howitworks-section mt-16">
+          <h2 class="text-2xl font-bold mb-6 text-blue-400">How It Works</h2>
+          <div class="howitworks-grid">
+            <div class="howitworks-step">
+              <div class="howitworks-icon">🔍</div>
+              <h4>Submit an Indicator</h4>
+              <p>Enter an IP, domain, URL, or file hash to begin your investigation.</p>
+            </div>
+            <div class="howitworks-step">
+              <div class="howitworks-icon">🤖</div>
+              <h4>Automated Analysis</h4>
+              <p>NexusTrace enriches and correlates data from multiple threat intelligence sources.</p>
+            </div>
+            <div class="howitworks-step">
+              <div class="howitworks-icon">📊</div>
+              <h4>Investigate & Collaborate</h4>
+              <p>Review results, pivot on findings, and share insights with your team.</p>
+            </div>
+          </div>
         </div>
     </div>
 </div>
+<!-- Footer -->
+<footer class="footer mt-16 py-8 text-center text-gray-400">
+  <div>
+    <a href="https://github.com/yourrepo" target="_blank" class="text-blue-400 hover:underline">GitHub</a> |
+    <a href="/docs" class="text-blue-400 hover:underline">Documentation</a> |
+    <a href="mailto:contact@nexustrace.com" class="text-blue-400 hover:underline">Contact</a>
+  </div>
+  <div class="mt-2 text-xs">© 2024 NexusTrace. Inspired by <a href="https://github.com/intelowlproject/IntelOwl" target="_blank" class="text-blue-400 hover:underline">IntelOwl</a>.</div>
+</footer>
 {% endblock %}
 
 {% block scripts %}

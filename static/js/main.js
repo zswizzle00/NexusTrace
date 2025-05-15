@@ -255,106 +255,59 @@ function createWhoisCard(whoisData) {
 
 function createShodanCard(shodanData) {
     if (!shodanData) return '';
-    
+    // Robust recursive renderValue for all fields
+    function renderValue(value, depth = 0, seen = new Set()) {
+        if (depth > 5) return '<span class="text-gray-400">[Max depth reached]</span>';
+        if (value === null || value === undefined) return '<span class="text-gray-400">N/A</span>';
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (typeof parsed === 'object') return renderValue(parsed, depth + 1, seen);
+            } catch (e) {}
+            return value;
+        }
+        if (typeof value === 'object') {
+            if (seen.has(value)) return '<span class="text-gray-400">[Circular]</span>';
+            seen.add(value);
+            if (Array.isArray(value)) {
+                if (value.length === 0) return '<span class="text-gray-400">None</span>';
+                if (value.every(v => typeof v === 'object')) {
+                    return value.map((obj, idx) =>
+                        `<div class="mb-2">
+                            <div class="text-xs text-blue-400 mb-1">Item ${idx + 1}</div>
+                            ${renderValue(obj, depth + 1, seen)}
+                        </div>`
+                    ).join('');
+                }
+                return '<ul class="pl-4 list-disc">' + value.map(v => `<li>${renderValue(v, depth + 1, seen)}</li>`).join('') + '</ul>';
+            } else {
+                const entries = Object.entries(value).filter(([k, v]) => v !== undefined);
+                if (entries.length === 0) return '<span class="text-gray-400">None</span>';
+                if (entries.some(([k, v]) => typeof v === 'object')) {
+                    return '<table class="w-full text-sm text-left text-gray-300">' +
+                        entries.map(([k, v]) =>
+                            `<tr><td class="font-semibold pr-2 align-top">${k}</td><td>${renderValue(v, depth + 1, seen)}</td></tr>`
+                        ).join('') +
+                        '</table>';
+                }
+                return '<table class="w-full text-sm text-left text-gray-300">' +
+                    entries.map(([k, v]) =>
+                        `<tr><td class="font-semibold pr-2 align-top">${k}</td><td>${v}</td></tr>`
+                    ).join('') +
+                    '</table>';
+            }
+        }
+        try {
+            return `<pre class="text-xs text-gray-400">${JSON.stringify(value, null, 2)}</pre>`;
+        } catch (e) {
+            return '<span class="text-gray-400">[Unrenderable Object]</span>';
+        }
+    }
     return `
         <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-8 w-full h-full flex flex-col">
             <h3 class="text-2xl font-extrabold text-white mb-6">Shodan Information</h3>
             <div class="shodan-content">
-                <!-- Basic Information -->
-                <div class="shodan-section">
-                    <div class="shodan-section-title text-blue-400">Basic Information</div>
-                    <div class="shodan-grid">
-                        <div class="shodan-item">
-                            <div class="shodan-label">Organization</div>
-                            <div class="shodan-value">${shodanData.organization || 'N/A'}</div>
-                        </div>
-                        <div class="shodan-item">
-                            <div class="shodan-label">Operating System</div>
-                            <div class="shodan-value">${shodanData.operating_system || 'N/A'}</div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Services -->
-                ${shodanData.services.length > 0 ? `
-                    <div class="shodan-section">
-                        <div class="shodan-section-title text-blue-400">Detected Services</div>
-                        <div class="services-list" style="max-height: 300px; overflow-y: auto;">
-                            ${shodanData.services.map(service => `
-                                <div class="service-item">
-                                    <div class="shodan-grid">
-                                        <div>
-                                            <div class="shodan-label">Service</div>
-                                            <div class="shodan-value">${service.service}</div>
-                                        </div>
-                                        <div>
-                                            <div class="shodan-label">Port</div>
-                                            <div class="shodan-value">${service.port}</div>
-                                        </div>
-                                        <div>
-                                            <div class="shodan-label">Product</div>
-                                            <div class="shodan-value">${service.product || 'N/A'}</div>
-                                        </div>
-                                        <div>
-                                            <div class="shodan-label">Version</div>
-                                            <div class="shodan-value">${service.version || 'N/A'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                <!-- Ports -->
-                ${shodanData.ports.length > 0 ? `
-                    <div class="shodan-section">
-                        <div class="shodan-section-title text-blue-400">Open Ports</div>
-                        <div class="ports-list" style="max-height: 300px; overflow-y: auto;">
-                            ${shodanData.ports.map(port => `
-                                <div class="port-item">
-                                    <div class="shodan-grid">
-                                        <div>
-                                            <div class="shodan-label">Port</div>
-                                            <div class="shodan-value">${port.port}</div>
-                                        </div>
-                                        <div>
-                                            <div class="shodan-label">Service</div>
-                                            <div class="shodan-value">${port.service}</div>
-                                        </div>
-                                    </div>
-                                    ${port.banner !== 'N/A' ? `
-                                        <div class="banner-content">${port.banner}</div>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                <!-- Vulnerabilities -->
-                ${shodanData.vulnerabilities.length > 0 ? `
-                    <div class="shodan-section">
-                        <div class="shodan-section-title text-blue-400">Vulnerabilities</div>
-                        <div class="vulnerabilities-list" style="max-height: 300px; overflow-y: auto;">
-                            ${shodanData.vulnerabilities.map(vuln => `
-                                <div class="vulnerability-item">
-                                    <div class="shodan-grid">
-                                        <div>
-                                            <div class="shodan-label">ID</div>
-                                            <div class="shodan-value">${vuln.id}</div>
-                                        </div>
-                                        <div>
-                                            <div class="shodan-label">CVSS Score</div>
-                                            <div class="shodan-value">${vuln.cvss}</div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-2">
-                                        <div class="shodan-label">Summary</div>
-                                        <div class="shodan-value">${vuln.summary}</div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
+                ${renderValue(shodanData)}
             </div>
         </div>
     `;

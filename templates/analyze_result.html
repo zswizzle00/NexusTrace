@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full mx-auto px-0 py-10">
+  <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+    {% if indicator_type == 'ip' %}
+      <!-- IPInfo Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">IPInfo</h3>
+        </div>
+        {% if ipinfo %}
+          <table class="mb-4 w-full text-sm">
+            <tr><th>Location</th><td>{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+            <tr><th>Org</th><td>{{ ipinfo.ipinfo.org }}</td></tr>
+            <tr><th>ASN</th><td>{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+            <tr><th>Hostname</th><td>{{ ipinfo.ipinfo.hostname }}</td></tr>
+          </table>
+        {% else %}
+          <span class="text-yellow-400">No IPInfo data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if ipinfo %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- IP2Location Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">IP2Location</h3>
+        </div>
+        {% if ip2location %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in ip2location.items() %}
+              <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <span class="text-yellow-400">No IP2Location data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if ip2location %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ip2location | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- VPNAPI Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">VPNAPI</h3>
+        </div>
+        {% if vpnapi %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in vpnapi.items() %}
+              <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <span class="text-yellow-400">No VPNAPI data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if vpnapi %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ vpnapi | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- ProxyCheck Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">ProxyCheck</h3>
+        </div>
+        {% if proxycheck %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in proxycheck.proxycheck.items() %}
+              <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <span class="text-yellow-400">No ProxyCheck data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if proxycheck %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ proxycheck | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- AbuseIPDB Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">AbuseIPDB</h3>
+        </div>
+        {% if abuseipdb %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in abuseipdb.summary.items() %}
+              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+          {% for table_name, rows in abuseipdb.tables.items() %}
+            <div class="mb-4 overflow-y-auto" style="max-height: 350px;">
+              <h5 class="font-semibold text-blue-300 mb-2">{{ table_name|replace('_', ' ')|title }}</h5>
+              <table class="data-table w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-800 text-blue-200">
+                    {% for col in rows[0].keys() %}
+                      <th class="px-3 py-2">{{ col|replace('_', ' ')|title }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                    <tr class="even:bg-gray-900 odd:bg-gray-800">
+                      {% for col in row.keys() %}
+                        <td class="px-3 py-2 break-all">{{ row[col] }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          <span class="text-yellow-400">No AbuseIPDB data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if abuseipdb and abuseipdb.raw %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ abuseipdb.raw | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- Shodan Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">Shodan</h3>
+        </div>
+        {% if shodan %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in shodan.summary.items() %}
+              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+          {% for table_name, rows in shodan.tables.items() %}
+            <div class="mb-4 overflow-y-auto" style="max-height: 350px;">
+              <h5 class="font-semibold text-blue-300 mb-2">{{ table_name|replace('_', ' ')|title }}</h5>
+              <table class="data-table w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-800 text-blue-200">
+                    {% for col in rows[0].keys() %}
+                      <th class="px-3 py-2">{{ col|replace('_', ' ')|title }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                    <tr class="even:bg-gray-900 odd:bg-gray-800">
+                      {% for col in row.keys() %}
+                        <td class="px-3 py-2 break-all">{{ row[col] }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          <span class="text-yellow-400">No Shodan data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if shodan and shodan.raw %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ shodan.raw | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+      <!-- AlienVault OTX Card -->
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col xl:col-span-3">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">AlienVault OTX</h3>
+        </div>
+        {% if alienvault %}
+          <table class="mb-4 w-full text-sm">
+            {% for k, v in alienvault.summary.items() %}
+              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+          {% for table_name, rows in alienvault.tables.items() %}
+            <div class="mb-4 overflow-y-auto" style="max-height: 350px;">
+              <h5 class="font-semibold text-blue-300 mb-2">{{ table_name|replace('_', ' ')|title }}</h5>
+              <table class="data-table w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-800 text-blue-200">
+                    {% for col in rows[0].keys() %}
+                      <th class="px-3 py-2">{{ col|replace('_', ' ')|title }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                    <tr class="even:bg-gray-900 odd:bg-gray-800">
+                      {% for col in row.keys() %}
+                        <td class="px-3 py-2 break-all">{{ row[col] }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          <span class="text-yellow-400">No AlienVault OTX data found.</span>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          {% if alienvault and alienvault.raw %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ alienvault.raw | tojson(indent=2) }}</pre>
+          {% else %}
+            <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+          {% endif %}
+        </details>
+      </div>
+    {% elif indicator_type == 'domain' or indicator_type == 'url' %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col xl:col-span-2">
+        <div class="flex items-center mb-4">
+          <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+          <h3 class="text-xl font-bold text-blue-300">Domain &amp; URL Enrichment</h3>
+        </div>
+        {% if indicator_type == 'domain' %}
+          <h4 class="text-lg font-semibold text-blue-400 mb-2">Domain Analysis</h4>
+          <table class="mb-4 w-full text-sm">
+            <tr><th>Domain</th><td class="font-mono">{{ indicator }}</td></tr>
+            {% if domain_info %}
+              <tr><th>IP Address</th><td>{{ domain_info.ip_address }}</td></tr>
+            {% else %}
+              <tr><td colspan="2"><span class="text-yellow-400">No domain info found.</span></td></tr>
+            {% endif %}
+          </table>
+          <div class="mb-4">
+            <h5 class="text-md font-semibold text-blue-400 mb-2">WHOIS (IP2WHOIS)</h5>
+            {% if whois %}
+              <table class="data-table mb-2 w-full text-sm">
+                {% for k, v in whois.items() %}
+                  <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+                {% endfor %}
+              </table>
+            {% else %}
+              <span class="text-yellow-400">No WHOIS data found.</span>
+            {% endif %}
+            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+              <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ whois | tojson(indent=2) }}</pre>
+            </details>
+          </div>
+          {% if domain_info %}
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">DNS Records</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Type</th><th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in domain_info.dns_records.items() %}
+                    <tr><td>{{ k }}</td><td>{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">SSL Info</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Field</th><th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in domain_info.ssl_info.items() %}
+                    <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+          {% endif %}
+          {% if ipinfo or ip2location %}
+            <div class="mb-4">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Resolved IP Enrichment</h5>
+              {% if ipinfo %}
+                <span class="font-semibold text-gray-400">IPInfo:</span>
+                <table class="data-table mb-2 w-full text-sm">
+                  <tr><th>Location</th><td>{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+                  <tr><th>Org</th><td>{{ ipinfo.ipinfo.org }}</td></tr>
+                  <tr><th>ASN</th><td>{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+                  <tr><th>Hostname</th><td>{{ ipinfo.ipinfo.hostname }}</td></tr>
+                </table>
+                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                  <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+              {% if ip2location %}
+                <span class="font-semibold text-gray-400">IP2Location:</span>
+                <table class="data-table mb-2 w-full text-sm">
+                  {% for k, v in ip2location.items() %}
+                    <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+                  {% endfor %}
+                </table>
+                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                  <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ip2location | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endif %}
+        {% if indicator_type == 'url' %}
+          <h4 class="text-lg font-semibold text-blue-400 mb-2">URL Analysis</h4>
+          <table class="mb-4 w-full text-sm">
+            <tr><th>URL</th><td class="font-mono">{{ indicator }}</td></tr>
+            {% if url_analysis %}
+              <tr><th>Title</th><td>{{ url_analysis.url_analysis.title }}</td></tr>
+            {% else %}
+              <tr><td colspan="2"><span class="text-yellow-400">No URL analysis found.</span></td></tr>
+            {% endif %}
+          </table>
+          {% if url_analysis %}
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Technologies</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Technology</th><th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in url_analysis.url_analysis.technologies.items() %}
+                    <tr><td>{{ k }}</td><td>{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.technologies | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Security Headers</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Header</th><th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in url_analysis.url_analysis.security_headers.items() %}
+                    <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.security_headers | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Meta Tags</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Name</th><th>Content</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tag in url_analysis.url_analysis.meta_tags %}
+                    <tr><td>{{ tag.name }}</td><td>{{ tag.content }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.meta_tags | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+            <div class="mb-4 overflow-x-auto" style="max-height: 350px;">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Redirect Chain</h5>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Status Code</th><th>URL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in url_analysis.url_analysis.response.redirect_chain %}
+                    <tr><td>{{ r.status_code }}</td><td>{{ r.url }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.response.redirect_chain | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+            <div class="mb-4">
+              <h5 class="text-md font-semibold text-blue-400 mb-2">Intezer Analysis</h5>
+              <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.intezer_analysis | tojson(indent=2) }}</pre>
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+  <div class="flex justify-center mt-12">
+    <a href="/" class="btn btn-primary px-6 py-3 text-lg rounded-lg shadow">Back to Home</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Simple tab switching logic
+const tabs = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.tab-panel');
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    panels.forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const tabName = tab.getAttribute('data-tab');
+    document.querySelector(`.tab-panel[data-tab="${tabName}"]`).classList.add('active');
+  });
+});
+</script>
+{% endblock %}
+
+{% block main_content_class %}full-width{% endblock %} 

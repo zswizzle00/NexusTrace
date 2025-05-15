@@ -3,354 +3,305 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexusTrace</title>
+    <title>{% block title %}NexusTrace{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-      .custom-btn {
-        background: #374151;
-        color: #e5e7eb;
-        border-radius: 0.5rem;
-        font-weight: 600;
-        font-size: 0.95rem;
-        padding: 0.5rem 1.25rem;
-        transition: all 0.2s ease-in-out;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        border: none;
-        outline: none;
-        cursor: pointer;
-      }
-      .custom-btn:hover, .custom-btn:focus {
-        background: #2563eb;
-        color: #fff;
-        transform: translateY(-1px);
-      }
-      .custom-btn.active {
-        background: #2563eb;
-        color: #fff;
-        box-shadow: 0 2px 8px 0 rgba(37,99,235,0.15);
-      }
+        :root {
+            /* Base Colors */
+            --color-primary: #3B82F6;
+            --color-primary-dark: #2563EB;
+            --color-secondary: #60A5FA;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --color-info: #3B82F6;
+            
+            /* Background Colors */
+            --bg-primary: #111827;
+            --bg-secondary: #1F2937;
+            --bg-tertiary: #374151;
+            --bg-card: #232946;
+            
+            /* Text Colors */
+            --text-primary: #F3F4F6;
+            --text-secondary: #9CA3AF;
+            --text-muted: #6B7280;
+            
+            /* Border Colors */
+            --border-primary: #374151;
+            --border-secondary: #4B5563;
+            
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            
+            /* Border Radius */
+            --radius-sm: 0.25rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 1rem;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-      /* Modern Header Styles */
-      .main-header {
-        background: rgba(17, 24, 39, 0.95);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid rgba(75, 85, 99, 0.2);
-        padding: 0.75rem 2rem;
-        position: sticky;
-        top: 0;
-        z-index: 50;
-        transition: all 0.3s ease;
-      }
+        /* Base Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
 
-      .header-left {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
+        /* Layout Components */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-      .logo {
-        font-size: 1.25rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -0.025em;
-      }
+        .main-header {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-primary);
+            padding: var(--spacing-md) var(--spacing-xl);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
 
-      .header-nav {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-      }
+        .main-content {
+            flex: 1;
+            padding: var(--spacing-xl);
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
 
-      .header-nav a {
-        color: #9CA3AF;
-        font-weight: 500;
-        font-size: 0.95rem;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.375rem;
-        transition: all 0.2s ease;
-        position: relative;
-      }
+        /* Card Components */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: var(--transition-normal);
+        }
 
-      .header-nav a:hover {
-        color: #E5E7EB;
-        background: rgba(75, 85, 99, 0.1);
-      }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--color-primary);
+        }
 
-      .header-nav a.active {
-        color: #60A5FA;
-        background: rgba(96, 165, 250, 0.1);
-      }
+        /* Form Components */
+        .input-group {
+            display: flex;
+            gap: var(--spacing-sm);
+            width: 100%;
+        }
 
-      .header-nav a.active::after {
-        content: '';
-        position: absolute;
-        bottom: -2px;
-        left: 0;
-        width: 100%;
-        height: 2px;
-        background: #60A5FA;
-        border-radius: 2px;
-      }
+        .input-field {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            color: var(--text-primary);
+            transition: var(--transition-fast);
+        }
 
-      .dropdown {
-        position: relative;
-        display: inline-block;
-      }
+        .input-field:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            outline: none;
+        }
 
-      .dropbtn {
-        background: transparent;
-        color: #9CA3AF;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.375rem;
-        font-weight: 500;
-        font-size: 0.95rem;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-      }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition-fast);
+            cursor: pointer;
+        }
 
-      .dropbtn:hover {
-        color: #E5E7EB;
-        background: rgba(75, 85, 99, 0.1);
-      }
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
 
-      .dropdown-content {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: calc(100% + 0.5rem);
-        background: rgba(17, 24, 39, 0.98);
-        backdrop-filter: blur(12px);
-        min-width: 200px;
-        border-radius: 0.75rem;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(75, 85, 99, 0.2);
-        z-index: 1000;
-        overflow: hidden;
-        transform-origin: top right;
-        transform: scale(0.95);
-        opacity: 0;
-        transition: all 0.2s ease;
-      }
+        .btn-primary:hover {
+            background: var(--color-primary-dark);
+        }
 
-      .dropdown-content.show {
-        display: block;
-        transform: scale(1);
-        opacity: 1;
-      }
+        /* Navigation */
+        .nav-link {
+            color: var(--text-secondary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            transition: var(--transition-fast);
+        }
 
-      .dropdown-content a {
-        color: #9CA3AF;
-        padding: 0.75rem 1rem;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-        border-left: 2px solid transparent;
-      }
+        .nav-link:hover {
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
 
-      .dropdown-content a:hover {
-        background: rgba(75, 85, 99, 0.1);
-        color: #E5E7EB;
-        border-left: 2px solid #60A5FA;
-      }
+        .nav-link.active {
+            color: var(--color-primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
 
-      .dropdown-content a svg {
-        width: 1.25rem;
-        height: 1.25rem;
-        opacity: 0.7;
-      }
+        /* Data Display */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+        }
 
-      .dropdown-content a:hover svg {
-        opacity: 1;
-      }
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
 
-      /* Add icons to dropdown items */
-      .dropdown-content a[href*="virustotal"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        .data-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
 
-      .dropdown-content a[href*="abuseipdb"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        .data-value {
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
 
-      .dropdown-content a[href*="shodan"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        /* Status Indicators */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
 
-      .dropdown-content a[href*="ipinfo"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-success);
+        }
 
-      .dropdown-content a[href*="vpnapi"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        .status-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--color-warning);
+        }
 
-      .dropdown-content a[href*="ip2whois"]::before {
-        content: '';
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360A5FA"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>');
-        background-size: contain;
-        background-repeat: no-repeat;
-      }
+        .status-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--color-danger);
+        }
 
-      .header-right {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-header {
+                padding: var(--spacing-sm) var(--spacing-lg);
+            }
+
+            .main-content {
+                padding: var(--spacing-lg);
+            }
+
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn var(--transition-normal);
+        }
+
+        .slide-in {
+            animation: slideIn var(--transition-normal);
+        }
     </style>
 </head>
-<body class="text-gray-100" style="background: linear-gradient(to bottom, #111827 0%, #232b39 100%); min-height: 100vh;">
-    <div class="flex flex-col min-h-screen">
-        <!-- Unified Header/Toolbar (always visible) -->
+<body>
+    <div class="app-container">
         {% if request.endpoint != 'index' %}
         <header class="main-header">
-            <div class="header-left">
-                <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
-                    </svg>
-                    <span class="logo">NexusTrace</span>
-                </a>
-            </div>
-            <nav class="header-nav">
-                <a href="{{ url_for('home.ip_section') }}" class="{% if request.endpoint == 'home.ip_section' %}active{% endif %}">IP Analysis</a>
-                <a href="{{ url_for('home.domain_section') }}" class="{% if request.endpoint == 'home.domain_section' %}active{% endif %}">Domain Analysis</a>
-                <a href="{{ url_for('home.url_section') }}" class="{% if request.endpoint == 'home.url_section' %}active{% endif %}">URL Analysis</a>
-                <div class="dropdown">
-                    <button class="dropbtn" onclick="toggleDropdown(this)">More ▼</button>
-                    <div class="dropdown-content">
-                        <a href="https://www.virustotal.com/gui/ip/" target="_blank" rel="noopener">VirusTotal</a>
-                        <a href="https://www.abuseipdb.com/check/" target="_blank" rel="noopener">AbuseIPDB</a>
-                        <a href="https://www.shodan.io/" target="_blank" rel="noopener">Shodan</a>
-                        <a href="https://ipinfo.io/" target="_blank" rel="noopener">IPinfo</a>
-                        <a href="https://vpnapi.io/" target="_blank" rel="noopener">VPNAPI.io</a>
-                        <a href="https://www.ip2whois.com/" target="_blank" rel="noopener">IP2WHOIS</a>
-                    </div>
+            <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-4">
+                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                        <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
+                        </svg>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
+                    </a>
                 </div>
-            </nav>
-            <div class="header-right">
-                <div class="dropdown">
-                    <button class="dropbtn" onclick="toggleDropdown(this)">Export ▼</button>
-                    <div class="dropdown-content">
-                        <a href="#" onclick="handleExportPDF()">Export PDF</a>
-                    </div>
+                <nav class="hidden md:flex items-center gap-4">
+                    <a href="/ip" class="nav-link {% if request.endpoint == 'ip' %}active{% endif %}">IP Analysis</a>
+                    <a href="/domain" class="nav-link {% if request.endpoint == 'domain' %}active{% endif %}">Domain Analysis</a>
+                    <a href="/url" class="nav-link {% if request.endpoint == 'url' %}active{% endif %}">URL Analysis</a>
+                </nav>
+                <div class="flex items-center gap-4">
+                    <button class="btn btn-primary" onclick="toggleTheme()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
                 </div>
             </div>
         </header>
         {% endif %}
-        <main class="flex-1">
+        
+        <main class="main-content {% block main_content_class %}{% endblock %}">
             {% block content %}{% endblock %}
         </main>
-        <footer class="w-full text-center py-6 text-gray-500 text-sm mt-8 border-t border-gray-800 bg-gray-900">
-            <div class="flex flex-col items-center space-y-2">
-                <div>
-                    <span class="font-mono text-blue-400">zswizzle00</span> &mdash; <span>NexusTrace: Open Source Enrichment/Analysis Tool for Security Analysts</span>
-                </div>
-                <div>
-                    <a href="https://github.com/zswizzle00/osint-opensource" target="_blank" rel="noopener" class="inline-flex items-center space-x-1 text-blue-400 hover:underline">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.263.82-.582 0-.288-.01-1.05-.015-2.06-3.338.726-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.606-2.665-.304-5.466-1.332-5.466-5.93 0-1.31.468-2.38 1.236-3.22-.124-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 013.003-.404c1.02.005 2.047.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.77.84 1.235 1.91 1.235 3.22 0 4.61-2.803 5.624-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.216.699.825.58C20.565 21.796 24 17.297 24 12c0-6.63-5.37-12-12-12z"/>
-                        </svg>
-                        <span>View on GitHub</span>
-                    </a>
-                </div>
-            </div>
-        </footer>
     </div>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
     <script>
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(event) {
-            const dropdowns = document.getElementsByClassName('dropdown-content');
-            const buttons = document.getElementsByClassName('dropbtn');
-            
-            for (let i = 0; i < dropdowns.length; i++) {
-                const dropdown = dropdowns[i];
-                const button = buttons[i];
-                
-                if (!dropdown.contains(event.target) && !button.contains(event.target)) {
-                    dropdown.classList.remove('show');
-                }
-            }
-        });
-
-        // Toggle dropdown
-        function toggleDropdown(button) {
-            const dropdown = button.nextElementSibling;
-            const isOpen = dropdown.classList.contains('show');
-            
-            // Close all other dropdowns
-            const allDropdowns = document.getElementsByClassName('dropdown-content');
-            for (let i = 0; i < allDropdowns.length; i++) {
-                allDropdowns[i].classList.remove('show');
-            }
-            
-            // Toggle current dropdown
-            if (!isOpen) {
-                dropdown.classList.add('show');
-            }
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
         }
-
-        // Close dropdown when clicking a link inside
-        document.querySelectorAll('.dropdown-content a').forEach(function(link) {
-            link.addEventListener('click', function() {
-                // Find the parent dropdown-content and close it
-                let dropdown = link.closest('.dropdown-content');
-                if (dropdown) {
-                    dropdown.classList.remove('show');
-                }
-            });
-        });
     </script>
-    {% block scripts %}{% endblock %}
 </body>
 </html> 

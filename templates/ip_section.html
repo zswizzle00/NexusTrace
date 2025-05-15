@@ -87,4 +87,189 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Function to create info cards with robust recursive rendering, circular reference handling, and JSON fallback
+    function createInfoCard(title, data) {
+        console.log(`Rendering card: ${title}`, data);
+        function renderValue(value, depth = 0, seen = new Set()) {
+            if (depth > 5) return '<span class="text-gray-400">[Max depth reached]</span>';
+            if (value === null || value === undefined) return '<span class="text-gray-400">N/A</span>';
+            if (typeof value === 'string') {
+                // Try to parse JSON strings
+                try {
+                    const parsed = JSON.parse(value);
+                    if (typeof parsed === 'object') return renderValue(parsed, depth + 1, seen);
+                } catch (e) {}
+                return value;
+            }
+            if (typeof value === 'object') {
+                if (seen.has(value)) return '<span class="text-gray-400">[Circular]</span>';
+                seen.add(value);
+                if (Array.isArray(value)) {
+                    if (value.length === 0) return '<span class="text-gray-400">None</span>';
+                    // If array of objects, render as table
+                    if (value.every(v => typeof v === 'object' && !Array.isArray(v))) {
+                        const headers = Array.from(new Set(value.flatMap(obj => Object.keys(obj))));
+                        return `
+                            <table class="w-full text-sm text-left text-gray-300">
+                                <thead><tr>${headers.map(h => `<th class="font-semibold pr-2">${h}</th>`).join('')}</tr></thead>
+                                <tbody>
+                                    ${value.map(obj => `<tr>${headers.map(h => `<td>${renderValue(obj[h], depth + 1, seen)}</td>`).join('')}</tr>`).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    // Otherwise, render as list
+                    return '<ul class="pl-4 list-disc">' + value.map(v => `<li>${renderValue(v, depth + 1, seen)}</li>`).join('') + '</ul>';
+                } else {
+                    const entries = Object.entries(value).filter(([k, v]) => v !== undefined);
+                    if (entries.length === 0) return '<span class="text-gray-400">None</span>';
+                    // If any value is an object or array, render as nested table
+                    if (entries.some(([k, v]) => typeof v === 'object')) {
+                        return '<table class="w-full text-sm text-left text-gray-300">' +
+                            entries.map(([k, v]) =>
+                                `<tr><td class="font-semibold pr-2 align-top">${k}</td><td>${renderValue(v, depth + 1, seen)}</td></tr>`
+                            ).join('') +
+                            '</table>';
+                    }
+                    // Otherwise, render as a simple table
+                    return '<table class="w-full text-sm text-left text-gray-300">' +
+                        entries.map(([k, v]) =>
+                            `<tr><td class="font-semibold pr-2 align-top">${k}</td><td>${v}</td></tr>`
+                        ).join('') +
+                        '</table>';
+                }
+            }
+            // Fallback: if value is still an object, show as JSON
+            try {
+                return `<pre class="text-xs text-gray-400">${JSON.stringify(value, null, 2)}</pre>`;
+            } catch (e) {
+                return '<span class="text-gray-400">[Unrenderable Object]</span>';
+            }
+        }
+        let rendered;
+        try {
+            rendered = renderValue(data);
+        } catch (e) {
+            rendered = `<pre class='text-xs text-red-400'>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+        return `
+            <div class="bg-gray-800 rounded-xl p-6 shadow border border-gray-700">
+                <h4 class="text-lg font-bold mb-2 text-blue-300">${title}</h4>
+                <div>${rendered}</div>
+            </div>
+        `;
+    }
+
+    // Function to analyze IP
+    function analyzeIP(ip) {
+        const loading = document.getElementById('ip-loading');
+        const results = document.getElementById('ip-results');
+        
+        // Clear previous results
+        const vpnResults = document.getElementById('vpn-results');
+        const geoNetworkResults = document.getElementById('geo-network-results');
+        const abuseipdbResults = document.getElementById('abuseipdb-results');
+        const alienvaultResults = document.getElementById('alienvault-results');
+        const shodanResults = document.getElementById('shodan-results');
+        
+        if (vpnResults) vpnResults.innerHTML = '';
+        if (geoNetworkResults) geoNetworkResults.innerHTML = '';
+        if (abuseipdbResults) abuseipdbResults.innerHTML = '';
+        if (alienvaultResults) alienvaultResults.innerHTML = '';
+        if (shodanResults) shodanResults.innerHTML = '';
+        
+        if (loading) loading.classList.remove('hidden');
+        showProgressBar('Analyzing IP address...');
+        
+        fetch('/api/ip/check_ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (loading) loading.classList.add('hidden');
+            hideProgressBar();
+            
+            // Show results container
+            if (results) results.classList.remove('hidden');
+            
+            // Update results sections
+            if (vpnResults) {
+                if (data.security) {
+                    vpnResults.innerHTML += createInfoCard('VPNAPI.io VPN Checker', data.security);
+                }
+                if (data.ipinfo && data.ipinfo.privacy) {
+                    vpnResults.innerHTML += createInfoCard('IPInfo.io Privacy Information', data.ipinfo.privacy);
+                }
+                if (data.proxycheck) {
+                    vpnResults.innerHTML += createInfoCard('ProxyCheck', filterProxyCheckFields(data.proxycheck));
+                }
+            }
+            
+            if (geoNetworkResults) {
+                if (data.location) {
+                    geoNetworkResults.innerHTML += createInfoCard('VPNAPI Location Data', data.location);
+                }
+                if (data.network) {
+                    geoNetworkResults.innerHTML += createInfoCard('VPNAPI Network Data', data.network);
+                }
+                if (data.ipinfo) {
+                    geoNetworkResults.innerHTML += createInfoCard('IPinfo Data', data.ipinfo);
+                }
+                if (data.alienvault && data.alienvault.geo) {
+                    geoNetworkResults.innerHTML += createInfoCard('AlienVault: Geo', data.alienvault.geo);
+                }
+            }
+            
+            if (abuseipdbResults && data.abuse) {
+                abuseipdbResults.innerHTML += createInfoCard('AbuseIPDB', data.abuse);
+            }
+            
+            if (alienvaultResults && data.alienvault) {
+                alienvaultResults.innerHTML += createInfoCard('AlienVault', data.alienvault);
+            }
+            
+            if (shodanResults && data.shodan) {
+                shodanResults.innerHTML += createInfoCard('Shodan', data.shodan);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (loading) loading.classList.add('hidden');
+            hideProgressBar();
+            showToast('Error analyzing IP address', 'error');
+        });
+    }
+
+    // Check for query parameter on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('query');
+        
+        if (query) {
+            // Set the input value
+            const ipInput = document.getElementById('ip-input');
+            if (ipInput) {
+                ipInput.value = query;
+            }
+            // Trigger analysis
+            analyzeIP(query);
+        }
+    });
+
+    // Form submission handler
+    const ipForm = document.getElementById('ip-form');
+    if (ipForm) {
+        ipForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const ip = document.getElementById('ip-input').value.trim();
+            if (ip) {
+                analyzeIP(ip);
+            }
+        });
+    }
+</script>
 {% endblock %} 

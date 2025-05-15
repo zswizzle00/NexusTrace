@@ -12,6 +12,7 @@ import ipinfo
 import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
+import json
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -119,9 +120,13 @@ def get_ipinfo_data(ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_shodan_info(ip_address):
-    """Get IP information from Shodan."""
+    """Get IP information from Shodan, flattening nested data for frontend rendering."""
     try:
         host = shodan_api.host(ip_address)
+        def flatten_dict(d):
+            # Only keep primitives, serialize nested objects
+            return {k: (json.dumps(v, indent=2) if isinstance(v, (dict, list)) else v) for k, v in d.items()}
+
         shodan_data = {
             'ip': host.get('ip_str'),
             'organization': host.get('org', 'N/A'),
@@ -130,7 +135,7 @@ def get_shodan_info(ip_address):
             'vulnerabilities': [],
             'services': [],
             'hostnames': host.get('hostnames', []),
-            'domains': host.get('domains', []),
+            'domains': [str(domain) for domain in host.get('domains', [])],
             'last_update': host.get('last_update'),
             'isp': host.get('isp'),
             'city': host.get('city'),
@@ -142,43 +147,47 @@ def get_shodan_info(ip_address):
             'longitude': host.get('longitude'),
             'latitude': host.get('latitude'),
             'tags': host.get('tags', []),
-            'data': host.get('data', []),
+            'data': [],
         }
-        
+
         # Process ports and services
         for item in host.get('data', []):
-            port_info = {
+            port_info = flatten_dict({
                 'port': item.get('port'),
                 'service': item.get('_shodan', {}).get('module', 'N/A'),
                 'banner': item.get('data', 'N/A'),
                 'product': item.get('product', 'N/A'),
                 'version': item.get('version', 'N/A'),
-                'cpe': item.get('cpe', []),
-                'ssl': item.get('ssl'),
-                'http': item.get('http'),
-            }
+                'cpe': ', '.join(item.get('cpe', [])) if isinstance(item.get('cpe', []), list) else item.get('cpe', ''),
+                'ssl': json.dumps(item.get('ssl')) if item.get('ssl') else None,
+                'http': json.dumps(item.get('http')) if item.get('http') else None,
+            })
             shodan_data['ports'].append(port_info)
-            
+
             if port_info['service'] != 'N/A':
-                service_info = {
+                service_info = flatten_dict({
                     'service': port_info['service'],
                     'port': port_info['port'],
                     'product': port_info['product'],
                     'version': port_info['version'],
                     'ssl': port_info['ssl'],
                     'http': port_info['http'],
-                }
+                })
                 shodan_data['services'].append(service_info)
-        
+
+            # Add to data array (flattened)
+            shodan_data['data'].append(flatten_dict(item))
+
         # Process vulnerabilities
         if 'vulns' in host:
             for vuln in host['vulns']:
-                shodan_data['vulnerabilities'].append({
+                vuln_info = host['vulns'][vuln]
+                shodan_data['vulnerabilities'].append(flatten_dict({
                     'id': vuln,
-                    'summary': host['vulns'][vuln].get('summary', 'N/A'),
-                    'cvss': host['vulns'][vuln].get('cvss', 'N/A')
-                })
-        
+                    'summary': vuln_info.get('summary', 'N/A'),
+                    'cvss': vuln_info.get('cvss', 'N/A')
+                }))
+
         return shodan_data
     except shodan.APIError as e:
         logger.error(f"Shodan API error: {str(e)}")
@@ -360,3 +369,7 @@ def process_single_ip(ip):
     except Exception as e:
         logger.error(f"Error processing IP {ip}: {str(e)}")
         return None 
+
+def get_ip2location_data(ip_address):
+    # TODO: Implement actual IP2Location lookup
+    return None 
