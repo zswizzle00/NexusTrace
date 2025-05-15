@@ -262,9 +262,9 @@
                 </a>
             </div>
             <nav class="header-nav">
-                <a href="{{ url_for('ip_section') }}" class="{% if request.endpoint == 'ip_section' %}active{% endif %}">IP Analysis</a>
-                <a href="{{ url_for('domain_section') }}" class="{% if request.endpoint == 'domain_section' %}active{% endif %}">Domain Analysis</a>
-                <a href="{{ url_for('url_section') }}" class="{% if request.endpoint == 'url_section' %}active{% endif %}">URL Analysis</a>
+                <a href="{{ url_for('home.ip_section') }}" class="{% if request.endpoint == 'home.ip_section' %}active{% endif %}">IP Analysis</a>
+                <a href="{{ url_for('home.domain_section') }}" class="{% if request.endpoint == 'home.domain_section' %}active{% endif %}">Domain Analysis</a>
+                <a href="{{ url_for('home.url_section') }}" class="{% if request.endpoint == 'home.url_section' %}active{% endif %}">URL Analysis</a>
                 <div class="dropdown">
                     <button class="dropbtn" onclick="toggleDropdown(this)">More ▼</button>
                     <div class="dropdown-content">

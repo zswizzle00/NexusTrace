@@ -654,7 +654,7 @@ window.addEventListener('DOMContentLoaded', () => {
             if (shodanResults) shodanResults.innerHTML = '';
             if (loading) loading.classList.remove('hidden');
             showProgressBar('Analyzing IP address...');
-            fetch('/check_ip', {
+            fetch('/api/ip/check_ip', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ip })
@@ -753,7 +753,7 @@ window.addEventListener('DOMContentLoaded', () => {
             if (results) results.innerHTML = '';
             if (loading) loading.classList.remove('hidden');
             showProgressBar('Analyzing domain...');
-            fetch('/check_domain', {
+            fetch('/api/domain/check_domain', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain })
@@ -799,7 +799,7 @@ window.addEventListener('DOMContentLoaded', () => {
             if (results) results.innerHTML = '';
             if (loading) loading.classList.remove('hidden');
             showProgressBar('Analyzing URL...');
-            fetch('/analyze_url', {
+            fetch('/api/url/analyze_url', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })

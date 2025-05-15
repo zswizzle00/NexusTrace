@@ -47,10 +47,12 @@ body {
     box-shadow: 0 4px 24px 0 #00000022;
     transition: all 0.2s;
     height: 100%;
-    padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
+    overflow: hidden;
+    word-wrap: break-word;
 }
 
 .info-card:hover {
@@ -68,6 +70,8 @@ body {
 .info-value {
     font-weight: 500;
     transition: color 0.2s;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .section-title {
@@ -95,10 +99,11 @@ body {
 
 .content-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 2rem;
     width: 100%;
+    padding: 0 1rem;
 }
 
 .info-card {
@@ -393,6 +398,7 @@ body {
     padding: 2.2rem 1.8rem;
     margin-bottom: 0;
     transition: box-shadow 0.2s, border-color 0.2s;
+    overflow: hidden;
 }
 
 .info-card:hover, .whois-card:hover, .shodan-card:hover {
@@ -401,65 +407,60 @@ body {
 }
 
 .data-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    margin-top: 0;
-    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.6rem 2rem;
+    margin-top: 1.2rem;
 }
 
 .data-row {
     display: flex;
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
-    margin-bottom: 0;
-    padding: 0;
     width: 100%;
-    border-bottom: none;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+    min-width: 0;
+    max-width: 100%;
 }
 
-.data-label, .data-value {
-    text-align: left !important;
-    font-size: 0.78rem;
-    margin: 0;
-    padding: 0;
+.data-label,
+.data-value {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-all;
 }
 
 .data-label {
     color: #8ca0c7;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    flex: 0 0 90px;
-    width: 90px;
-    padding-right: 0.15rem;
+    font-weight: 700;
+    width: 130px;
+    text-align: left;
+    padding-right: 1rem;
+    font-size: 1rem;
 }
 
 .data-value {
-    color: #f3f4f6;
+    color: #e5e7ef;
     font-weight: 500;
-    border-radius: 0.2rem;
-    display: inline-block;
-    background: none !important;
-    word-break: break-word;
-    flex: 1 1 0;
+    text-align: left;
+    font-size: 1rem;
+    padding-left: 0.2rem;
 }
 
-.value-green {
-    color: #10b981 !important;
-    background: none !important;
-}
-.value-red {
-    color: #ef4444 !important;
-    background: none !important;
-}
-.value-blue {
-    color: #60a5fa !important;
-    background: none !important;
-}
-.value-yellow {
-    color: #f59e0b !important;
-    background: none !important;
+.value-green, .value-red, .value-blue, .value-yellow {
+    display: inline-block;
+    padding: 0.15em 0.7em;
+    border-radius: 1em;
+    font-size: 0.98em;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-right: 0.2em;
+    margin-bottom: 0.1em;
+    white-space: pre-line;
+    word-break: break-word;
 }
 
 .progress-bar-animated {
@@ -698,15 +699,70 @@ ul, ol {
 
 @media (max-width: 700px) {
     .section-header {
-        font-size: 1.1rem;
-        margin-top: 1.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
     }
+    
     .info-card {
-        padding: 1rem;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
     }
+    
     .data-grid {
         grid-template-columns: 1fr;
         gap: 0.75rem;
+    }
+    
+    .content-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        padding: 0 0.5rem;
+    }
+    
+    .whois-card, .shodan-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .whois-grid, .shodan-grid {
+        grid-template-columns: 1fr;
+    }
+    .data-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
+        margin-bottom: 0.5rem;
+    }
+    .data-label {
+        padding-right: 0;
+        font-size: 0.95rem;
+    }
+    .data-value {
+        font-size: 0.95rem;
+        padding-left: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .info-card {
+        padding: 0.5rem;
+    }
+    
+    .info-label {
+        font-size: 0.8rem;
+    }
+    
+    .info-value {
+        font-size: 0.9rem;
+    }
+    
+    .section-title {
+        font-size: 1.1rem;
+    }
+    
+    .whois-section-title, .shodan-section-title {
+        font-size: 1rem;
     }
 }
 
@@ -735,13 +791,54 @@ ul, ol {
 /* Table/grid for key-value pairs */
 .data-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     gap: 0.6rem 2rem;
     margin-top: 1.2rem;
 }
 .data-row {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.data-label {
+    color: #8ca0c7;
+    font-weight: 700;
+    width: 130px;
+    min-width: 0;
+    max-width: 180px;
+    text-align: left;
+    padding-right: 1rem;
+    font-size: 1rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+.data-value {
+    color: #e5e7ef;
+    font-weight: 500;
+    text-align: left;
+    word-break: break-all;
+    font-size: 1rem;
+    padding-left: 0.2rem;
+    overflow-wrap: break-word;
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+}
+.value-green, .value-red, .value-blue, .value-yellow {
+    display: inline-block;
+    padding: 0.15em 0.7em;
+    border-radius: 1em;
+    font-size: 0.98em;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-right: 0.2em;
+    margin-bottom: 0.1em;
+    white-space: pre-line;
+    word-break: break-word;
 }
 
 @media (max-width: 900px) {
@@ -768,24 +865,6 @@ ul, ol {
     padding: 0.28rem 0.5rem 0.28rem 0;
     vertical-align: middle;
     border: none;
-}
-.data-label {
-    color: #8ca0c7;
-    font-weight: 700;
-    width: 130px;
-    min-width: 100px;
-    max-width: 180px;
-    text-align: left;
-    padding-right: 1rem;
-    font-size: 1rem;
-}
-.data-value {
-    color: #e5e7ef;
-    font-weight: 500;
-    text-align: left;
-    word-break: break-word;
-    font-size: 1rem;
-    padding-left: 0.2rem;
 }
 .info-card {
     padding: 1.2rem 1.5rem 1.2rem 1.5rem;
@@ -924,4 +1003,15 @@ ul, ol {
     flex-direction: column;
     gap: 0;
   }
+}
+
+.alienvault-geo-table, .alienvault-geo-table td, .alienvault-geo-table th {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  min-width: 0;
+  max-width: 1px;
+}
+.alienvault-geo-table td span, .alienvault-geo-table td {
+  display: block;
+  white-space: normal !important;
 } 
