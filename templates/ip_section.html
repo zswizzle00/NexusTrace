@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="w-full px-4 py-10">
+    <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-4 text-center mx-auto">IP Analysis</h2>
+    <p class="text-gray-300 mb-10 text-lg text-center">Analyze IP addresses for security, geolocation, and threat intelligence.</p>
+    <div id="ip-section" class="w-full">
+        <form id="ip-form" class="mb-8 w-full bg-gray-800/80 rounded-2xl border border-gray-700 p-8 shadow-xl">
+            <label for="ip-input" class="block text-lg font-semibold text-white mb-2">Enter IP Address for Analysis</label>
+            <div class="flex flex-col md:flex-row gap-4 mb-4 w-full">
+                <input type="text" id="ip-input" name="ip" placeholder="e.g., 8.8.8.8 (IPv4 or IPv6)" required class="flex-1 rounded-lg px-4 py-3 bg-gray-900 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button type="submit" class="px-6 py-3 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-500 transition-colors duration-200">Analyze IP</button>
+            </div>
+            <div class="mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Or Upload IP List</label>
+                <div class="flex flex-col md:flex-row gap-4 items-center w-full">
+                    <input type="file" id="file-input" class="hidden" accept=".csv,.xlsx,.txt" onchange="handleFileUpload(this)">
+                    <label for="file-input" class="file-label cursor-pointer px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Choose File</label>
+                    <span id="file-name" class="ml-2 text-gray-400">No file chosen</span>
+                    <button onclick="processFile()" id="process-file-btn" disabled class="px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-500 ml-4 disabled:opacity-50 disabled:cursor-not-allowed">Process File</button>
+                </div>
+                <p class="mt-2 text-sm text-gray-400">Supported formats: CSV, XLSX, TXT (one IP per line)</p>
+            </div>
+        </form>
+        <!-- Loading Indicator -->
+        <div id="ip-loading" class="loading hidden">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Analyzing IP address...</p>
+        </div>
+        <!-- Progress Bar -->
+        <div id="progress-bar" class="w-full hidden">
+            <span class="progress-label" id="progress-label"></span>
+            <div class="progress-bar-inner" style="width: 0%">
+                <div class="progress-bar-stripes"></div>
+            </div>
+        </div>
+        <div id="ip-results" class="space-y-12 mt-10 hidden">
+            <!-- VPN & Security Row -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-blue-600 text-white rounded-full p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">VPN & Security</h3>
+                </div>
+                <div id="vpn-results" class="grid w-full gap-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+            </section>
+            <!-- Geo/Network Information Row -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-green-600 text-white rounded-full p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.657-1.343-3-3-3s-3 1.343-3 3 1.343 3 3 3 3-1.343 3-3zm0 0c0 1.657 1.343 3 3 3s3-1.343 3-3-1.343-3-3-3-3 1.343-3 3zm0 0v8"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">Geo & Network Information</h3>
+                </div>
+                <div id="geo-network-results" class="grid w-full gap-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+            </section>
+            <!-- AbuseIPDB Row -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-yellow-500 text-white rounded-full p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">AbuseIPDB</h3>
+                </div>
+                <div id="abuseipdb-results" class="grid w-full gap-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+            </section>
+            <!-- AlienVault Row -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-purple-600 text-white rounded-full p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">AlienVault</h3>
+                </div>
+                <div id="alienvault-results" class="grid w-full gap-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+            </section>
+            <!-- Shodan Row -->
+            <section>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-pink-600 text-white rounded-full p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">Shodan</h3>
+                </div>
+                <div id="shodan-results" class="grid w-full gap-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));"></div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %} 
