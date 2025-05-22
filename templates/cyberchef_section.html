@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block title %}CyberChef - NexusTrace{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-white">CyberChef</h2>
+        <div class="flex space-x-4">
+            <button onclick="toggleRecipeManager()" class="btn btn-secondary">
+                Manage Recipes
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Access Presets -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-semibold text-white">Quick Access Presets</h3>
+            <div class="flex space-x-2">
+                <button onclick="togglePresetCategory('encoding')" class="preset-category-btn active" data-category="encoding">Encoding</button>
+                <button onclick="togglePresetCategory('crypto')" class="preset-category-btn" data-category="crypto">Crypto</button>
+                <button onclick="togglePresetCategory('analysis')" class="preset-category-btn" data-category="analysis">Analysis</button>
+            </div>
+        </div>
+        
+        <!-- Encoding Presets -->
+        <div id="encoding-presets" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="loadPreset('base64')" class="preset-btn">
+                <span class="text-sm font-medium">Base64 Decode</span>
+            </button>
+            <button onclick="loadPreset('hex')" class="preset-btn">
+                <span class="text-sm font-medium">Hex Decode</span>
+            </button>
+            <button onclick="loadPreset('url')" class="preset-btn">
+                <span class="text-sm font-medium">URL Decode</span>
+            </button>
+            <button onclick="loadPreset('html')" class="preset-btn">
+                <span class="text-sm font-medium">HTML Decode</span>
+            </button>
+        </div>
+
+        <!-- Crypto Presets -->
+        <div id="crypto-presets" class="grid grid-cols-2 md:grid-cols-4 gap-4 hidden">
+            <button onclick="loadPreset('xor')" class="preset-btn">
+                <span class="text-sm font-medium">XOR Decrypt</span>
+            </button>
+            <button onclick="loadPreset('aes')" class="preset-btn">
+                <span class="text-sm font-medium">AES Decrypt</span>
+            </button>
+            <button onclick="loadPreset('md5')" class="preset-btn">
+                <span class="text-sm font-medium">MD5 Hash</span>
+            </button>
+            <button onclick="loadPreset('sha256')" class="preset-btn">
+                <span class="text-sm font-medium">SHA256 Hash</span>
+            </button>
+        </div>
+
+        <!-- Analysis Presets -->
+        <div id="analysis-presets" class="grid grid-cols-2 md:grid-cols-4 gap-4 hidden">
+            <button onclick="loadPreset('entropy')" class="preset-btn">
+                <span class="text-sm font-medium">Entropy Analysis</span>
+            </button>
+            <button onclick="loadPreset('frequency')" class="preset-btn">
+                <span class="text-sm font-medium">Frequency Analysis</span>
+            </button>
+            <button onclick="loadPreset('regex')" class="preset-btn">
+                <span class="text-sm font-medium">Regex Search</span>
+            </button>
+            <button onclick="loadPreset('extract')" class="preset-btn">
+                <span class="text-sm font-medium">Extract IPs</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Recipe Manager Modal -->
+    <div id="recipeManager" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 p-6 rounded-lg w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Recipe Manager</h3>
+                <button onclick="toggleRecipeManager()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Save Recipe Form -->
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold text-white mb-3">Save Current Recipe</h4>
+                <div class="space-y-4">
+                    <input type="text" id="recipeName" placeholder="Recipe Name" class="input-field">
+                    <textarea id="recipeDescription" placeholder="Recipe Description" class="input-field" rows="2"></textarea>
+                    <div class="flex space-x-2">
+                        <button onclick="saveCurrentRecipe()" class="btn btn-primary flex-1">Save Recipe</button>
+                        <button onclick="exportRecipe()" class="btn btn-secondary flex-1">Export Recipe</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saved Recipes List -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="text-lg font-semibold text-white">Saved Recipes</h4>
+                    <div class="flex space-x-2">
+                        <input type="text" id="recipeSearch" placeholder="Search recipes..." class="input-field text-sm" onkeyup="filterRecipes()">
+                    </div>
+                </div>
+                <div id="savedRecipes" class="space-y-2 max-h-60 overflow-y-auto">
+                    <!-- Recipes will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Direct CyberChef API Form -->
+    <div class="mb-8">
+        <h3 class="text-lg font-semibold text-white mb-2">Run CyberChef Operation (Direct API)</h3>
+        <form id="cyberchef-api-form" class="bg-gray-800 p-4 rounded-lg flex flex-col gap-4" onsubmit="runCyberchefApi(event)">
+            <div>
+                <label for="apiInput" class="block text-gray-300 mb-1">Input Data</label>
+                <textarea id="apiInput" class="input-field w-full" rows="2" required></textarea>
+            </div>
+            <div>
+                <label for="apiOperation" class="block text-gray-300 mb-1">Operation</label>
+                <select id="apiOperation" class="input-field w-full">
+                    <option value='[{"op": "From Base64", "args": ["A-Za-z0-9+/=", false]}]'>Base64 Decode</option>
+                    <option value='[{"op": "From Hex", "args": ["Space"]}]'>Hex Decode</option>
+                    <option value='[{"op": "URL Decode", "args": []}]'>URL Decode</option>
+                    <option value='[{"op": "HTML Decode", "args": []}]'>HTML Decode</option>
+                    <option value='[{"op": "XOR", "args": ["Standard", "Single byte", "0x00"]}]'>XOR Decrypt (0x00)</option>
+                    <option value='[{"op": "MD5", "args": []}]'>MD5 Hash</option>
+                    <option value='[{"op": "SHA-256", "args": []}]'>SHA256 Hash</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full">Run</button>
+        </form>
+        <div id="cyberchef-api-result" class="mt-4 text-white"></div>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg overflow-hidden" style="height: 800px;">
+        <iframe 
+            id="cyberchef-frame"
+            src="/cyberchef/" 
+            class="w-full h-full border-0"
+            title="CyberChef Interface"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+        ></iframe>
+    </div>
+</div>
+
+<style>
+    .preset-btn {
+        @apply bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors duration-200;
+        border: 1px solid var(--border-primary);
+    }
+    .preset-btn:hover {
+        border-color: var(--color-primary);
+    }
+    .btn-secondary {
+        @apply bg-gray-700 hover:bg-gray-600 text-white;
+    }
+    .preset-category-btn {
+        @apply px-3 py-1 rounded text-sm font-medium transition-colors duration-200;
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+    .preset-category-btn.active {
+        background: var(--color-primary);
+        color: white;
+    }
+</style>
+
+<script src="{{ url_for('static', filename='js/cyberchef.js') }}"></script>
+
+<script>
+    const presets = {
+        base64: {
+            recipe: [
+                {
+                    "op": "From Base64",
+                    "args": ["Standard", false]
+                }
+            ]
+        },
+        hex: {
+            recipe: [
+                {
+                    "op": "From Hex",
+                    "args": ["Space"]
+                }
+            ]
+        },
+        url: {
+            recipe: [
+                {
+                    "op": "URL Decode",
+                    "args": []
+                }
+            ]
+        },
+        html: {
+            recipe: [
+                {
+                    "op": "HTML Decode",
+                    "args": []
+                }
+            ]
+        },
+        xor: {
+            recipe: [
+                {
+                    "op": "XOR",
+                    "args": ["Standard", "Single byte", "0x00"]
+                }
+            ]
+        },
+        aes: {
+            recipe: [
+                {
+                    "op": "AES Decrypt",
+                    "args": ["ECB", "PKCS7", "Hex", "Hex"]
+                }
+            ]
+        },
+        md5: {
+            recipe: [
+                {
+                    "op": "MD5",
+                    "args": []
+                }
+            ]
+        },
+        sha256: {
+            recipe: [
+                {
+                    "op": "SHA-256",
+                    "args": []
+                }
+            ]
+        },
+        entropy: {
+            recipe: [
+                {
+                    "op": "Entropy",
+                    "args": []
+                }
+            ]
+        },
+        frequency: {
+            recipe: [
+                {
+                    "op": "Frequency Distribution",
+                    "args": []
+                }
+            ]
+        },
+        regex: {
+            recipe: [
+                {
+                    "op": "Regular expression",
+                    "args": ["User defined", "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b"]
+                }
+            ]
+        },
+        extract: {
+            recipe: [
+                {
+                    "op": "Extract IP addresses",
+                    "args": []
+                }
+            ]
+        }
+    };
+
+    function togglePresetCategory(category) {
+        // Hide all preset categories
+        document.querySelectorAll('[id$="-presets"]').forEach(el => el.classList.add('hidden'));
+        // Show selected category
+        document.getElementById(`${category}-presets`).classList.remove('hidden');
+        // Update active button
+        document.querySelectorAll('.preset-category-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.category === category);
+        });
+    }
+
+    function loadPreset(presetName) {
+        const frame = document.getElementById('cyberchef-frame');
+        frame.onload = function() {
+            frame.contentWindow.postMessage({
+                type: 'loadRecipe',
+                recipe: presets[presetName].recipe
+            }, '*');
+        };
+        frame.src = frame.src;
+    }
+
+    function toggleRecipeManager() {
+        const modal = document.getElementById('recipeManager');
+        modal.classList.toggle('hidden');
+        if (!modal.classList.contains('hidden')) {
+            loadSavedRecipes();
+        }
+    }
+
+    function filterRecipes() {
+        const searchTerm = document.getElementById('recipeSearch').value.toLowerCase();
+        const recipes = document.querySelectorAll('#savedRecipes > div');
+        
+        recipes.forEach(recipe => {
+            const name = recipe.querySelector('h5').textContent.toLowerCase();
+            const description = recipe.querySelector('p').textContent.toLowerCase();
+            const isVisible = name.includes(searchTerm) || description.includes(searchTerm);
+            recipe.style.display = isVisible ? 'flex' : 'none';
+        });
+    }
+
+    async function loadSavedRecipes() {
+        const response = await fetch('/api/cyberchef/recipes');
+        const recipes = await response.json();
+        const container = document.getElementById('savedRecipes');
+        
+        container.innerHTML = recipes.map(recipe => `
+            <div class="flex justify-between items-center bg-gray-700 p-3 rounded">
+                <div>
+                    <h5 class="text-white font-medium">${recipe.name}</h5>
+                    <p class="text-gray-400 text-sm">${recipe.description || ''}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="loadSavedRecipe('${recipe.filename}')" class="btn btn-primary text-sm">
+                        Load
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function saveCurrentRecipe() {
+        const name = document.getElementById('recipeName').value;
+        const description = document.getElementById('recipeDescription').value;
+        
+        if (!name) {
+            alert('Please enter a recipe name');
+            return;
+        }
+
+        const frame = document.getElementById('cyberchef-frame');
+        frame.contentWindow.postMessage({
+            type: 'getRecipe'
+        }, '*');
+
+        window.addEventListener('message', async function handler(event) {
+            if (event.data.type === 'recipe') {
+                const recipe = {
+                    name,
+                    description,
+                    recipe: event.data.recipe
+                };
+
+                const response = await fetch('/api/cyberchef/recipes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(recipe)
+                });
+
+                if (response.ok) {
+                    alert('Recipe saved successfully');
+                    loadSavedRecipes();
+                    document.getElementById('recipeName').value = '';
+                    document.getElementById('recipeDescription').value = '';
+                } else {
+                    alert('Failed to save recipe');
+                }
+
+                window.removeEventListener('message', handler);
+            }
+        });
+    }
+
+    async function loadSavedRecipe(filename) {
+        const response = await fetch(`/api/cyberchef/recipes/${filename}`);
+        const recipe = await response.json();
+        
+        const frame = document.getElementById('cyberchef-frame');
+        frame.onload = function() {
+            frame.contentWindow.postMessage({
+                type: 'loadRecipe',
+                recipe: recipe.recipe
+            }, '*');
+        };
+        frame.src = frame.src;
+        
+        toggleRecipeManager();
+    }
+
+    function exportRecipe() {
+        const frame = document.getElementById('cyberchef-frame');
+        frame.contentWindow.postMessage({
+            type: 'getRecipe'
+        }, '*');
+
+        window.addEventListener('message', function handler(event) {
+            if (event.data.type === 'recipe') {
+                const recipeStr = JSON.stringify(event.data.recipe, null, 2);
+                const blob = new Blob([recipeStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'cyberchef-recipe.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                window.removeEventListener('message', handler);
+            }
+        });
+    }
+
+    async function runCyberchefApi(event) {
+        event.preventDefault();
+        const input = document.getElementById('apiInput').value;
+        const recipe = JSON.parse(document.getElementById('apiOperation').value);
+        const resultDiv = document.getElementById('cyberchef-api-result');
+        resultDiv.textContent = 'Processing...';
+        
+        try {
+            const frame = document.getElementById('cyberchef-frame');
+            frame.onload = function() {
+                frame.contentWindow.postMessage({
+                    type: 'runRecipe',
+                    input: input,
+                    recipe: recipe
+                }, '*');
+            };
+            
+            // Listen for the result
+            window.addEventListener('message', function handler(event) {
+                if (event.data.type === 'recipeResult') {
+                    resultDiv.textContent = event.data.result;
+                    window.removeEventListener('message', handler);
+                }
+            });
+            
+            // Reload the frame to ensure it's ready
+            frame.src = frame.src;
+        } catch (err) {
+            resultDiv.textContent = 'Error: ' + err;
+        }
+    }
+</script>
+{% endblock %} 

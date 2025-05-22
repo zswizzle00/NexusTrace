@@ -2,6 +2,7 @@ from flask import Flask
 from app.routes import register_routes
 from app.services import setup_services
 from app.utils import setup_utils
+from app.services.cyberchef import setup_cyberchef
 
 # Configure Flask app
 app = Flask(__name__)
@@ -15,6 +16,9 @@ register_routes(app)
 
 # Setup services (API clients, cache, etc.)
 setup_services(app)
+
+# Setup CyberChef
+setup_cyberchef(app)
 
 # Setup utilities (logging, etc.)
 setup_utils(app)
