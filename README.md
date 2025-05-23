@@ -63,9 +63,32 @@ NexusTrace/
 │   │   ├── rate_limiter.py # Rate limiting
 │   │   └── logging.py     # Logging configuration
 │   │
+│   ├── tests/             # Test files
+│   │   ├── minimal_flask_test.py
+│   │   └── test_endpoints.py
+│   │
+│   ├── build/             # Build artifacts
+│   │   ├── ip_checker.spec
+│   │   └── Info.plist
+│   │
 │   └── app.py            # Main application file
 │
-├── logs/                 # Application logs
+├── templates/            # Jinja2 HTML templates
+├── static/              # CSS, JS, images, favicon, etc.
+├── frontend/            # Static HTML/assets
+├── CyberChef_v10.19.4/  # External tool
+├── icon_tools/          # Icon/favicon scripts
+├── logs/                # Application logs
+├── build/               # Build artifacts (if any)
+├── tailwind-test/       # Tailwind experiments
+├── app.py               # Flask entry point
+├── wsgi.py              # WSGI entry point
+├── run.py               # Flask run script
+├── requirements.txt     # Python dependencies
+├── Dockerfile           # Docker configuration
+├── docker-compose.yml   # Docker Compose configuration
+├── nginx.conf           # Nginx configuration
+├── entrypoint.sh        # Docker entrypoint script
 └── README.md            # This documentation
 ```
 
@@ -146,7 +169,7 @@ IP2WHOIS_KEY=your_ip2whois_key
 1. Clone the repository
 2. Install dependencies: `pip install -r requirements.txt`
 3. Set up environment variables
-4. Run the application: `python app/app.py`
+4. Run the application: `python run.py`
 
 ### Testing
 - Unit tests for each service
