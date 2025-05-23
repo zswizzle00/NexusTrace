@@ -7,7 +7,7 @@
             Welcome to NexusTrace
         </h1>
         <p class="text-lg md:text-xl text-gray-300 mb-10">
-            Your comprehensive OSINT and threat intelligence platform for analyzing IP addresses, domains, and URLs.
+            A comprehensive OSINT and threat intelligence platform for analyzing IP addresses, domains, URLs, and hashes.
         </p>
         <!-- Unified Search Bar -->
         <div class="unified-search mt-4 mb-10">
@@ -16,99 +16,8 @@
             <button type="submit" class="btn btn-primary">Analyze</button>
           </form>
         </div>
-        <div class="card-grid">
-            <a href="/ip" class="feature-card group">
-                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
-                    <!-- Shield/Check SVG -->
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">IP Analysis</h3>
-                <p class="text-gray-400 mb-4">Comprehensive analysis of IP addresses including geolocation, reputation, and threat intelligence.</p>
-                <span class="arrow">→</span>
-            </a>
-            <a href="/domain" class="feature-card group">
-                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
-                    <!-- Globe SVG -->
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">Domain Analysis</h3>
-                <p class="text-gray-400 mb-4">In-depth domain investigation including WHOIS data, DNS records, and security metrics.</p>
-                <span class="arrow">→</span>
-            </a>
-            <a href="/url" class="feature-card group">
-                <div class="icon text-blue-400 group-hover:text-blue-300 transition-colors">
-                    <!-- Link SVG -->
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">URL Analysis</h3>
-                <p class="text-gray-400 mb-4">Detailed URL scanning for malicious content, redirects, and security vulnerabilities.</p>
-                <span class="arrow">→</span>
-            </a>
-        </div>
-        <!-- Features/Benefits section -->
-        <div class="features-section mt-12">
-          <h2 class="text-2xl font-bold mb-6 text-blue-400">Why NexusTrace?</h2>
-          <div class="features-grid">
-            <div class="feature">
-              <div class="feature-icon">⚡</div>
-              <h4>Automated Enrichment</h4>
-              <p>Instantly gather threat intelligence from multiple sources for any indicator.</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🔗</div>
-              <h4>Centralized Investigation</h4>
-              <p>Correlate and pivot on data from IPs, domains, URLs, and more—all in one place.</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🛠️</div>
-              <h4>Customizable Playbooks</h4>
-              <p>Automate repetitive investigation steps and integrate with your security stack.</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🤝</div>
-              <h4>Collaboration</h4>
-              <p>Share findings, notes, and reports with your team for faster response.</p>
-            </div>
-          </div>
-        </div>
-        <!-- How it works section -->
-        <div class="howitworks-section mt-16">
-          <h2 class="text-2xl font-bold mb-6 text-blue-400">How It Works</h2>
-          <div class="howitworks-grid">
-            <div class="howitworks-step">
-              <div class="howitworks-icon">🔍</div>
-              <h4>Submit an Indicator</h4>
-              <p>Enter an IP, domain, URL, or file hash to begin your investigation.</p>
-            </div>
-            <div class="howitworks-step">
-              <div class="howitworks-icon">🤖</div>
-              <h4>Automated Analysis</h4>
-              <p>NexusTrace enriches and correlates data from multiple threat intelligence sources.</p>
-            </div>
-            <div class="howitworks-step">
-              <div class="howitworks-icon">📊</div>
-              <h4>Investigate & Collaborate</h4>
-              <p>Review results, pivot on findings, and share insights with your team.</p>
-            </div>
-          </div>
-        </div>
     </div>
 </div>
-<!-- Footer -->
-<footer class="footer mt-16 py-8 text-center text-gray-400">
-  <div>
-    <a href="https://github.com/yourrepo" target="_blank" class="text-blue-400 hover:underline">GitHub</a> |
-    <a href="/docs" class="text-blue-400 hover:underline">Documentation</a> |
-    <a href="mailto:contact@nexustrace.com" class="text-blue-400 hover:underline">Contact</a>
-  </div>
-  <div class="mt-2 text-xs">© 2024 NexusTrace. Inspired by <a href="https://github.com/intelowlproject/IntelOwl" target="_blank" class="text-blue-400 hover:underline">IntelOwl</a>.</div>
-</footer>
 {% endblock %}
 
 {% block scripts %}

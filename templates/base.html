@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}NexusTrace{% endblock %}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon_io/favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_io/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon_io/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='favicon_io/site.webmanifest') }}">
+    <!-- Optionally keep SVG for modern browsers -->
+    <!-- <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}"> -->
+    <meta name="msapplication-TileColor" content="#3B82F6">
+    <meta name="theme-color" content="#3B82F6">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -276,13 +284,8 @@
                         </svg>
                         <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
                     </a>
-                </div>
-                <nav class="hidden md:flex items-center gap-4">
-                    <a href="/ip" class="nav-link {% if request.endpoint == 'ip' %}active{% endif %}">IP Analysis</a>
-                    <a href="/domain" class="nav-link {% if request.endpoint == 'domain' %}active{% endif %}">Domain Analysis</a>
-                    <a href="/url" class="nav-link {% if request.endpoint == 'url' %}active{% endif %}">URL Analysis</a>
                     <a href="/tools/cyberchef" class="nav-link {% if request.endpoint == 'cyberchef_tab.cyberchef_tab' %}active{% endif %}">CyberChef</a>
-                </nav>
+                </div>
                 <div class="flex items-center gap-4">
                     <button class="btn btn-primary" onclick="toggleTheme()">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,6 +300,12 @@
         <main class="main-content {% block main_content_class %}{% endblock %}">
             {% block content %}{% endblock %}
         </main>
+        <footer class="w-full border-t border-gray-700 mt-auto py-6 text-center text-sm text-gray-400">
+            <a href="https://github.com/" class="text-blue-400 hover:underline">GitHub</a> |
+            <a href="/docs" class="text-blue-400 hover:underline">Documentation</a> |
+            <a href="/contact" class="text-blue-400 hover:underline">Contact</a>
+            <div class="mt-2">© 2024 NexusTrace. All rights reserved.</div>
+        </footer>
     </div>
 
     <script>

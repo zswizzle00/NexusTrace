@@ -371,5 +371,18 @@ def process_single_ip(ip):
         return None 
 
 def get_ip2location_data(ip_address):
-    # TODO: Implement actual IP2Location lookup
-    return None 
+    """Get IP information from IP2Location.io API."""
+    api_key = os.getenv('IP2LOCATION_KEY')
+    if not api_key:
+        logger.warning("IP2Location.io API key not configured")
+        return None
+    url = f'https://api.ip2location.io/?key={api_key}&ip={ip_address}&format=json'
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        # Optionally, flatten or map fields for template
+        return data
+    except Exception as e:
+        logger.error(f"IP2Location.io API request failed: {str(e)}")
+        return None 

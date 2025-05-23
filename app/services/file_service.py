@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def setup_file_services(app):
     """Setup file-related services."""
     # Initialize Intezer API
-    intezer_api_key = os.getenv('INTEZER_API_KEY')
+    intezer_api_key = os.getenv('INTEZER_KEY')
     if not intezer_api_key:
         logger.warning("Intezer API key not configured")
     else:
@@ -20,7 +20,7 @@ def setup_file_services(app):
 def get_intezer_analysis(file_path=None, file_hash=None):
     """Analyze a file using Intezer's API."""
     try:
-        if not os.getenv('INTEZER_API_KEY'):
+        if not os.getenv('INTEZER_KEY'):
             logger.warning("Intezer API key not configured")
             return None
             
