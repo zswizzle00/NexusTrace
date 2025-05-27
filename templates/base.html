@@ -180,10 +180,62 @@
         /* Dropdown Menus */
         .dropdown-menu {
             display: none;
+            position: absolute;
+            min-width: 200px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
         }
-        .group:hover > .dropdown-menu,
-        .group:focus-within > .dropdown-menu {
+
+        /* Submenus open to the right */
+        .submenu {
+            left: 100%;
+            right: auto;
+            top: 0;
+            z-index: 60;
+        }
+
+        /* Main dropdown opens downward */
+        .group > .dropdown-menu:not(.submenu) {
+            left: 0;
+            right: auto;
+            top: 100%;
+            z-index: 50;
+        }
+
+        .group > .dropdown-menu,
+        .group > .dropdown-menu.submenu {
+            display: none;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s 0.15s;
+        }
+        .group:hover > .dropdown-menu.submenu,
+        .group:focus-within > .dropdown-menu.submenu,
+        .group > .dropdown-menu.submenu:hover {
             display: block;
+            pointer-events: auto;
+            opacity: 1;
+            transition-delay: 0s;
+        }
+
+        /* Ensure parent menu items have proper positioning */
+        .group {
+            position: relative;
+        }
+
+        /* Add hover effect for menu items */
+        .dropdown-menu a {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: var(--text-secondary);
+            transition: var(--transition-fast);
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--color-primary);
+            color: white;
         }
 
         /* Data Display */
@@ -279,6 +331,53 @@
         .slide-in {
             animation: slideIn var(--transition-normal);
         }
+
+        /* Add arrow indicator and hover delay styles */
+        .arrow {
+            margin-left: 0.5em;
+            font-size: 0.8em;
+            transition: transform 0.2s;
+        }
+        .group:hover > .nav-link .arrow {
+            transform: translateX(3px);
+        }
+
+        .group:hover > .dropdown-menu:not(.submenu),
+        .group:focus-within > .dropdown-menu:not(.submenu),
+        .group > .dropdown-menu:not(.submenu):hover {
+            display: block;
+            pointer-events: auto;
+            opacity: 1;
+            transition-delay: 0s;
+        }
+
+        /* Submenu animation */
+        @keyframes slideRight {
+            from { opacity: 0; transform: translateX(-10px);}
+            to { opacity: 1; transform: translateX(0);}
+        }
+        .submenu {
+            animation: slideRight 0.2s;
+            min-width: 12rem;
+            width: auto;
+            overflow: visible;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            border: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+        }
+
+        /* Main dropdown should allow overflow for submenus */
+        .dropdown-menu {
+            overflow: visible !important;
+        }
+
+        /* Menu item hover */
+        .dropdown-menu a:hover {
+            background: var(--color-primary);
+            color: #fff;
+            border-radius: 0.375rem;
+            transition: background 0.15s, color 0.15s;
+        }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
@@ -293,60 +392,56 @@
                         </svg>
                         <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
                     </a>
+                    <a href="/tools/cyberchef" class="nav-link flex items-center gap-1 focus:outline-none">CyberChef</a>
                     <div class="flex items-center gap-4">
-                        <!-- Tools Dropdown -->
-                        <div class="relative group">
-                            <button class="nav-link flex items-center gap-1 focus:outline-none">
-                                Tools
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div class="dropdown-menu absolute left-0 mt-0 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50">
-                                <a href="/tools/cyberchef" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">CyberChef</a>
-                                <a href="https://www.virustotal.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">VirusTotal</a>
-                                <a href="https://www.shodan.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Shodan</a>
-                                <a href="https://ipinfo.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">IPInfo</a>
-                                <a href="https://ip2whois.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">IP2WHOIS</a>
-                                <a href="https://otx.alienvault.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">AlienVault</a>
-                                <a href="https://proxycheck.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">ProxyCheck</a>
-                            </div>
-                        </div>
-                        <!-- Resources Dropdown -->
                         <div class="relative group">
                             <button class="nav-link flex items-center gap-1 focus:outline-none">
                                 Resources
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <div class="dropdown-menu absolute left-0 mt-0 w-96 max-h-96 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50">
-                                <a href="https://cybergladius.com/free-active-directory-security-tools/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">AD Security Tools</a>
-                                <a href="https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Security Log Encyclopedia</a>
-                                <a href="https://bpatty.rocks/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">bpatty.rocks</a>
-                                <a href="https://130.211.117.169/#/userdashboard" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">User Dashboard</a>
-                                <a href="https://regex101.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Regex101</a>
-                                <a href="https://app.any.run/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">ANY.RUN</a>
-                                <a href="https://www.hybrid-analysis.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Hybrid Analysis</a>
-                                <a href="https://intel471.com/blog/the-art-of-drafting-a-stellar-threat-hunting-report-a-deep-dive" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Threat Hunting Report Guide</a>
-                                <a href="https://www.crowdstrike.com/en-us/cybersecurity-101/threat-intelligence/threat-hunting/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">CrowdStrike Threat Hunting</a>
-                                <a href="https://github.com/ion-storm/sysmon-config" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Sysmon Config</a>
-                                <a href="https://make.powerautomate.com/environments/Default-4b55a5f1-660a-4433-baa2-2ba9a8e997c2/home" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Power Automate</a>
-                                <a href="https://social.cyware.com/cyber-security-news-articles" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Cyware News</a>
-                                <a href="#" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Google SecOps Chronicle</a>
-                                <a href="https://detection.fyi/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Detection.FYI</a>
-                                <a href="https://falcon.laggar.gcw.crowdstrike.com/real-time-response/console?start=activity&aid=b0ace8db44bf4f4b9065f32bcb62fd1a&_cid=d0e40ba3fa194376885e7294f641896e" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">CrowdStrike Falcon RTR</a>
-                                <a href="https://kravensecurity.com/creating-your-own-cti-aggregator-for-free/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">CTI Aggregator Guide</a>
-                                <a href="https://github.com/Syslifters/sysreptor" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Sysreptor</a>
-                                <a href="https://github.com/sensepost/go-out" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Go-Out</a>
-                                <a href="https://bpatty.rocks/blueteam/pwnedpasswords/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Pwned Passwords</a>
-                                <a href="https://kravensecurity.com/threat-hunting-with-netlas-io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Threat Hunting with Netlas.io</a>
+                            <div class="dropdown-menu mt-0 w-64 bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50 text-sm text-gray-200">
+                                <div class="group relative">
+                                    <button class="nav-link flex items-center gap-1 focus:outline-none">
+                                        Tools <span class="arrow">&#9654;</span>
+                                    </button>
+                                    <div class="dropdown-menu submenu mt-0 bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50 text-sm text-gray-200">
+                                        <a href="/tools/cyberchef" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">CyberChef</a>
+                                        <a href="https://www.virustotal.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">VirusTotal</a>
+                                        <a href="https://www.shodan.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">Shodan</a>
+                                        <a href="https://ipinfo.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">IPInfo</a>
+                                        <a href="https://ip2whois.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">IP2WHOIS</a>
+                                        <a href="https://otx.alienvault.com/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">AlienVault</a>
+                                        <a href="https://proxycheck.io/" target="_blank" rel="noopener" class="block px-4 py-2 text-sm text-gray-200 hover:bg-blue-600 hover:text-white">ProxyCheck</a>
+                                        <a href="https://cybergladius.com/free-active-directory-security-tools/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">AD Security Tools</a>
+                                        <a href="https://regex101.com/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Regex101</a>
+                                        <a href="https://app.any.run/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">ANY.RUN</a>
+                                        <a href="https://www.hybrid-analysis.com/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Hybrid Analysis</a>
+                                        <a href="https://bpatty.rocks/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">bpatty.rocks</a>
+                                    </div>
+                                </div>
+                                <div class="group relative">
+                                    <button class="nav-link flex items-center gap-1 focus:outline-none">
+                                        Threat Intel <span class="arrow">&#9654;</span>
+                                    </button>
+                                    <div class="dropdown-menu submenu mt-0 bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50 text-sm text-gray-200">
+                                        <a href="https://detection.fyi/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Detection.FYI</a>
+                                        <a href="https://kravensecurity.com/creating-your-own-cti-aggregator-for-free/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">CTI Aggregator</a>
+                                        <a href="https://social.cyware.com/cyber-security-news-articles" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Cyware News</a>
+                                    </div>
+                                </div>
+                                <div class="group relative">
+                                    <button class="nav-link flex items-center gap-1 focus:outline-none">
+                                        Learning <span class="arrow">&#9654;</span>
+                                    </button>
+                                    <div class="dropdown-menu submenu mt-0 bg-gray-900 border border-gray-700 rounded-lg shadow-lg transition-opacity z-50 text-sm text-gray-200">
+                                        <a href="https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Security Log Encyclopedia</a>
+                                        <a href="https://intel471.com/blog/the-art-of-drafting-a-stellar-threat-hunting-report-a-deep-dive" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">Threat Hunting Guide</a>
+                                        <a href="https://www.crowdstrike.com/en-us/cybersecurity-101/threat-intelligence/threat-hunting/" target="_blank" class="block px-4 py-2 hover:bg-blue-600 hover:text-white">CrowdStrike Guide</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="flex items-center gap-4">
-                    <button class="btn btn-primary" onclick="toggleTheme()">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                        </svg>
-                    </button>
                 </div>
             </div>
         </header>
@@ -381,12 +476,5 @@
         });
     });
     </script>
-
-    <nav class="flex space-x-4">
-        <a href="/ip" class="text-gray-300 hover:text-white">IP Analysis</a>
-        <a href="/domain" class="text-gray-300 hover:text-white">Domain Analysis</a>
-        <a href="/url" class="text-gray-300 hover:text-white">URL Analysis</a>
-        <a href="/hash/analyze" class="text-gray-300 hover:text-white">Hash Analysis</a>
-    </nav>
 </body>
 </html> 

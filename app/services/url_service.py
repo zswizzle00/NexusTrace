@@ -1,6 +1,7 @@
 import os
 import requests
 import logging
+import time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import builtwith
@@ -14,6 +15,52 @@ logger = logging.getLogger(__name__)
 def setup_url_services(app):
     """Setup URL-related services."""
     pass  # Add any necessary setup code here
+
+def submit_to_urlscan(url):
+    """Submit a URL to urlscan.io for analysis."""
+    api_key = os.getenv('URLSCAN_API_KEY')
+    if not api_key:
+        logger.warning("URLSCAN_API_KEY not configured")
+        return None
+
+    headers = {
+        'API-Key': api_key,
+        'Content-Type': 'application/json'
+    }
+    
+    data = {
+        'url': url,
+        'visibility': 'public'
+    }
+    
+    try:
+        # Submit URL for scanning
+        response = requests.post(
+            'https://urlscan.io/api/v1/scan/',
+            headers=headers,
+            json=data
+        )
+        response.raise_for_status()
+        result = response.json()
+        
+        # Wait for scan to complete (poll every 5 seconds, timeout after 2 minutes)
+        scan_id = result.get('uuid')
+        if not scan_id:
+            return None
+            
+        for _ in range(24):  # 24 * 5 seconds = 2 minutes timeout
+            time.sleep(5)
+            result_response = requests.get(
+                f'https://urlscan.io/api/v1/result/{scan_id}/',
+                headers=headers
+            )
+            if result_response.status_code == 200:
+                return result_response.json()
+                
+        return None
+    except Exception as e:
+        logger.error(f"Error submitting to urlscan.io: {str(e)}")
+        return None
 
 @timed_lru_cache(seconds=1800)
 def analyze_url(url):
@@ -97,6 +144,9 @@ def analyze_url(url):
                 os.remove(temp_file)
             except Exception as e:
                 logger.error(f"Intezer URL analysis failed: {str(e)}")
+
+        # Get urlscan.io analysis
+        urlscan_analysis = submit_to_urlscan(url)
         
         return {
             'url_analysis': {
@@ -113,7 +163,8 @@ def analyze_url(url):
                 'technologies': tech_stack,
                 'meta_tags': meta_tags,
                 'title': title,
-                'intezer_analysis': intezer_analysis
+                'intezer_analysis': intezer_analysis,
+                'urlscan_analysis': urlscan_analysis
             }
         }
     except Exception as e:
