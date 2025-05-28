@@ -647,6 +647,107 @@
           {% endif %}
         {% endif %}
       </div>
+    {% elif indicator_type == 'hash' %}
+      {% if intezer_result %}
+        <!-- Intezer Hash Result: Structured Layout -->
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+            <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
+          </h3>
+          <!-- Summary Table -->
+          <table class="mb-4 w-full text-sm">
+            <tr><th class="pr-4 text-gray-400">SHA256</th><td class="font-mono">{{ intezer_result.sha256 }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Verdict</th><td>{{ intezer_result.verdict or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Sub Verdict</th><td>{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Family</th><td>{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Type</th><td>{{ intezer_result.file_type or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Architecture</th><td>{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Analysis Time</th><td>{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 text-gray-400">Analysis URL</th><td>{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
+          </table>
+          <!-- Code Reuse Section -->
+          {% if intezer_result.code_reuse %}
+            <div class="mb-4">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Family Name</th><th>Type</th><th>Reused Gene Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for fam in intezer_result.code_reuse.families %}
+                    <tr>
+                      <td>{{ fam.family_name }}</td>
+                      <td>{{ fam.family_type }}</td>
+                      <td>{{ fam.reused_gene_count }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+          <!-- Indicators Section -->
+          {% if intezer_result.indicators %}
+            <div class="mb-4">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th>Name</th><th>Classification</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for ind in intezer_result.indicators %}
+                    <tr>
+                      <td>{{ ind.name }}</td>
+                      <td>{{ ind.classification }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+          <!-- Metadata Section -->
+          {% if intezer_result.metadata %}
+            <div class="mb-4">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
+              <table class="data-table mb-2 w-full text-xs">
+                <tbody>
+                  {% for k, v in intezer_result.metadata.items() %}
+                    <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+          <!-- Raw Data Section -->
+          <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
+            <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
+          </details>
+        </div>
+      {% elif hash_info %}
+        <!-- Fallback: Basic Hash Info -->
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
+          <div class="space-y-2">
+            <p class="text-gray-300"><span class="text-gray-400">Type:</span> {{ hash_info.type }}</p>
+            <p class="text-gray-300"><span class="text-gray-400">Value:</span> {{ hash_info.hash }}</p>
+          </div>
+          <div class="mt-4">
+            <h4 class="text-lg font-medium text-blue-400 mb-2">Sources</h4>
+            <ul>
+              {% for source, info in hash_info.sources.items() %}
+                <li class="text-gray-300">
+                  <span class="text-gray-400">{{ source|capitalize }}:</span> {{ info.message }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% else %}
+        <span class="text-yellow-400">No hash analysis available.</span>
+      {% endif %}
     {% endif %}
   </div>
   <div class="flex flex-col items-center justify-center mt-12 gap-4">

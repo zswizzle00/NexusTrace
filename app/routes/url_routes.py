@@ -13,6 +13,10 @@ def analyze_url_endpoint():
         if not url:
             return jsonify({'error': 'URL is required'}), 400
         
+        # Normalize URL: prepend https:// if no scheme is present
+        if not url.lower().startswith(('http://', 'https://')):
+            url = f'https://{url}'
+        
         # Analyze URL
         url_analysis = analyze_url(url)
         

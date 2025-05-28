@@ -10,11 +10,11 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='favicon_io/site.webmanifest') }}">
     <!-- Optionally keep SVG for modern browsers -->
-    <!-- <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}"> -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta name="msapplication-TileColor" content="#3B82F6">
     <meta name="theme-color" content="#3B82F6">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -381,6 +381,7 @@
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
+    <a href="#main-content" class="sr-only focus:not-sr-only bg-blue-700 text-white px-4 py-2 rounded absolute top-2 left-2 z-50">Skip to main content</a>
     <div class="app-container">
         {% if request.endpoint != 'index' %}
         <header class="main-header">
@@ -447,14 +448,16 @@
         </header>
         {% endif %}
         
-        <main class="main-content {% block main_content_class %}{% endblock %}">
+        <main id="main-content" aria-label="Main content" class="main-content {% block main_content_class %}{% endblock %}">
             {% block content %}{% endblock %}
         </main>
-        <footer class="w-full border-t border-gray-700 mt-auto py-6 text-center text-sm text-gray-400">
-            <a href="https://github.com/" class="text-blue-400 hover:underline">GitHub</a> |
-            <a href="/docs" class="text-blue-400 hover:underline">Documentation</a> |
-            <a href="/contact" class="text-blue-400 hover:underline">Contact</a>
-            <div class="mt-2">© 2024 NexusTrace. All rights reserved.</div>
+        <footer class="footer mt-12 py-6 text-center text-sm text-blue-200 bg-gray-900 border-t border-blue-900">
+            <div class="mb-2">
+                <a href="https://github.com/" class="text-blue-400 hover:underline mx-2">GitHub</a> |
+                <a href="/docs" class="text-blue-400 hover:underline mx-2">Documentation</a> |
+                <a href="/contact" class="text-blue-400 hover:underline mx-2">Contact</a>
+            </div>
+            <div>© 2024 NexusTrace. All rights reserved.</div>
         </footer>
     </div>
 

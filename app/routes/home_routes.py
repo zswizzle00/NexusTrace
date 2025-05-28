@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 import re
 from app.services.file_service import get_intezer_analysis
+from app.services.hash_service import get_hash_info
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
 from app.services.domain_service import get_domain_info, get_whois_info
 from app.services.url_service import analyze_url
@@ -136,7 +137,11 @@ def analyze():
         indicator_type = None
 
     if indicator_type == 'hash':
-        result_data['intezer_result'] = get_intezer_analysis(file_hash=indicator)
+        intezer_result = get_intezer_analysis(file_hash=indicator)
+        if intezer_result:
+            result_data['intezer_result'] = intezer_result
+        else:
+            result_data['hash_info'] = get_hash_info(indicator)
     elif indicator_type == 'ip':
         result_data['ipinfo'] = get_ipinfo_data(indicator)
         result_data['ip2location'] = get_ip2location_data(indicator)
@@ -156,6 +161,9 @@ def analyze():
             result_data['ipinfo'] = get_ipinfo_data(ip)
             result_data['ip2location'] = get_ip2location_data(ip)
     elif indicator_type == 'url':
+        # Normalize URL: prepend https:// if no scheme is present
+        if not indicator.lower().startswith(('http://', 'https://')):
+            indicator = f'https://{indicator}'
         result_data['url_analysis'] = analyze_url(indicator)
 
     return render_template('analyze_result.html', indicator=indicator, hash_type=hash_type, indicator_type=indicator_type, **result_data) 
