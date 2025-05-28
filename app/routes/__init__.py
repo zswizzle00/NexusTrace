@@ -6,6 +6,7 @@ from .url_routes import url_bp
 from .file_routes import file_bp
 from .health_routes import health_bp
 from .hash_routes import hash_bp
+from .event_routes import event_bp
 from .cyberchef_routes import register_cyberchef_routes
 from .cyberchef_api import cyberchef_api
 
@@ -18,5 +19,6 @@ def register_routes(app):
     app.register_blueprint(file_bp, url_prefix='/api/file')
     app.register_blueprint(health_bp, url_prefix='/api/health')
     app.register_blueprint(hash_bp, url_prefix='/api/hash')
+    app.register_blueprint(event_bp)
     register_cyberchef_routes(app)
     app.register_blueprint(cyberchef_api) 

@@ -2,6 +2,7 @@ import time
 import logging
 from functools import lru_cache, wraps
 import threading
+import importlib
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -33,10 +34,26 @@ def timed_lru_cache(seconds: int, maxsize: int = MAX_CACHE_SIZE):
 
 def clear_caches():
     """Clear all cached functions periodically."""
-    for func in [check_abuseipdb, get_ipinfo_data, get_shodan_info, 
-                get_proxycheck_data, get_alienvault_data, get_intezer_analysis]:
-        if hasattr(func, 'cache_clear'):
-            func.cache_clear()
+    try:
+        # Dynamically import the modules when needed
+        ip_service = importlib.import_module('app.services.ip_service')
+        file_service = importlib.import_module('app.services.file_service')
+        
+        # List of functions to clear
+        functions = [
+            ip_service.check_abuseipdb,
+            ip_service.get_ipinfo_data,
+            ip_service.get_shodan_info,
+            ip_service.get_proxycheck_data,
+            ip_service.get_alienvault_data,
+            file_service.get_intezer_analysis
+        ]
+        
+        for func in functions:
+            if hasattr(func, 'cache_clear'):
+                func.cache_clear()
+    except Exception as e:
+        logger.error(f"Error clearing caches: {str(e)}")
 
 def schedule_cache_clearing():
     """Schedule cache clearing every 30 minutes."""
