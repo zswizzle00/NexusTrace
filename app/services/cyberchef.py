@@ -7,7 +7,7 @@ def setup_cyberchef(app):
     This will serve the CyberChef interface and handle its assets.
     """
     # Create a blueprint for CyberChef
-    cyberchef_bp = Blueprint('cyberchef', __name__, url_prefix='/cyberchef')
+    cyberchef_bp = Blueprint('cyberchef', __name__, url_prefix='/cyberchef_app')
     
     # Get the path to CyberChef files
     cyberchef_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 

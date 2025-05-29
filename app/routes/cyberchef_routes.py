@@ -1,4 +1,4 @@
-from flask import render_template, Blueprint, jsonify, request
+from flask import render_template, Blueprint, jsonify, request, redirect, url_for
 import json
 import os
 
@@ -9,9 +9,8 @@ def register_cyberchef_routes(app):
     recipes_dir = os.path.join(app.root_path, '..', 'data', 'cyberchef_recipes')
     os.makedirs(recipes_dir, exist_ok=True)
     
-    @cyberchef_bp.route('/tools/cyberchef')
+    @cyberchef_bp.route('/cyberchef', strict_slashes=False)
     def cyberchef_tab():
-        """Render the CyberChef tab interface"""
         return render_template('cyberchef_section.html')
     
     @cyberchef_bp.route('/api/cyberchef/recipes', methods=['GET'])

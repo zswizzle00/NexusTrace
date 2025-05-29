@@ -1,20 +1,90 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="flex flex-col items-center justify-center flex-grow text-center px-4">
-    <div class="max-w-4xl mx-auto">
-        <h1 class="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-            Welcome to NexusTrace
-        </h1>
-        <p class="text-lg md:text-xl text-gray-300 mb-10">
-            A comprehensive OSINT and threat intelligence platform for analyzing IP addresses, domains, URLs, and hashes.
-        </p>
-        <!-- Unified Search Bar -->
-        <div class="unified-search mt-4 mb-10">
-          <form action="/analyze" method="POST" class="search-form flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="search-input input-field w-full sm:w-96" required>
-            <button type="submit" class="btn btn-primary">Analyze</button>
-          </form>
+<div class="flex flex-col items-center justify-center min-h-[80vh] bg-gradient-to-b from-gray-900 to-gray-800 px-2">
+    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
+        <div class="card bg-gray-800 border border-gray-700 p-8 md:p-14 space-y-12">
+            <div class="text-center mb-4 md:mb-8">
+                <h1 class="text-4xl md:text-6xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                    Welcome to NexusTrace
+                </h1>
+                <p class="text-lg md:text-2xl text-gray-300">
+                    A Tool for analyzing IP addresses, domains, URLs, and hashes. As well as AD Event Search and CyberChef.
+                </p>
+            </div>
+            <!-- Unified Search Bar -->
+            <div class="unified-search">
+                <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
+                    <input type="text" 
+                           name="indicator" 
+                           placeholder="Unifified Search" 
+                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
+                           required>
+                    <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto text-lg md:text-xl py-4 md:py-5 px-6 md:px-8 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Analyze
+                    </button>
+                </form>
+            </div>
+            <!-- Quick Links -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mt-6 md:mt-10">
+                <a href="/hash_analysis" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">Hash Search</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze file hashes and malware</p>
+                    </div>
+                </a>
+                <a href="/ip_search" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m13-3.13V7a4 4 0 00-4-4H7a4 4 0 00-4 4v6a4 4 0 004 4h6"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">IP Search</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze and investigate IP addresses</p>
+                    </div>
+                </a>
+                <a href="/domain_search" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">Domain/URL Search</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze domains and URLs</p>
+                    </div>
+                </a>
+                <a href="/ad_event_search" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">AD Event Search</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze AD events</p>
+                    </div>
+                </a>
+                <a href="/user_agent_search" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">User Agent Search</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze User Agents</p>
+                    </div>
+                </a>
+                <a href="/cyberchef" class="card bg-gray-700 hover:bg-gray-600 transition-colors duration-200 flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
+                    <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <div class="text-center">
+                        <h3 class="text-lg md:text-xl font-semibold text-white">CyberChef</h3>
+                        <p class="text-gray-400 text-base md:text-lg">Analyze data with CyberChef</p>
+                    </div>
+                </a>
+            </div>
         </div>
     </div>
 </div>

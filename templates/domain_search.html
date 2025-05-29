@@ -3,22 +3,22 @@
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-md mx-auto">
         <div class="card bg-gray-800 border border-gray-700">
-            <h2 class="text-2xl font-bold text-blue-400 mb-6">Hash Analysis</h2>
-            <form method="post" action="/api/hash/analyze" class="space-y-4">
+            <h2 class="text-2xl font-bold text-blue-400 mb-6">Domain/URL Search</h2>
+            <form method="post" action="/analyze" class="space-y-4">
                 <div class="flex flex-col space-y-2">
-                    <label for="hash" class="text-gray-300">Enter Hash</label>
+                    <label for="indicator" class="text-gray-300">Enter Domain or URL</label>
                     <div class="relative">
                         <input
                             type="text"
-                            id="hash"
-                            name="hash"
-                            placeholder="Enter MD5, SHA1, or SHA256 hash"
+                            id="indicator"
+                            name="indicator"
+                            placeholder="Enter domain or URL (e.g., example.com or https://...)"
                             class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full"
                             required
                         />
                         <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                             </svg>
                         </div>
                     </div>
@@ -28,9 +28,9 @@
                     class="btn btn-primary w-full"
                 >
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
-                    Analyze Hash
+                    Search Domain/URL
                 </button>
             </form>
         </div>

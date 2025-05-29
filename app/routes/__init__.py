@@ -9,6 +9,7 @@ from .hash_routes import hash_bp
 from .event_routes import event_bp
 from .cyberchef_routes import register_cyberchef_routes
 from .cyberchef_api import cyberchef_api
+from .user_agent_routes import user_agent_bp
 
 def register_routes(app):
     """Register all route blueprints with the Flask application."""
@@ -20,5 +21,6 @@ def register_routes(app):
     app.register_blueprint(health_bp, url_prefix='/api/health')
     app.register_blueprint(hash_bp, url_prefix='/api/hash')
     app.register_blueprint(event_bp)
+    app.register_blueprint(user_agent_bp)
     register_cyberchef_routes(app)
     app.register_blueprint(cyberchef_api) 

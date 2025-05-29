@@ -3,7 +3,7 @@
 {% block content %}
 <div class="w-full px-0 py-10">
   <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
-  <div class="grid w-full gap-8 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+  <div class="max-w-4xl mx-auto grid w-full gap-8 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
     {% if indicator_type == 'ip' %}
       <!-- IPInfo Card -->
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
@@ -748,33 +748,48 @@
       {% else %}
         <span class="text-yellow-400">No hash analysis available.</span>
       {% endif %}
+    {% elif indicator_type == 'user_agent' %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Analysis</h3>
+        {% if user_agent %}
+          <div class="mb-4">
+            <h4 class="text-lg font-semibold text-blue-400 mb-2">Browser Information</h4>
+            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.browser.name }}</span></p>
+            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.browser.version }}</span></p>
+          </div>
+          <div class="mb-4">
+            <h4 class="text-lg font-semibold text-blue-400 mb-2">Operating System</h4>
+            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.os.name }}</span></p>
+            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.os.version }}</span></p>
+          </div>
+          <div class="mb-4">
+            <h4 class="text-lg font-semibold text-blue-400 mb-2">Device Information</h4>
+            <p class="text-gray-300">Type: <span class="text-white">{{ user_agent.device.type }}</span></p>
+            <p class="text-gray-300">Brand: <span class="text-white">{{ user_agent.device.brand }}</span></p>
+            <p class="text-gray-300">Model: <span class="text-white">{{ user_agent.device.model }}</span></p>
+          </div>
+          <div class="mb-4">
+            <h4 class="text-lg font-semibold text-blue-400 mb-2">Additional Information</h4>
+            <p class="text-gray-300">Is Mobile: <span class="text-white">{{ user_agent.is_mobile }}</span></p>
+            <p class="text-gray-300">Is Tablet: <span class="text-white">{{ user_agent.is_tablet }}</span></p>
+            <p class="text-gray-300">Is Desktop: <span class="text-white">{{ user_agent.is_desktop }}</span></p>
+          </div>
+        {% elif user_agent_error %}
+          <span class="text-yellow-400">{{ user_agent_error }}</span>
+        {% else %}
+          <span class="text-yellow-400">No User Agent analysis available.</span>
+        {% endif %}
+      </div>
     {% endif %}
   </div>
-  <div class="flex flex-col items-center justify-center mt-12 gap-4">
-    <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-      <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="input-field w-full sm:w-96" required>
-      <button type="submit" class="btn btn-primary">Analyze</button>
+  <div class="flex flex-col items-center justify-center mt-12 gap-4 w-full max-w-md mx-auto">
+    <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto">
+      <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full" required>
+      <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto">Analyze</button>
     </form>
     <a href="/" class="btn btn-primary px-6 py-3 text-lg rounded-lg shadow">Return to Home</a>
   </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-// Simple tab switching logic
-const tabs = document.querySelectorAll('.tab');
-const panels = document.querySelectorAll('.tab-panel');
-tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    tabs.forEach(t => t.classList.remove('active'));
-    panels.forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    const tabName = tab.getAttribute('data-tab');
-    document.querySelector(`.tab-panel[data-tab="${tabName}"]`).classList.add('active');
-  });
-});
-</script>
-{% endblock %}
-
-{% block main_content_class %}full-width{% endblock %} 
+{% block scripts %}{{ super() }}{% endblock %} 

@@ -4,7 +4,11 @@ from app.services.event_service import get_event_info
 
 event_bp = Blueprint('event', __name__)
 
-@event_bp.route('/event/search', methods=['POST'])
+@event_bp.route('/ad_event_search', methods=['GET'])
+def event_section():
+    return render_template('event_section.html')
+
+@event_bp.route('/api/event/search', methods=['POST'])
 def search_event():
     event_id = request.form.get('event_id', '').strip()
     
@@ -17,8 +21,4 @@ def search_event():
     # Get event information from the service
     event_info = get_event_info(event_id)
     
-    return jsonify(event_info)
-
-@event_bp.route('/event')
-def event_section():
-    return render_template('event_section.html') 
+    return jsonify(event_info) 

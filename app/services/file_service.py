@@ -1,7 +1,7 @@
 import os
 import logging
 from intezer_sdk import api
-from intezer_sdk.analysis import FileAnalysis
+from intezer_sdk.analysis import Analysis
 from ..utils.cache import timed_lru_cache
 
 # Configure logging
@@ -25,9 +25,9 @@ def get_intezer_analysis(file_path=None, file_hash=None):
             return None
             
         if file_path:
-            analysis = FileAnalysis(file_path=file_path)
+            analysis = Analysis(file_path=file_path)
         elif file_hash:
-            analysis = FileAnalysis(file_hash=file_hash)
+            analysis = Analysis(file_hash=file_hash)
         else:
             return None
             

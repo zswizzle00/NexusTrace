@@ -1,10 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory
 import re
 from app.services.file_service import get_intezer_analysis
 from app.services.hash_service import get_hash_info
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
 from app.services.domain_service import get_domain_info, get_whois_info
 from app.services.url_service import analyze_url
+import os
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 home_bp = Blueprint('home', __name__)
 
@@ -23,6 +29,36 @@ def domain_section():
 @home_bp.route('/url')
 def url_section():
     return render_template('url_section.html')
+
+@home_bp.route('/ip_search', methods=['GET', 'POST'])
+def ip_search():
+    error = None
+    result = None
+    if request.method == 'POST':
+        ip = request.form.get('ip', '').strip()
+        if not ip:
+            error = 'IP address is required.'
+        else:
+            # For demo, just echo the IP. Replace with real lookup as needed.
+            result = {'ip': ip, 'message': f'Search results for {ip} would appear here.'}
+    return render_template('ip_search.html', error=error, result=result)
+
+@home_bp.route('/domain_search', methods=['GET', 'POST'])
+def domain_search():
+    error = None
+    result = None
+    if request.method == 'POST':
+        domain = request.form.get('domain', '').strip()
+        if not domain:
+            error = 'Domain or URL is required.'
+        else:
+            # For demo, just echo the domain. Replace with real lookup as needed.
+            result = {'domain': domain, 'message': f'Search results for {domain} would appear here.'}
+    return render_template('domain_search.html', error=error, result=result)
+
+@home_bp.route('/hash_analysis', methods=['GET'])
+def hash_analysis_form():
+    return render_template('hash_analysis.html')
 
 def parse_alienvault_otx(raw_data):
     if not raw_data or not isinstance(raw_data, dict):
@@ -134,7 +170,49 @@ def analyze():
     elif domain_re.match(indicator):
         indicator_type = 'domain'
     else:
-        indicator_type = None
+        print(f"[DEBUG] Treating as User Agent: {indicator}")
+        api_key = os.getenv('APILAYER_API_KEY')
+        if api_key:
+            url = "https://api.apilayer.com/user_agent/parse"
+            headers = {"apikey": api_key}
+            params = {"ua": indicator}
+            try:
+                response = requests.get(url, headers=headers, params=params)
+                print(f"[DEBUG] User Agent API status code: {response.status_code}")
+                print(f"[DEBUG] User Agent API response text: {response.text}")
+                response.raise_for_status()
+                results = response.json()
+                print(f"[DEBUG] User Agent API response: {results}")
+                formatted_results = {
+                    'browser': {
+                        'name': results.get('browser', {}).get('name', 'Unknown'),
+                        'version': results.get('browser', {}).get('version', 'Unknown')
+                    },
+                    'os': {
+                        'name': results.get('os', {}).get('name', 'Unknown'),
+                        'version': results.get('os', {}).get('version', 'Unknown')
+                    },
+                    'device': {
+                        'type': results.get('device', {}).get('type', 'Unknown'),
+                        'brand': results.get('device', {}).get('brand', 'Unknown'),
+                        'model': results.get('device', {}).get('model', 'Unknown')
+                    },
+                    'is_mobile': results.get('is_mobile', False),
+                    'is_tablet': results.get('is_tablet', False),
+                    'is_desktop': results.get('is_desktop', False)
+                }
+                result_data['user_agent'] = formatted_results
+                indicator_type = 'user_agent'
+            except Exception as e:
+                print(f"[DEBUG] User Agent API error: {e}")
+                result_data['user_agent_error'] = f"User Agent analysis failed: {str(e)}"
+                indicator_type = 'user_agent'
+        else:
+            print("[DEBUG] User Agent API key not configured.")
+            result_data['user_agent_error'] = "User Agent API key not configured."
+            indicator_type = 'user_agent'
+    print(f"[DEBUG] indicator_type: {indicator_type}")
+    print(f"[DEBUG] result_data: {result_data}")
 
     if indicator_type == 'hash':
         intezer_result = get_intezer_analysis(file_hash=indicator)
@@ -166,4 +244,15 @@ def analyze():
             indicator = f'https://{indicator}'
         result_data['url_analysis'] = analyze_url(indicator)
 
-    return render_template('analyze_result.html', indicator=indicator, hash_type=hash_type, indicator_type=indicator_type, **result_data) 
+    return render_template('analyze_result.html', indicator=indicator, hash_type=hash_type, indicator_type=indicator_type, **result_data)
+
+# Serve favicon.ico at the root
+@home_bp.route('/favicon.ico')
+def favicon():
+    abs_path = os.path.abspath(os.path.join('static', 'favicon_io'))
+    print(f"[DEBUG] Favicon absolute path: {abs_path}")
+    return send_from_directory(
+        abs_path,
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    ) 
