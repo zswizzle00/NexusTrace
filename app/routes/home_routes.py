@@ -149,6 +149,7 @@ def analyze():
     ip_re = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
     domain_re = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.(?:[A-Za-z]{2,})$')
     url_re = re.compile(r'^(https?://)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*/?$')
+    event_id_re = re.compile(r'^\d{1,5}$')  # Windows Event IDs are typically 1-5 digits
 
     hash_type = None
     indicator_type = None
@@ -169,6 +170,17 @@ def analyze():
         indicator_type = 'url'
     elif domain_re.match(indicator):
         indicator_type = 'domain'
+    elif event_id_re.match(indicator):
+        indicator_type = 'event'
+        try:
+            from app.services.event_service import get_event_info
+            event_info = get_event_info(indicator)
+            if event_info:
+                result_data['event_info'] = event_info
+            else:
+                result_data['event_error'] = "Could not find information for this Event ID"
+        except Exception as e:
+            result_data['event_error'] = f"Error analyzing Event ID: {str(e)}"
     else:
         print(f"[DEBUG] Treating as User Agent: {indicator}")
         api_key = os.getenv('APILAYER_API_KEY')

@@ -780,6 +780,78 @@
           <span class="text-yellow-400">No User Agent analysis available.</span>
         {% endif %}
       </div>
+    {% elif indicator_type == 'event' %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+        <h3 class="text-xl font-bold text-blue-400 mb-4">Windows Event Analysis</h3>
+        {% if event_info %}
+          <div class="grid gap-6 md:grid-cols-2">
+            <div class="card bg-gray-700 border border-gray-600 p-4">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h4>
+              <div class="space-y-2">
+                <p class="flex justify-between">
+                  <span class="text-gray-400">Event ID:</span>
+                  <span class="text-white">{{ event_info.event_id }}</span>
+                </p>
+                <p class="flex justify-between">
+                  <span class="text-gray-400">Title:</span>
+                  <span class="text-white">{{ event_info.title or 'N/A' }}</span>
+                </p>
+              </div>
+            </div>
+            <div class="card bg-gray-700 border border-gray-600 p-4">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Summary</h4>
+              <p class="text-gray-300">{{ event_info.summary or 'No summary available' }}</p>
+            </div>
+          </div>
+
+          {% if event_info.details_table %}
+          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+            <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
+            <div class="overflow-x-auto">
+              <table class="table">
+                <tbody>
+                  {% for row in event_info.details_table %}
+                    <tr class="border-b border-gray-600">
+                      {% for cell in row %}
+                        <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if event_info.fields %}
+          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+            <div class="flex items-center justify-end gap-2 mb-2">
+              <button 
+                type="button"
+                class="btn btn-secondary text-sm"
+                onclick="const details = this.parentElement.nextElementSibling; details.classList.toggle('hidden'); this.querySelector('span').textContent = details.classList.contains('hidden') ? 'Show' : 'Hide';"
+              >
+                <span>Hide</span> Field Details
+              </button>
+              <button 
+                type="button"
+                class="btn btn-primary text-sm"
+                onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
+              >
+                Copy
+              </button>
+            </div>
+            <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
+              {{ event_info.fields }}
+            </div>
+          </div>
+          {% endif %}
+        {% elif event_error %}
+          <div class="text-yellow-400">{{ event_error }}</div>
+        {% else %}
+          <div class="text-yellow-400">No event information available.</div>
+        {% endif %}
+      </div>
     {% endif %}
   </div>
   <div class="flex flex-col items-center justify-center mt-12 gap-4 w-full max-w-md mx-auto">
