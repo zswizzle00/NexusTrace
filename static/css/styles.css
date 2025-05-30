@@ -24,6 +24,10 @@
     --border-primary: #374151;
     --border-secondary: #4B5563;
     
+    /* Link Colors */
+    --link-color: #FFFFFF;
+    --link-hover-color: #FFFFFF;
+    
     /* Spacing */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
@@ -180,9 +184,8 @@
 
 /* Cards */
 .card {
-    background: rgba(35, 41, 70, 0.85);
-    border: 1px solid rgba(59, 130, 246, 0.15);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid #e0e7ef !important;
     border-radius: 1rem;
     padding: var(--spacing-lg);
     transition: var(--transition-normal);
@@ -289,7 +292,7 @@
 
 body {
     font-family: 'Inter', 'Roboto', 'Open Sans', Arial, sans-serif;
-    background: linear-gradient(135deg, #3b82f6 0%, #232946 100%);
+    background: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%);
     color: var(--text-primary);
     line-height: 1.7;
     letter-spacing: 0.01em;
@@ -334,10 +337,10 @@ body {
 }
 
 .info-card {
-    background: #232946;
-    border: 1px solid #374151;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid #e0e7ef !important;
     border-radius: 1rem;
-    box-shadow: 0 4px 24px 0 #00000022;
+    box-shadow: 0 2px 12px 0 #00000022;
     transition: all 0.2s;
     height: 100%;
     padding: 1rem;
@@ -1180,7 +1183,7 @@ ul, ol {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #181f2a !important;
+  background: #20243a;
   padding: 0 32px;
   height: 64px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -1702,7 +1705,7 @@ table.data-table td, table.data-table th { padding: 0.5em 1em; }
 
 /* 9. Subtle gradient for page background */
 body {
-  background: linear-gradient(135deg, #3b82f6 0%, #232946 100%);
+  background: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%);
 }
 
 /* 10. Responsive cards/tables/forms */
