@@ -24,10 +24,6 @@
     --border-primary: #374151;
     --border-secondary: #4B5563;
     
-    /* Link Colors */
-    --link-color: #FFFFFF;
-    --link-hover-color: #FFFFFF;
-    
     /* Spacing */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
@@ -49,6 +45,9 @@
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Enterprise Theme Additions */
+    --accent-orange: #FF6A1A;
 }
 
 /* Loading States */
@@ -292,8 +291,8 @@
 
 body {
     font-family: 'Inter', 'Roboto', 'Open Sans', Arial, sans-serif;
-    background: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%);
-    color: var(--text-primary);
+    background: linear-gradient(120deg, #181A20 0%, #232946 100%) !important;
+    color: #fff;
     line-height: 1.7;
     letter-spacing: 0.01em;
 }
@@ -1705,7 +1704,7 @@ table.data-table td, table.data-table th { padding: 0.5em 1em; }
 
 /* 9. Subtle gradient for page background */
 body {
-  background: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%);
+  background: linear-gradient(120deg, #181A20 0%, #232946 100%) !important;
 }
 
 /* 10. Responsive cards/tables/forms */
@@ -1733,4 +1732,56 @@ body {
 .main-content {
   background: none !important;
   box-shadow: none !important;
+}
+
+.enterprise-headline {
+  font-size: 2.8rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 1.2rem;
+  letter-spacing: 0.01em;
+}
+.enterprise-headline .accent {
+  color: var(--accent-orange);
+}
+.enterprise-subtitle {
+  color: #bfc7e0;
+  font-size: 1.25rem;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  max-width: 600px;
+}
+.enterprise-icon-row {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+  justify-content: center;
+}
+.enterprise-icon-box {
+  background: rgba(255,255,255,0.07);
+  border-radius: 1.2rem;
+  padding: 1.2rem 1.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px 0 #00000022;
+}
+.enterprise-icon-box svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: block;
+}
+.enterprise-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 3rem;
+  font-size: 1.2rem;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.enterprise-brand .accent {
+  color: var(--accent-orange);
+  font-size: 1.5rem;
 } 

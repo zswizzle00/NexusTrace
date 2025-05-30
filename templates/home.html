@@ -1,100 +1,234 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
-    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
-        <div class="card p-8 md:p-14 space-y-8">
-            <!-- Header Section with Border -->
-            <div class="text-center mb-8 pb-8 border-b border-gray-700">
-                <h1 class="text-4xl md:text-6xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                    Welcome to NexusTrace
-                </h1>
-                <p class="text-lg md:text-2xl text-gray-400">
-                    A tool for analyzing IP addresses, domains, URLs, user-agent strings, and file hashes — with additional support for Active Directory event searches and baked-in CyberChef functionality.
-                </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusTrace Enterprise</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        body {
+            min-height: 100vh;
+            background: linear-gradient(120deg, #181A20 0%, #232946 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .circle-bg {
+            position: absolute;
+            left: -10vw;
+            top: 10vh;
+            width: 60vw;
+            height: 60vw;
+            z-index: 0;
+            opacity: 0.18;
+        }
+        .main-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .headline {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 1.2rem;
+            letter-spacing: 0.01em;
+        }
+        .headline .accent {
+            color: #FF6A1A;
+        }
+        .subtitle {
+            color: #bfc7e0;
+            font-size: 1.25rem;
+            margin-bottom: 2.5rem;
+            text-align: center;
+            max-width: 600px;
+        }
+        .icon-row {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2.5rem;
+        }
+        .icon-box {
+            background: rgba(255,255,255,0.07);
+            border-radius: 1.2rem;
+            padding: 1.2rem 1.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 12px 0 #00000022;
+        }
+        .icon-box svg {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: block;
+        }
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+            width: 100%;
+            max-width: 420px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 1rem 1.2rem;
+            border-radius: 0.7rem;
+            border: none;
+            background: rgba(255,255,255,0.07);
+            color: #fff;
+            font-size: 1.1rem;
+            outline: none;
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .search-input::placeholder {
+            color: #bfc7e0;
+        }
+        .search-btn {
+            background: #FF6A1A;
+            color: #fff;
+            border: none;
+            border-radius: 0.7rem;
+            padding: 1rem 1.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px 0 #FF6A1A33;
+        }
+        .search-btn:hover, .search-btn:focus {
+            background: #d4550d;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 2rem;
+            margin-top: 1.5rem;
+            margin-bottom: 2.5rem;
+            width: 100%;
+            max-width: 900px;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.07);
+            border-radius: 1.2rem;
+            padding: 2rem 1.5rem 1.5rem 1.5rem;
+            text-decoration: none;
+            color: #fff;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            transition: transform 0.15s, box-shadow 0.15s, border 0.15s, background 0.15s;
+            position: relative;
+            border: 1.5px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            min-height: 180px;
+        }
+        .feature-card:hover, .feature-card:focus {
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 8px 32px rgba(255, 106, 26, 0.15);
+            border: 1.5px solid #FF6A1A;
+            background: rgba(255,255,255,0.12);
+            outline: none;
+        }
+        .feature-card .icon {
+            font-size: 2rem;
+            margin-bottom: 1.2rem;
+            color: #FF6A1A;
+        }
+        .feature-card .title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+        .feature-card .desc {
+            color: #bfc7e0;
+            font-size: 1rem;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 3rem;
+            font-size: 1.2rem;
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+        .brand .accent {
+            color: #FF6A1A;
+            font-size: 1.5rem;
+        }
+        @media (max-width: 700px) {
+            .main-content { padding: 1.2rem; }
+            .feature-grid { grid-template-columns: 1fr; gap: 1.2rem; }
+            .icon-row { gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <svg class="circle-bg" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="200" cy="200" r="180" stroke="#fff" stroke-width="2" opacity="0.12" />
+        <circle cx="200" cy="200" r="120" stroke="#fff" stroke-width="2" opacity="0.10" />
+        <circle cx="200" cy="200" r="60" stroke="#fff" stroke-width="2" opacity="0.08" />
+    </svg>
+    <div class="main-content">
+        <div class="headline"><span class="accent">Nexus</span>Trace Enterprise</div>
+        <div class="subtitle">A modern platform for analyzing IPs, domains, hashes, user-agents, and more. Built for security teams and enterprise workflows.</div>
+        <form class="search-bar" action="/analyze" method="POST">
+            <input class="search-input" type="text" name="indicator" placeholder="Unified Search" required />
+            <button class="search-btn" type="submit">Analyze</button>
+        </form>
+        <div class="icon-row">
+            <div class="icon-box">
+                <svg fill="#fff" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
             </div>
-            <!-- Unified Search Bar with Border -->
-            <div class="unified-search mb-8 pb-8 border-b border-gray-700">
-                <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
-                    <input type="text" 
-                           name="indicator" 
-                           placeholder="Unified Search" 
-                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
-                           required>
-                    <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto text-lg md:text-xl py-4 md:py-5 px-6 md:px-8 flex items-center justify-center">
-                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        Analyze
-                    </button>
-                </form>
+            <div class="icon-box">
+                <svg fill="#fff" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/></svg>
             </div>
-            <!-- Quick Links Grid with Border -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                <a href="/hash_analysis" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path d="M16.5 7.5h-9v9h9v-9Z" />
-                        <path fill-rule="evenodd" d="M8.25 2.25A.75.75 0 0 1 9 3v.75h2.25V3a.75.75 0 0 1 1.5 0v.75H15V3a.75.75 0 0 1 1.5 0v.75h.75a3 3 0 0 1 3 3v.75H21A.75.75 0 0 1 21 9h-.75v2.25H21a.75.75 0 0 1 0 1.5h-.75V15H21a.75.75 0 0 1 0 1.5h-.75v.75a3 3 0 0 1-3 3h-.75V21a.75.75 0 0 1-1.5 0v-.75h-2.25V21a.75.75 0 0 1-1.5 0v-.75H9V21a.75.75 0 0 1-1.5 0v-.75h-.75a3 3 0 0 1-3-3v-.75H3A.75.75 0 0 1 3 15h.75v-2.25H3a.75.75 0 0 1 0-1.5h.75V9H3a.75.75 0 0 1 0-1.5h.75v-.75a3 3 0 0 1 3-3h.75V3a.75.75 0 0 1 .75-.75ZM6 6.75A.75.75 0 0 1 6.75 6h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75H6.75a.75.75 0 0 1-.75-.75V6.75Z" clip-rule="evenodd" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">Hash Search</h3>
-                        <p class="text-gray-400 text-sm">Analyze file hashes and malware</p>
-                    </div>
-                </a>
-                <a href="/ip_search" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path d="M5.507 4.048A3 3 0 0 1 7.785 3h8.43a3 3 0 0 1 2.278 1.048l1.722 2.008A4.533 4.533 0 0 0 19.5 6h-15c-.243 0-.482.02-.715.056l1.722-2.008Z" />
-                        <path fill-rule="evenodd" d="M1.5 10.5a3 3 0 0 1 3-3h15a3 3 0 1 1 0 6h-15a3 3 0 0 1-3-3Zm15 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm2.25.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.5 15a3 3 0 1 0 0 6h15a3 3 0 1 0 0-6h-15Zm11.25 3.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM19.5 18a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" clip-rule="evenodd" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">IP Search</h3>
-                        <p class="text-gray-400 text-sm">Analyze and investigate IP addresses</p>
-                    </div>
-                </a>
-                <a href="/domain_search" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path d="M21.721 12.752a9.711 9.711 0 0 0-.945-5.003 12.754 12.754 0 0 1-4.339 2.708 18.991 18.991 0 0 1-.214 4.772 17.165 17.165 0 0 0 5.498-2.477ZM14.634 15.55a17.324 17.324 0 0 0 .332-4.647c-.952.227-1.945.347-2.966.347-1.021 0-2.014-.12-2.966-.347a17.515 17.515 0 0 0 .332 4.647 17.385 17.385 0 0 0 5.268 0ZM9.772 17.119a18.963 18.963 0 0 0 4.456 0A17.182 17.182 0 0 1 12 21.724a17.18 17.18 0 0 1-2.228-4.605ZM7.777 15.23a18.87 18.87 0 0 1-.214-4.774 12.753 12.753 0 0 1-4.34-2.708 9.711 9.711 0 0 0-.944 5.004 17.165 17.165 0 0 0 5.498 2.477ZM21.356 14.752a9.765 9.765 0 0 1-7.478 6.817 18.64 18.64 0 0 0 1.988-4.718 18.627 18.627 0 0 0 5.49-2.098ZM2.644 14.752c1.682.971 3.53 1.688 5.49 2.099a18.64 18.64 0 0 0 1.988 4.718 9.765 9.765 0 0 1-7.478-6.816ZM13.878 2.43a9.755 9.755 0 0 1 6.116 3.986 11.267 11.267 0 0 1-3.746 2.504 18.63 18.63 0 0 0-2.37-6.49ZM12 2.276a17.152 17.152 0 0 1 2.805 7.121c-.897.23-1.837.353-2.805.353-.968 0-1.908-.122-2.805-.353A17.151 17.151 0 0 1 12 2.276ZM10.122 2.43a18.629 18.629 0 0 0-2.37 6.49 11.266 11.266 0 0 1-3.746-2.504 9.754 9.754 0 0 1 6.116-3.985Z" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">Domain/URL Search</h3>
-                        <p class="text-gray-400 text-sm">Analyze domains and URLs</p>
-                    </div>
-                </a>
-                <a href="/ad_event_search" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path fill-rule="evenodd" d="M4.5 3.75a3 3 0 0 0-3 3v10.5a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3V6.75a3 3 0 0 0-3-3h-15Zm4.125 3a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Zm-3.873 8.703a4.126 4.126 0 0 1 7.746 0 .75.75 0 0 1-.351.92 7.47 7.47 0 0 1-3.522.877 7.47 7.47 0 0 1-3.522-.877.75.75 0 0 1-.351-.92ZM15 8.25a.75.75 0 0 0 0 1.5h3.75a.75.75 0 0 0 0-1.5H15ZM14.25 12a.75.75 0 0 1 .75-.75h3.75a.75.75 0 0 1 0 1.5H15a.75.75 0 0 1-.75-.75Zm.75 2.25a.75.75 0 0 0 0 1.5h3.75a.75.75 0 0 0 0-1.5H15Z" clip-rule="evenodd" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">AD Event Search</h3>
-                        <p class="text-gray-400 text-sm">Analyze AD events</p>
-                    </div>
-                </a>
-                <a href="/user_agent_search" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">User Agent Search</h3>
-                        <p class="text-gray-400 text-sm">Analyze User Agents</p>
-                    </div>
-                </a>
-                <a href="/cyberchef" class="card flex flex-col items-center gap-2 md:gap-4 p-6 md:p-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8">
-                        <path d="m15 1.784-.796.795a1.125 1.125 0 1 0 1.591 0L15 1.784ZM12 1.784l-.796.795a1.125 1.125 0 1 0 1.591 0L12 1.784ZM9 1.784l-.796.795a1.125 1.125 0 1 0 1.591 0L9 1.784ZM9.75 7.547c.498-.021.998-.035 1.5-.042V6.75a.75.75 0 0 1 1.5 0v.755c.502.007 1.002.021 1.5.042V6.75a.75.75 0 0 1 1.5 0v.88l.307.022c1.55.117 2.693 1.427 2.693 2.946v1.018a62.182 62.182 0 0 0-13.5 0v-1.018c0-1.519 1.143-2.829 2.693-2.946l.307-.022v-.88a.75.75 0 0 1 1.5 0v.797ZM12 12.75c-2.472 0-4.9.184-7.274.54-1.454.217-2.476 1.482-2.476 2.916v.384a4.104 4.104 0 0 1 2.585.364 2.605 2.605 0 0 0 2.33 0 4.104 4.104 0 0 1 3.67 0 2.605 2.605 0 0 0 2.33 0 4.104 4.104 0 0 1 3.67 0 2.605 2.605 0 0 0 2.33 0 4.104 4.104 0 0 1 2.585-.364v-.384c0-1.434-1.022-2.7-2.476-2.917A49.138 49.138 0 0 0 12 12.75ZM21.75 18.131a2.604 2.604 0 0 0-1.915.165 4.104 4.104 0 0 1-3.67 0 2.605 2.605 0 0 0-2.33 0 4.104 4.104 0 0 1-3.67 0 2.605 2.605 0 0 0-2.33 0 4.104 4.104 0 0 1-3.67 0 2.604 2.604 0 0 0-1.915-.165v2.494c0 1.035.84 1.875 1.875 1.875h15.75c1.035 0 1.875-.84 1.875-1.875v-2.494Z" />
-                    </svg>                      
-                    <div class="text-center">
-                        <h3 class="text-lg font-semibold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">CyberChef</h3>
-                        <p class="text-gray-400 text-sm">The Cyber Swiss Army Knife</p>
-                    </div>
-                </a>
+            <div class="icon-box">
+                <svg fill="#fff" viewBox="0 0 24 24"><polygon points="12,2 22,22 2,22"/></svg>
+            </div>
+            <div class="icon-box">
+                <svg fill="#fff" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
             </div>
         </div>
+        <div class="feature-grid">
+            <a href="/hash_analysis" class="feature-card" tabindex="0">
+                <span class="icon">🔑</span>
+                <span class="title">Hash Search</span>
+                <span class="desc">Analyze file hashes and malware</span>
+            </a>
+            <a href="/ip_search" class="feature-card" tabindex="0">
+                <span class="icon">🌐</span>
+                <span class="title">IP Search</span>
+                <span class="desc">Analyze and investigate IP addresses</span>
+            </a>
+            <a href="/domain_search" class="feature-card" tabindex="0">
+                <span class="icon">🔗</span>
+                <span class="title">Domain/URL Search</span>
+                <span class="desc">Analyze domains and URLs</span>
+            </a>
+            <a href="/ad_event_search" class="feature-card" tabindex="0">
+                <span class="icon">📅</span>
+                <span class="title">AD Event Search</span>
+                <span class="desc">Analyze AD events</span>
+            </a>
+            <a href="/user_agent_search" class="feature-card" tabindex="0">
+                <span class="icon">🧑‍💻</span>
+                <span class="title">User Agent Search</span>
+                <span class="desc">Analyze User Agents</span>
+            </a>
+            <a href="/cyberchef" class="feature-card" tabindex="0">
+                <span class="icon">🧰</span>
+                <span class="title">CyberChef</span>
+                <span class="desc">The Cyber Swiss Army Knife</span>
+            </a>
+        </div>
+        <div class="brand"><span class="accent">N</span>EXUS</div>
     </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Add any necessary JavaScript here
-</script>
-{% endblock %} 
+</body>
+</html> 
