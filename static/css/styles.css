@@ -180,11 +180,13 @@
 
 /* Cards */
 .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-lg);
+    background: rgba(35, 41, 70, 0.85);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    backdrop-filter: blur(8px);
+    border-radius: 1rem;
     padding: var(--spacing-lg);
     transition: var(--transition-normal);
+    box-shadow: 0 4px 24px 0 #00000022;
 }
 
 .card:hover {
@@ -285,9 +287,9 @@
     background: var(--border-secondary);
 }
 
-body, html {
+body {
     font-family: 'Inter', 'Roboto', 'Open Sans', Arial, sans-serif;
-    background: linear-gradient(135deg, #181f2a 0%, #232946 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #232946 100%);
     color: var(--text-primary);
     line-height: 1.7;
     letter-spacing: 0.01em;
@@ -1178,7 +1180,7 @@ ul, ol {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #23283a;
+  background: #181f2a !important;
   padding: 0 32px;
   height: 64px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -1410,7 +1412,7 @@ ul, ol {
   border-color: #3b82f6;
 }
 .footer {
-  background: none;
+  background: #20243a !important;
   border-top: 1px solid #232946;
   margin-top: 4rem;
   padding-top: 2rem;
@@ -1700,7 +1702,7 @@ table.data-table td, table.data-table th { padding: 0.5em 1em; }
 
 /* 9. Subtle gradient for page background */
 body {
-  background: linear-gradient(135deg, #181f2a 0%, #232946 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #232946 100%);
 }
 
 /* 10. Responsive cards/tables/forms */
@@ -1723,4 +1725,9 @@ body {
     padding: 0.3em 0.3em;
     font-size: 0.9em;
   }
+}
+
+.main-content {
+  background: none !important;
+  box-shadow: none !important;
 } 
