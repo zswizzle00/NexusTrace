@@ -1,234 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexusTrace Enterprise</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <style>
-        body {
-            min-height: 100vh;
-            background: linear-gradient(120deg, #181A20 0%, #232946 100%);
-            position: relative;
-            overflow: hidden;
-        }
-        .circle-bg {
-            position: absolute;
-            left: -10vw;
-            top: 10vh;
-            width: 60vw;
-            height: 60vw;
-            z-index: 0;
-            opacity: 0.18;
-        }
-        .main-content {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .headline {
-            font-size: 2.8rem;
-            font-weight: 800;
-            color: #fff;
-            margin-bottom: 1.2rem;
-            letter-spacing: 0.01em;
-        }
-        .headline .accent {
-            color: #FF6A1A;
-        }
-        .subtitle {
-            color: #bfc7e0;
-            font-size: 1.25rem;
-            margin-bottom: 2.5rem;
-            text-align: center;
-            max-width: 600px;
-        }
-        .icon-row {
-            display: flex;
-            gap: 2rem;
-            margin-bottom: 2.5rem;
-        }
-        .icon-box {
-            background: rgba(255,255,255,0.07);
-            border-radius: 1.2rem;
-            padding: 1.2rem 1.7rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 12px 0 #00000022;
-        }
-        .icon-box svg {
-            width: 2.5rem;
-            height: 2.5rem;
-            display: block;
-        }
-        .search-bar {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2.5rem;
-            width: 100%;
-            max-width: 420px;
-        }
-        .search-input {
-            flex: 1;
-            padding: 1rem 1.2rem;
-            border-radius: 0.7rem;
-            border: none;
-            background: rgba(255,255,255,0.07);
-            color: #fff;
-            font-size: 1.1rem;
-            outline: none;
-            transition: box-shadow 0.2s, border-color 0.2s;
-        }
-        .search-input::placeholder {
-            color: #bfc7e0;
-        }
-        .search-btn {
-            background: #FF6A1A;
-            color: #fff;
-            border: none;
-            border-radius: 0.7rem;
-            padding: 1rem 1.5rem;
-            font-weight: 700;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: background 0.2s, box-shadow 0.2s;
-            box-shadow: 0 2px 8px 0 #FF6A1A33;
-        }
-        .search-btn:hover, .search-btn:focus {
-            background: #d4550d;
-        }
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 2rem;
-            margin-top: 1.5rem;
-            margin-bottom: 2.5rem;
-            width: 100%;
-            max-width: 900px;
-        }
-        .feature-card {
-            background: rgba(255,255,255,0.07);
-            border-radius: 1.2rem;
-            padding: 2rem 1.5rem 1.5rem 1.5rem;
-            text-decoration: none;
-            color: #fff;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-            transition: transform 0.15s, box-shadow 0.15s, border 0.15s, background 0.15s;
-            position: relative;
-            border: 1.5px solid transparent;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            min-height: 180px;
-        }
-        .feature-card:hover, .feature-card:focus {
-            transform: translateY(-4px) scale(1.03);
-            box-shadow: 0 8px 32px rgba(255, 106, 26, 0.15);
-            border: 1.5px solid #FF6A1A;
-            background: rgba(255,255,255,0.12);
-            outline: none;
-        }
-        .feature-card .icon {
-            font-size: 2rem;
-            margin-bottom: 1.2rem;
-            color: #FF6A1A;
-        }
-        .feature-card .title {
-            font-size: 1.15rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: #fff;
-        }
-        .feature-card .desc {
-            color: #bfc7e0;
-            font-size: 1rem;
-        }
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: 3rem;
-            font-size: 1.2rem;
-            color: #fff;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-        }
-        .brand .accent {
-            color: #FF6A1A;
-            font-size: 1.5rem;
-        }
-        @media (max-width: 700px) {
-            .main-content { padding: 1.2rem; }
-            .feature-grid { grid-template-columns: 1fr; gap: 1.2rem; }
-            .icon-row { gap: 1rem; }
-        }
-    </style>
-</head>
-<body>
-    <svg class="circle-bg" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="200" cy="200" r="180" stroke="#fff" stroke-width="2" opacity="0.12" />
-        <circle cx="200" cy="200" r="120" stroke="#fff" stroke-width="2" opacity="0.10" />
-        <circle cx="200" cy="200" r="60" stroke="#fff" stroke-width="2" opacity="0.08" />
-    </svg>
-    <div class="main-content">
-        <div class="headline"><span class="accent">Nexus</span>Trace Enterprise</div>
-        <div class="subtitle">A modern platform for analyzing IPs, domains, hashes, user-agents, and more. Built for security teams and enterprise workflows.</div>
-        <form class="search-bar" action="/analyze" method="POST">
-            <input class="search-input" type="text" name="indicator" placeholder="Unified Search" required />
-            <button class="search-btn" type="submit">Analyze</button>
-        </form>
-        <div class="icon-row">
-            <div class="icon-box">
-                <svg fill="#fff" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
+    <div class="w-full max-w-4xl mx-auto px-2 py-8 md:py-10">
+        <div class="card bg-[#181A20] border border-[#232946] rounded-2xl shadow-xl p-6 transition-all duration-200 space-y-4 text-gray-200">
+            <!-- Header Section with Border -->
+            <div class="text-center mb-6 pb-6 border-b border-gray-700">
+                <h1 class="text-3xl md:text-5xl font-extrabold mb-3 md:mb-6 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                    Welcome to NexusTrace
+                </h1>
+                <p class="text-base md:text-xl text-gray-400">
+                    A tool for analyzing IP addresses, domains, URLs, user-agent strings, and file hashes — with additional support for Active Directory event searches and baked-in CyberChef functionality.
+                </p>
             </div>
-            <div class="icon-box">
-                <svg fill="#fff" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/></svg>
-            </div>
-            <div class="icon-box">
-                <svg fill="#fff" viewBox="0 0 24 24"><polygon points="12,2 22,22 2,22"/></svg>
-            </div>
-            <div class="icon-box">
-                <svg fill="#fff" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
+            <!-- Search Bar -->
+            <form class="search-form w-full mx-auto mb-6" action="/analyze" method="POST">
+                <input class="search-input" type="text" name="indicator" placeholder="Unified Search" required />
+                <button class="btn btn-primary" type="submit">Analyze</button>
+            </form>
+            <!-- Feature Grid -->
+            <div class="feature-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+                <a href="/hash_analysis" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">🔑</span>
+                    <span class="title">Hash Search</span>
+                    <span class="desc">Analyze file hashes and malware</span>
+                </a>
+                <a href="/ip_search" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">🌐</span>
+                    <span class="title">IP Search</span>
+                    <span class="desc">Analyze and investigate IP addresses</span>
+                </a>
+                <a href="/domain_search" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">🔗</span>
+                    <span class="title">Domain/URL Search</span>
+                    <span class="desc">Analyze domains and URLs</span>
+                </a>
+                <a href="/ad_event_search" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">📅</span>
+                    <span class="title">AD Event Search</span>
+                    <span class="desc">Analyze AD events</span>
+                </a>
+                <a href="/user_agent_search" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">🧑‍💻</span>
+                    <span class="title">User Agent Search</span>
+                    <span class="desc">Analyze User Agents</span>
+                </a>
+                <a href="/cyberchef" class="feature-card min-h-[140px] p-4" tabindex="0">
+                    <span class="icon">🧰</span>
+                    <span class="title">CyberChef</span>
+                    <span class="desc">The Cyber Swiss Army Knife</span>
+                </a>
             </div>
         </div>
-        <div class="feature-grid">
-            <a href="/hash_analysis" class="feature-card" tabindex="0">
-                <span class="icon">🔑</span>
-                <span class="title">Hash Search</span>
-                <span class="desc">Analyze file hashes and malware</span>
-            </a>
-            <a href="/ip_search" class="feature-card" tabindex="0">
-                <span class="icon">🌐</span>
-                <span class="title">IP Search</span>
-                <span class="desc">Analyze and investigate IP addresses</span>
-            </a>
-            <a href="/domain_search" class="feature-card" tabindex="0">
-                <span class="icon">🔗</span>
-                <span class="title">Domain/URL Search</span>
-                <span class="desc">Analyze domains and URLs</span>
-            </a>
-            <a href="/ad_event_search" class="feature-card" tabindex="0">
-                <span class="icon">📅</span>
-                <span class="title">AD Event Search</span>
-                <span class="desc">Analyze AD events</span>
-            </a>
-            <a href="/user_agent_search" class="feature-card" tabindex="0">
-                <span class="icon">🧑‍💻</span>
-                <span class="title">User Agent Search</span>
-                <span class="desc">Analyze User Agents</span>
-            </a>
-            <a href="/cyberchef" class="feature-card" tabindex="0">
-                <span class="icon">🧰</span>
-                <span class="title">CyberChef</span>
-                <span class="desc">The Cyber Swiss Army Knife</span>
-            </a>
-        </div>
-        <div class="brand"><span class="accent">N</span>EXUS</div>
     </div>
-</body>
-</html> 
+</div>
+{% endblock %} 

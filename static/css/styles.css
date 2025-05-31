@@ -183,8 +183,6 @@
 
 /* Cards */
 .card {
-    background: rgba(255, 255, 255, 0.2) !important;
-    border: 1px solid #e0e7ef !important;
     border-radius: 1rem;
     padding: var(--spacing-lg);
     transition: var(--transition-normal);
@@ -207,7 +205,7 @@
 
 .nav-link:hover {
     color: var(--text-primary);
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.1);a
 }
 
 .nav-link.active {
