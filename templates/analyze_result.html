@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
+{% block main_content_class %}full-width{% endblock %}
+
 {% block content %}
-<div class="w-full px-0 py-10">
+<div class="w-full py-10">
   <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
-  <div class="max-w-4xl mx-auto grid w-full gap-8 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+  <div class="w-full grid gap-8 [grid-template-columns:repeat(auto-fit,minmax(400px,1fr))]">
     {% if indicator_type == 'ip' %}
       <!-- IPInfo Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">IPInfo</h3>
@@ -31,7 +33,7 @@
         </details>
       </div>
       <!-- IP2Location Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">IP2Location</h3>
@@ -55,7 +57,7 @@
         </details>
       </div>
       <!-- VPNAPI Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">VPNAPI</h3>
@@ -106,7 +108,7 @@
         </details>
       </div>
       <!-- ProxyCheck Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">ProxyCheck</h3>
@@ -130,7 +132,7 @@
         </details>
       </div>
       <!-- AbuseIPDB Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">AbuseIPDB</h3>
@@ -192,7 +194,7 @@
         </details>
       </div>
       <!-- Shodan Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">Shodan</h3>
@@ -283,7 +285,7 @@
         </details>
       </div>
       <!-- AlienVault OTX Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col xl:col-span-3">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col [grid-column:1/-1]">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">AlienVault OTX</h3>
