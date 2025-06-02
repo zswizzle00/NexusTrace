@@ -1,5 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify
 from ..services.hash_service import get_hash_info
+from ..services.file_service import get_intezer_analysis
+from ..services.ip_service import get_alienvault_data
+from app.routes.home_routes import parse_alienvault_otx  # If you have a parse function
 import logging
 
 # Configure logging
@@ -28,30 +31,31 @@ def check_hash():
         logger.error(f"Error in check_hash: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@hash_bp.route('/analyze', methods=['GET', 'POST'])
+@hash_bp.route('/hash/analyze', methods=['GET', 'POST'])
 def analyze_hash():
-    logger.debug("Entering analyze_hash route")
     result = None
     error = None
-    
+    intezer_result = None
+    alienvault = None
+
     if request.method == 'POST':
-        logger.debug("Processing POST request")
         hash_value = request.form.get('hash', '').strip()
-        logger.debug(f"Received hash value: {hash_value}")
-        
         if not hash_value:
             error = 'Hash is required'
-            logger.debug("No hash value provided")
         else:
-            hash_info = get_hash_info(hash_value)
-            logger.debug(f"Hash info result: {hash_info}")
-            
-            if 'error' in hash_info:
-                error = hash_info['error']
-                logger.debug(f"Error in hash info: {error}")
-            else:
-                result = hash_info
-                logger.debug("Successfully processed hash")
-    
-    logger.debug(f"Rendering template with result: {result}, error: {error}")
-    return render_template('hash_analysis.html', result=result, error=error) 
+            # Intezer enrichment
+            intezer_result = get_intezer_analysis(file_hash=hash_value)
+            # AlienVault enrichment
+            alienvault_raw = get_alienvault_data(hash_value)
+            alienvault = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+            # Fallback: basic hash info
+            if not intezer_result:
+                result = get_hash_info(hash_value)
+
+    return render_template(
+        'hash_analysis.html',
+        result=result,
+        error=error,
+        intezer_result=intezer_result,
+        alienvault=alienvault
+    ) 

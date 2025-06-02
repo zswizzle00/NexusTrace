@@ -5,20 +5,22 @@
 {% block content %}
 <div class="w-full py-10">
   <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
-  <div class="w-full grid gap-8 [grid-template-columns:repeat(auto-fit,minmax(400px,1fr))]">
+  
+  <!-- Main grid container -->
+  <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
     {% if indicator_type == 'ip' %}
       <!-- IPInfo Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">IPInfo</h3>
         </div>
         {% if ipinfo %}
           <table class="mb-4 w-full text-sm">
-            <tr><th>Location</th><td>{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
-            <tr><th>Org</th><td>{{ ipinfo.ipinfo.org }}</td></tr>
-            <tr><th>ASN</th><td>{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
-            <tr><th>Hostname</th><td>{{ ipinfo.ipinfo.hostname }}</td></tr>
+            <tr><th class="break-all pr-4 py-2">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+            <tr><th class="break-all pr-4 py-2">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
+            <tr><th class="break-all pr-4 py-2">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+            <tr><th class="break-all pr-4 py-2">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
           </table>
         {% else %}
           <span class="text-yellow-400">No IPInfo data found.</span>
@@ -33,7 +35,7 @@
         </details>
       </div>
       <!-- IP2Location Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">IP2Location</h3>
@@ -41,7 +43,7 @@
         {% if ip2location %}
           <table class="mb-4 w-full text-sm">
             {% for k, v in ip2location.items() %}
-              <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
             {% endfor %}
           </table>
         {% else %}
@@ -57,7 +59,7 @@
         </details>
       </div>
       <!-- VPNAPI Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">VPNAPI</h3>
@@ -108,7 +110,7 @@
         </details>
       </div>
       <!-- ProxyCheck Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">ProxyCheck</h3>
@@ -116,7 +118,7 @@
         {% if proxycheck %}
           <table class="mb-4 w-full text-sm">
             {% for k, v in proxycheck.proxycheck.items() %}
-              <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
             {% endfor %}
           </table>
         {% else %}
@@ -132,7 +134,7 @@
         </details>
       </div>
       <!-- AbuseIPDB Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">AbuseIPDB</h3>
@@ -140,7 +142,7 @@
         {% if abuseipdb %}
           <table class="mb-4 w-full text-sm">
             {% for k, v in abuseipdb.summary.items() %}
-              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
             {% endfor %}
           </table>
           {% for table_name, rows in abuseipdb.tables.items() %}
@@ -194,7 +196,7 @@
         </details>
       </div>
       <!-- Shodan Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">Shodan</h3>
@@ -202,7 +204,7 @@
         {% if shodan %}
           <table class="mb-4 w-full text-sm">
             {% for k, v in shodan.summary.items() %}
-              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
             {% endfor %}
           </table>
           {% for table_name, rows in shodan.tables.items() %}
@@ -285,7 +287,7 @@
         </details>
       </div>
       <!-- AlienVault OTX Card -->
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col [grid-column:1/-1]">
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col [grid-column:1/-1] overflow-x-auto">
         <div class="flex items-center mb-4">
           <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
           <h3 class="text-xl font-bold text-blue-300">AlienVault OTX</h3>
@@ -293,7 +295,7 @@
         {% if alienvault %}
           <table class="mb-4 w-full text-sm">
             {% for k, v in alienvault.summary.items() %}
-              <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
             {% endfor %}
           </table>
           {# --- New Section: False Positives, Whitelist, WHOIS, Geo --- #}
@@ -378,27 +380,126 @@
         </details>
       </div>
     {% elif indicator_type == 'domain' or indicator_type == 'url' %}
-      <div class="grid gap-8 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        {% if indicator_type == 'domain' %}
+      {% set card_count = (1 if domain_info else 0) + (1 if whois else 0) + (1 if url_analysis else 0) + (1 if ipinfo else 0) + (1 if ip2location else 0) %}
+      {% if card_count == 1 %}
+        <div class="w-full flex justify-center mt-8">
+          <!-- Place all single card logic here, each card wrapped in overflow-x-auto and using break-all on table cells -->
+          {% if domain_info %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Domain Info</h4>
+              <table class="mb-4 w-full text-sm">
+                <tr><th class="break-all">Domain</th><td class="break-all font-mono">{{ indicator }}</td></tr>
+                {% if domain_info %}
+                  <tr><th class="break-all">IP Address</th><td class="break-all">{{ domain_info.ip_address }}</td></tr>
+                {% else %}
+                  <tr><td colspan="2"><span class="text-yellow-400">No domain info found.</span></td></tr>
+                {% endif %}
+              </table>
+            </div>
+          {% endif %}
+          {% if whois %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">WHOIS (IP2WHOIS)</h4>
+              <table class="data-table mb-2 w-full text-sm">
+                {% for k, v in whois.items() %}
+                  <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
+                {% endfor %}
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ whois | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+          {% endif %}
+          {% if domain_info %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">DNS Records</h4>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th class="break-all">Type</th><th class="break-all">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in domain_info.dns_records.items() %}
+                    <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+          {% endif %}
+          {% if domain_info %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">SSL Info</h4>
+              <table class="data-table mb-2 w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-700 text-blue-200">
+                    <th class="break-all">Field</th><th class="break-all">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for k, v in domain_info.ssl_info.items() %}
+                    <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+          {% endif %}
+          {% if ipinfo or ip2location %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h4 class="text-lg font-semibold text-blue-400 mb-2">Resolved IP Enrichment</h4>
+              {% if ipinfo %}
+                <span class="font-semibold text-gray-400">IPInfo:</span>
+                <table class="data-table mb-2 w-full text-sm">
+                  <tr><th class="break-all">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+                  <tr><th class="break-all">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
+                  <tr><th class="break-all">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+                  <tr><th class="break-all">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
+                </table>
+                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                  <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+              {% if ip2location %}
+                <span class="font-semibold text-gray-400">IP2Location:</span>
+                <table class="data-table mb-2 w-full text-sm">
+                  {% for k, v in ip2location.items() %}
+                    <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
+                  {% endfor %}
+                </table>
+                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                  <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ip2location | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 mt-8">
           <!-- Domain Info Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h4 class="text-lg font-semibold text-blue-400 mb-2">Domain Info</h4>
             <table class="mb-4 w-full text-sm">
-              <tr><th>Domain</th><td class="font-mono">{{ indicator }}</td></tr>
+              <tr><th class="break-all">Domain</th><td class="break-all font-mono">{{ indicator }}</td></tr>
               {% if domain_info %}
-                <tr><th>IP Address</th><td>{{ domain_info.ip_address }}</td></tr>
+                <tr><th class="break-all">IP Address</th><td class="break-all">{{ domain_info.ip_address }}</td></tr>
               {% else %}
                 <tr><td colspan="2"><span class="text-yellow-400">No domain info found.</span></td></tr>
               {% endif %}
             </table>
           </div>
           <!-- WHOIS Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h4 class="text-lg font-semibold text-blue-400 mb-2">WHOIS (IP2WHOIS)</h4>
             {% if whois %}
               <table class="data-table mb-2 w-full text-sm">
                 {% for k, v in whois.items() %}
-                  <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+                  <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
                 {% endfor %}
               </table>
             {% else %}
@@ -410,17 +511,17 @@
           </div>
           <!-- DNS Records Card -->
           {% if domain_info %}
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h4 class="text-lg font-semibold text-blue-400 mb-2">DNS Records</h4>
             <table class="data-table mb-2 w-full text-xs">
               <thead>
                 <tr class="bg-gray-700 text-blue-200">
-                  <th>Type</th><th>Value</th>
+                  <th class="break-all">Type</th><th class="break-all">Value</th>
                 </tr>
               </thead>
               <tbody>
                 {% for k, v in domain_info.dns_records.items() %}
-                  <tr><td>{{ k }}</td><td>{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
+                  <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -429,17 +530,17 @@
             </details>
           </div>
           <!-- SSL Info Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h4 class="text-lg font-semibold text-blue-400 mb-2">SSL Info</h4>
             <table class="data-table mb-2 w-full text-xs">
               <thead>
                 <tr class="bg-gray-700 text-blue-200">
-                  <th>Field</th><th>Value</th>
+                  <th class="break-all">Field</th><th class="break-all">Value</th>
                 </tr>
               </thead>
               <tbody>
                 {% for k, v in domain_info.ssl_info.items() %}
-                  <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+                  <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v }}</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -450,15 +551,15 @@
           {% endif %}
           <!-- Resolved IP Enrichment Card -->
           {% if ipinfo or ip2location %}
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h4 class="text-lg font-semibold text-blue-400 mb-2">Resolved IP Enrichment</h4>
             {% if ipinfo %}
               <span class="font-semibold text-gray-400">IPInfo:</span>
               <table class="data-table mb-2 w-full text-sm">
-                <tr><th>Location</th><td>{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
-                <tr><th>Org</th><td>{{ ipinfo.ipinfo.org }}</td></tr>
-                <tr><th>ASN</th><td>{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
-                <tr><th>Hostname</th><td>{{ ipinfo.ipinfo.hostname }}</td></tr>
+                <tr><th class="break-all">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+                <tr><th class="break-all">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
+                <tr><th class="break-all">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+                <tr><th class="break-all">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
               </table>
               <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
                 <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
@@ -468,7 +569,7 @@
               <span class="font-semibold text-gray-400">IP2Location:</span>
               <table class="data-table mb-2 w-full text-sm">
                 {% for k, v in ip2location.items() %}
-                  <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+                  <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
                 {% endfor %}
               </table>
               <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
@@ -477,383 +578,383 @@
             {% endif %}
           </div>
           {% endif %}
-        {% endif %}
-        {% if indicator_type == 'url' %}
-          <!-- URL Analysis Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col mb-6">
-            <h4 class="text-xl font-bold text-blue-300 mb-2 flex items-center gap-2">
-              <span>URL Analysis Summary</span>
-              <span class="text-xs bg-blue-800 text-blue-200 rounded px-2 py-1">Summary</span>
-            </h4>
-            <table class="mb-4 w-full text-sm">
-              <tr><th>URL</th><td class="font-mono">{{ indicator }}</td></tr>
-              {% if url_analysis %}
-                <tr><th>Title</th><td>{{ url_analysis.url_analysis.title }}</td></tr>
-                <tr><th>Technologies</th><td>{{ url_analysis.url_analysis.technologies | length }} detected</td></tr>
-                <tr><th>Security Headers</th><td>{{ url_analysis.url_analysis.security_headers | length }} checked</td></tr>
-                <tr><th>Redirects</th><td>{{ url_analysis.url_analysis.response.redirect_chain | length }}</td></tr>
-                <tr><th>Tools</th><td>
-                  <span class="inline-block bg-blue-700 text-blue-100 rounded px-2 py-1 text-xs mr-2">Native</span>
-                  <span class="inline-block bg-green-700 text-green-100 rounded px-2 py-1 text-xs mr-2">Intezer</span>
-                  <span class="inline-block bg-yellow-700 text-yellow-100 rounded px-2 py-1 text-xs">urlscan.io</span>
-                </td></tr>
-              {% else %}
-                <tr><td colspan="2"><span class="text-yellow-400">No URL analysis found.</span></td></tr>
-              {% endif %}
-            </table>
-          </div>
-          {% if url_analysis %}
-          <!-- Native Analysis Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <!-- Technologies Card -->
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Technologies</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Technology</th><th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for k, v in url_analysis.url_analysis.technologies.items() %}
-                    <tr><td>{{ k }}</td><td>{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.technologies | tojson(indent=2) }}</pre>
-              </details>
-            </div>
-            <!-- Security Headers Card -->
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Security Headers</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Header</th><th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for k, v in url_analysis.url_analysis.security_headers.items() %}
-                    <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.security_headers | tojson(indent=2) }}</pre>
-              </details>
-            </div>
-            <!-- Meta Tags Card -->
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Meta Tags</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Name</th><th>Content</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for tag in url_analysis.url_analysis.meta_tags %}
-                    <tr><td>{{ tag.name }}</td><td>{{ tag.content }}</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.meta_tags | tojson(indent=2) }}</pre>
-              </details>
-            </div>
-            <!-- Redirect Chain Card -->
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Redirect Chain</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Status Code</th><th>URL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for r in url_analysis.url_analysis.response.redirect_chain %}
-                    <tr><td>{{ r.status_code }}</td><td>{{ r.url }}</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-              <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.response.redirect_chain | tojson(indent=2) }}</pre>
-              </details>
-            </div>
-          </div>
-          <!-- Intezer Analysis Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col mb-6">
-            <h4 class="text-lg font-semibold text-green-400 mb-2 flex items-center gap-2">
-              <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
-            </h4>
-            {% if url_analysis.url_analysis.intezer_analysis %}
-              <details open class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.intezer_analysis | tojson(indent=2) }}</pre>
-              </details>
-            {% else %}
-              <span class="text-yellow-400">No Intezer analysis available.</span>
-            {% endif %}
-          </div>
-          <!-- urlscan.io Analysis Card -->
-          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col mb-6">
-            <h4 class="text-lg font-semibold text-yellow-300 mb-2 flex items-center gap-2">
-              <img src="https://urlscan.io/static/images/favicon.png" alt="urlscan.io" class="w-5 h-5 inline-block"> urlscan.io Analysis
-            </h4>
-            {% if url_analysis.url_analysis.urlscan_analysis %}
-              <table class="data-table mb-2 w-full text-xs">
-                <tbody>
-                  <tr><th>Scan ID</th><td>{{ url_analysis.url_analysis.urlscan_analysis.task.uuid }}</td></tr>
-                  <tr><th>Scan Time</th><td>{{ url_analysis.url_analysis.urlscan_analysis.task.time }}</td></tr>
-                  <tr><th>Result Link</th><td><a href="https://urlscan.io/result/{{ url_analysis.url_analysis.urlscan_analysis.task.uuid }}/" target="_blank" class="text-blue-400 underline">View Full Report</a></td></tr>
-                  <tr><th>Page Screenshot</th><td><a href="{{ url_analysis.url_analysis.urlscan_analysis.screenshotURL }}" target="_blank" class="text-blue-400 underline">View Screenshot</a></td></tr>
-                  <tr><th>Domain</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.domain }}</td></tr>
-                  <tr><th>Country</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.country }}</td></tr>
-                  <tr><th>Server IP</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.ip }}</td></tr>
-                  <tr><th>ASN</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.asn }}</td></tr>
-                  {% if url_analysis.url_analysis.urlscan_analysis.verdicts %}
-                    <tr><th>Malicious</th><td>{{ url_analysis.url_analysis.urlscan_analysis.verdicts.overall.malicious if url_analysis.url_analysis.urlscan_analysis.verdicts.overall is defined else 'N/A' }}</td></tr>
-                    <tr><th>Phishing</th><td>{{ url_analysis.url_analysis.urlscan_analysis.verdicts.overall.phishing if url_analysis.url_analysis.urlscan_analysis.verdicts.overall is defined else 'N/A' }}</td></tr>
-                    <tr><th>Score</th><td>{{ url_analysis.url_analysis.urlscan_analysis.verdicts.overall.score if url_analysis.url_analysis.urlscan_analysis.verdicts.overall is defined else 'N/A' }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.lists and url_analysis.url_analysis.urlscan_analysis.lists.ips %}
-                    <tr><th>Unique IPs Contacted</th><td>{{ url_analysis.url_analysis.urlscan_analysis.lists.ips | length }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.lists and url_analysis.url_analysis.urlscan_analysis.lists.domains %}
-                    <tr><th>Unique Domains Contacted</th><td>{{ url_analysis.url_analysis.urlscan_analysis.lists.domains | length }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.lists and url_analysis.url_analysis.urlscan_analysis.lists.urls %}
-                    {# Outgoing Links row removed as requested #}
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.page and url_analysis.url_analysis.urlscan_analysis.page.server %}
-                    <tr><th>Server</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.server }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.meta and url_analysis.url_analysis.urlscan_analysis.meta.processed %}
-                    <tr><th>HTTP Requests</th><td>{{ url_analysis.url_analysis.urlscan_analysis.meta.processed.requests }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.meta and url_analysis.url_analysis.urlscan_analysis.meta.processed and url_analysis.url_analysis.urlscan_analysis.meta.processed.responses %}
-                    <tr><th>HTTP Responses</th><td>{{ url_analysis.url_analysis.urlscan_analysis.meta.processed.responses }}</td></tr>
-                  {% endif %}
-                  {% if url_analysis.url_analysis.urlscan_analysis.page and url_analysis.url_analysis.urlscan_analysis.page.domains %}
-                    <tr><th>Detected Technologies</th><td>{{ url_analysis.url_analysis.urlscan_analysis.page.domains | join(', ') }}</td></tr>
-                  {% endif %}
-                </tbody>
-              </table>
-              <details class="mt-2"><summary class="cursor-pointer text-yellow-400">Show Raw Data</summary>
-                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ url_analysis.url_analysis.urlscan_analysis | tojson(indent=2) }}</pre>
-              </details>
-            {% else %}
-              <span class="text-yellow-400">No urlscan.io analysis available.</span>
-            {% endif %}
-          </div>
-          {% endif %}
-        {% endif %}
-      </div>
-    {% elif indicator_type == 'hash' %}
-      {% if intezer_result %}
-        <!-- Intezer Hash Result: Structured Layout -->
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-          <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-            <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
-          </h3>
-          <!-- Summary Table -->
-          <table class="mb-4 w-full text-sm">
-            <tr><th class="pr-4 text-gray-400">SHA256</th><td class="font-mono">{{ intezer_result.sha256 }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Verdict</th><td>{{ intezer_result.verdict or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Sub Verdict</th><td>{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Family</th><td>{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Type</th><td>{{ intezer_result.file_type or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Architecture</th><td>{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Analysis Time</th><td>{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 text-gray-400">Analysis URL</th><td>{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
-          </table>
-          <!-- Code Reuse Section -->
-          {% if intezer_result.code_reuse %}
-            <div class="mb-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Family Name</th><th>Type</th><th>Reused Gene Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for fam in intezer_result.code_reuse.families %}
-                    <tr>
-                      <td>{{ fam.family_name }}</td>
-                      <td>{{ fam.family_type }}</td>
-                      <td>{{ fam.reused_gene_count }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% endif %}
-          <!-- Indicators Section -->
-          {% if intezer_result.indicators %}
-            <div class="mb-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <thead>
-                  <tr class="bg-gray-700 text-blue-200">
-                    <th>Name</th><th>Classification</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for ind in intezer_result.indicators %}
-                    <tr>
-                      <td>{{ ind.name }}</td>
-                      <td>{{ ind.classification }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% endif %}
-          <!-- Metadata Section -->
-          {% if intezer_result.metadata %}
-            <div class="mb-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
-              <table class="data-table mb-2 w-full text-xs">
-                <tbody>
-                  {% for k, v in intezer_result.metadata.items() %}
-                    <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% endif %}
-          <!-- Raw Data Section -->
-          <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
-            <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
-          </details>
         </div>
-      {% elif hash_info %}
-        <!-- Fallback: Basic Hash Info -->
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-          <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
-          <div class="space-y-2">
-            <p class="text-gray-300"><span class="text-gray-400">Type:</span> {{ hash_info.type }}</p>
-            <p class="text-gray-300"><span class="text-gray-400">Value:</span> {{ hash_info.hash }}</p>
-          </div>
-          <div class="mt-4">
-            <h4 class="text-lg font-medium text-blue-400 mb-2">Sources</h4>
-            <ul>
-              {% for source, info in hash_info.sources.items() %}
-                <li class="text-gray-300">
-                  <span class="text-gray-400">{{ source|capitalize }}:</span> {{ info.message }}
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
+      {% endif %}
+    {% elif indicator_type == 'hash' %}
+      {% set card_count = (1 if intezer_result else 0) + (1 if alienvault else 0) + (1 if hash_info else 0) %}
+      {% if card_count == 1 %}
+        <div class="w-full flex justify-center mt-8">
+          <!-- Place all single card logic here, each card wrapped in overflow-x-auto and using break-all on table cells -->
+          {% if intezer_result %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+              <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+                <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
+              </h3>
+              <!-- Summary Table -->
+              <table class="mb-4 w-full text-sm">
+                <tr><th class="pr-4 text-gray-400">SHA256</th><td class="font-mono">{{ intezer_result.sha256 }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Verdict</th><td>{{ intezer_result.verdict or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Sub Verdict</th><td>{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Family</th><td>{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Type</th><td>{{ intezer_result.file_type or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Architecture</th><td>{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Analysis Time</th><td>{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400">Analysis URL</th><td>{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
+              </table>
+              <!-- Code Reuse Section -->
+              {% if intezer_result.code_reuse %}
+                <div class="mb-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
+                  <table class="data-table mb-2 w-full text-xs">
+                    <thead>
+                      <tr class="bg-gray-700 text-blue-200">
+                        <th>Family Name</th><th>Type</th><th>Reused Gene Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for fam in intezer_result.code_reuse.families %}
+                        <tr>
+                          <td>{{ fam.family_name }}</td>
+                          <td>{{ fam.family_type }}</td>
+                          <td>{{ fam.reused_gene_count }}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+              <!-- Indicators Section -->
+              {% if intezer_result.indicators %}
+                <div class="mb-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
+                  <table class="data-table mb-2 w-full text-xs">
+                    <thead>
+                      <tr class="bg-gray-700 text-blue-200">
+                        <th>Name</th><th>Classification</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for ind in intezer_result.indicators %}
+                        <tr>
+                          <td>{{ ind.name }}</td>
+                          <td>{{ ind.classification }}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+              <!-- Metadata Section -->
+              {% if intezer_result.metadata %}
+                <div class="mb-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
+                  <table class="data-table mb-2 w-full text-xs">
+                    <tbody>
+                      {% for k, v in intezer_result.metadata.items() %}
+                        <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+              <!-- Raw Data Section -->
+              <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
+                <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
+              </details>
+            </div>
+          {% endif %}
         </div>
       {% else %}
-        <span class="text-yellow-400">No hash analysis available.</span>
+        <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 mt-8">
+          <!-- Intezer Hash Result: Structured Layout -->
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+            <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+              <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
+            </h3>
+            <!-- Summary Table -->
+            <table class="mb-4 w-full text-sm">
+              <tr><th class="pr-4 text-gray-400">SHA256</th><td class="font-mono">{{ intezer_result.sha256 }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Verdict</th><td>{{ intezer_result.verdict or 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Sub Verdict</th><td>{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Family</th><td>{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Type</th><td>{{ intezer_result.file_type or 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Architecture</th><td>{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Analysis Time</th><td>{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
+              <tr><th class="pr-4 text-gray-400">Analysis URL</th><td>{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
+            </table>
+            <!-- Code Reuse Section -->
+            {% if intezer_result.code_reuse %}
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
+                <table class="data-table mb-2 w-full text-xs">
+                  <thead>
+                    <tr class="bg-gray-700 text-blue-200">
+                      <th>Family Name</th><th>Type</th><th>Reused Gene Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for fam in intezer_result.code_reuse.families %}
+                      <tr>
+                        <td>{{ fam.family_name }}</td>
+                        <td>{{ fam.family_type }}</td>
+                        <td>{{ fam.reused_gene_count }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+            <!-- Indicators Section -->
+            {% if intezer_result.indicators %}
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
+                <table class="data-table mb-2 w-full text-xs">
+                  <thead>
+                    <tr class="bg-gray-700 text-blue-200">
+                      <th>Name</th><th>Classification</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for ind in intezer_result.indicators %}
+                      <tr>
+                        <td>{{ ind.name }}</td>
+                        <td>{{ ind.classification }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+            <!-- Metadata Section -->
+            {% if intezer_result.metadata %}
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
+                <table class="data-table mb-2 w-full text-xs">
+                  <tbody>
+                    {% for k, v in intezer_result.metadata.items() %}
+                      <tr><th>{{ k|replace('_', ' ')|title }}</th><td>{{ v }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+            <!-- Raw Data Section -->
+            <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
+              <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
+            </details>
+          </div>
+        </div>
       {% endif %}
     {% elif indicator_type == 'user_agent' %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-        <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Analysis</h3>
-        {% if user_agent %}
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Browser Information</h4>
-            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.browser.name }}</span></p>
-            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.browser.version }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Operating System</h4>
-            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.os.name }}</span></p>
-            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.os.version }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Device Information</h4>
-            <p class="text-gray-300">Type: <span class="text-white">{{ user_agent.device.type }}</span></p>
-            <p class="text-gray-300">Brand: <span class="text-white">{{ user_agent.device.brand }}</span></p>
-            <p class="text-gray-300">Model: <span class="text-white">{{ user_agent.device.model }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Additional Information</h4>
-            <p class="text-gray-300">Is Mobile: <span class="text-white">{{ user_agent.is_mobile }}</span></p>
-            <p class="text-gray-300">Is Tablet: <span class="text-white">{{ user_agent.is_tablet }}</span></p>
-            <p class="text-gray-300">Is Desktop: <span class="text-white">{{ user_agent.is_desktop }}</span></p>
-          </div>
-        {% elif user_agent_error %}
-          <span class="text-yellow-400">{{ user_agent_error }}</span>
-        {% else %}
-          <span class="text-yellow-400">No User Agent analysis available.</span>
-        {% endif %}
-      </div>
-    {% elif indicator_type == 'event' %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
-        <h3 class="text-xl font-bold text-blue-400 mb-4">Windows Event Analysis</h3>
-        {% if event_info %}
-          <div class="grid gap-6 md:grid-cols-2">
-            <div class="card bg-gray-700 border border-gray-600 p-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h4>
-              <div class="space-y-2">
-                <p class="flex justify-between">
-                  <span class="text-gray-400">Event ID:</span>
-                  <span class="text-white">{{ event_info.event_id }}</span>
-                </p>
-                <p class="flex justify-between">
-                  <span class="text-gray-400">Title:</span>
-                  <span class="text-white">{{ event_info.title or 'N/A' }}</span>
-                </p>
+      {% set card_count = (1 if user_agent else 0) + (1 if user_agent_error else 0) %}
+      {% if card_count == 1 %}
+        <div class="w-full flex justify-center mt-8">
+          {% if user_agent %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Analysis</h3>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Browser Information</h4>
+                <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.browser.name }}</span></p>
+                <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.browser.version }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Operating System</h4>
+                <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.os.name }}</span></p>
+                <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.os.version }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Device Information</h4>
+                <p class="text-gray-300">Type: <span class="text-white">{{ user_agent.device.type }}</span></p>
+                <p class="text-gray-300">Brand: <span class="text-white">{{ user_agent.device.brand }}</span></p>
+                <p class="text-gray-300">Model: <span class="text-white">{{ user_agent.device.model }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Additional Information</h4>
+                <p class="text-gray-300">Is Mobile: <span class="text-white">{{ user_agent.is_mobile }}</span></p>
+                <p class="text-gray-300">Is Tablet: <span class="text-white">{{ user_agent.is_tablet }}</span></p>
+                <p class="text-gray-300">Is Desktop: <span class="text-white">{{ user_agent.is_desktop }}</span></p>
               </div>
             </div>
-            <div class="card bg-gray-700 border border-gray-600 p-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Summary</h4>
-              <p class="text-gray-300">{{ event_info.summary or 'No summary available' }}</p>
+          {% elif user_agent_error %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <span class="text-yellow-400">{{ user_agent_error }}</span>
             </div>
-          </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 mt-8">
+          {% if user_agent %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Analysis</h3>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Browser Information</h4>
+                <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.browser.name }}</span></p>
+                <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.browser.version }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Operating System</h4>
+                <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.os.name }}</span></p>
+                <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.os.version }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Device Information</h4>
+                <p class="text-gray-300">Type: <span class="text-white">{{ user_agent.device.type }}</span></p>
+                <p class="text-gray-300">Brand: <span class="text-white">{{ user_agent.device.brand }}</span></p>
+                <p class="text-gray-300">Model: <span class="text-white">{{ user_agent.device.model }}</span></p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Additional Information</h4>
+                <p class="text-gray-300">Is Mobile: <span class="text-white">{{ user_agent.is_mobile }}</span></p>
+                <p class="text-gray-300">Is Tablet: <span class="text-white">{{ user_agent.is_tablet }}</span></p>
+                <p class="text-gray-300">Is Desktop: <span class="text-white">{{ user_agent.is_desktop }}</span></p>
+              </div>
+            </div>
+          {% endif %}
+          {% if user_agent_error %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <span class="text-yellow-400">{{ user_agent_error }}</span>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% elif indicator_type == 'event' %}
+      {% set card_count = (1 if event_info else 0) + (1 if event_error else 0) %}
+      {% if card_count == 1 %}
+        <div class="w-full flex justify-center mt-8">
+          <!-- Place all single card logic here, each card wrapped in overflow-x-auto and using break-all on table cells -->
+          {% if event_info %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <h3 class="text-xl font-bold text-blue-400 mb-4">Windows Event Analysis</h3>
+              <div class="grid gap-6 md:grid-cols-2">
+                <div class="card bg-gray-700 border border-gray-600 p-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h4>
+                  <div class="space-y-2">
+                    <p class="flex justify-between">
+                      <span class="text-gray-400">Event ID:</span>
+                      <span class="text-white">{{ event_info.event_id }}</span>
+                    </p>
+                    <p class="flex justify-between">
+                      <span class="text-gray-400">Title:</span>
+                      <span class="text-white">{{ event_info.title or 'N/A' }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="card bg-gray-700 border border-gray-600 p-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Summary</h4>
+                  <p class="text-gray-300">{{ event_info.summary or 'No summary available' }}</p>
+                </div>
+              </div>
 
-          {% if event_info.details_table %}
-          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
-            <div class="overflow-x-auto">
-              <table class="table">
-                <tbody>
-                  {% for row in event_info.details_table %}
-                    <tr class="border-b border-gray-600">
-                      {% for cell in row %}
-                        <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
+              {% if event_info.details_table %}
+              <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
+                <div class="overflow-x-auto">
+                  <table class="table">
+                    <tbody>
+                      {% for row in event_info.details_table %}
+                        <tr class="border-b border-gray-600">
+                          {% for cell in row %}
+                            <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
+                          {% endfor %}
+                        </tr>
                       {% endfor %}
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          {% endif %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {% endif %}
 
-          {% if event_info.fields %}
-          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-            <div class="flex items-center justify-end gap-2 mb-2">
-              <button 
-                type="button"
-                class="btn btn-secondary text-sm"
-                onclick="const details = this.parentElement.nextElementSibling; details.classList.toggle('hidden'); this.querySelector('span').textContent = details.classList.contains('hidden') ? 'Show' : 'Hide';"
-              >
-                <span>Hide</span> Field Details
-              </button>
-              <button 
-                type="button"
-                class="btn btn-primary text-sm"
-                onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
-              >
-                Copy
-              </button>
+              {% if event_info.fields %}
+              <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+                <div class="flex items-center justify-end mb-2">
+                  <button 
+                    type="button"
+                    class="btn btn-primary text-sm"
+                    onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
+                  >
+                    Copy Field Details
+                  </button>
+                </div>
+                <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
+                  {{ event_info.fields }}
+                </div>
+              </div>
+              {% endif %}
             </div>
-            <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
-              {{ event_info.fields }}
+          {% elif event_error %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+              <span class="text-yellow-400">{{ event_error }}</span>
             </div>
-          </div>
           {% endif %}
-        {% elif event_error %}
-          <div class="text-yellow-400">{{ event_error }}</div>
-        {% else %}
-          <div class="text-yellow-400">No event information available.</div>
-        {% endif %}
-      </div>
+        </div>
+      {% else %}
+        <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 mt-8">
+          <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-400 mb-4">Windows Event Analysis</h3>
+            {% if event_info %}
+              <div class="grid gap-6 md:grid-cols-2">
+                <div class="card bg-gray-700 border border-gray-600 p-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h4>
+                  <div class="space-y-2">
+                    <p class="flex justify-between">
+                      <span class="text-gray-400">Event ID:</span>
+                      <span class="text-white">{{ event_info.event_id }}</span>
+                    </p>
+                    <p class="flex justify-between">
+                      <span class="text-gray-400">Title:</span>
+                      <span class="text-white">{{ event_info.title or 'N/A' }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="card bg-gray-700 border border-gray-600 p-4">
+                  <h4 class="text-lg font-semibold text-blue-400 mb-2">Summary</h4>
+                  <p class="text-gray-300">{{ event_info.summary or 'No summary available' }}</p>
+                </div>
+              </div>
+
+              {% if event_info.details_table %}
+              <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+                <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
+                <div class="overflow-x-auto">
+                  <table class="table">
+                    <tbody>
+                      {% for row in event_info.details_table %}
+                        <tr class="border-b border-gray-600">
+                          {% for cell in row %}
+                            <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
+                          {% endfor %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {% endif %}
+
+              {% if event_info.fields %}
+              <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
+                <div class="flex items-center justify-end mb-2">
+                  <button 
+                    type="button"
+                    class="btn btn-primary text-sm"
+                    onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
+                  >
+                    Copy Field Details
+                  </button>
+                </div>
+                <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
+                  {{ event_info.fields }}
+                </div>
+              </div>
+              {% endif %}
+            {% elif event_error %}
+              <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+                <span class="text-yellow-400">{{ event_error }}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
     {% endif %}
   </div>
   <div class="flex flex-col items-center justify-center mt-12 gap-4 w-full max-w-md mx-auto">

@@ -15,7 +15,7 @@
 
             <!-- Search Form -->
             <div class="unified-search">
-                <form action="/api/hash/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
+                <form action="/hash/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
                     <input type="text" 
                            name="hash" 
                            placeholder="Enter MD5, SHA1, or SHA256 hash" 
@@ -28,6 +28,191 @@
                         Analyze
                     </button>
                 </form>
+            </div>
+
+            <!-- Results Grid -->
+            {% set card_count = (1 if intezer_result else 0) + (1 if alienvault else 0) + (1 if result else 0) %}
+            <div class="w-full grid gap-8 {% if card_count == 1 %}grid-cols-1 justify-center{% else %}grid-cols-1 lg:grid-cols-2 xl:grid-cols-3{% endif %} mt-8">
+              {% if intezer_result %}
+                <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+                  <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+                    <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
+                  </h3>
+                  <table class="mb-4 w-full text-sm">
+                    <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all">{{ intezer_result.sha256 }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Verdict</th><td class="break-all">{{ intezer_result.verdict or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Sub Verdict</th><td class="break-all">{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Family</th><td class="break-all">{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ intezer_result.file_type or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Architecture</th><td class="break-all">{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Analysis Time</th><td class="break-all">{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Analysis URL</th><td class="break-all">{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
+                  </table>
+                  {% if intezer_result.code_reuse %}
+                    <div class="mb-4">
+                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
+                      <table class="data-table mb-2 w-full text-xs">
+                        <thead>
+                          <tr class="bg-gray-700 text-blue-200">
+                            <th class="break-all">Family Name</th><th class="break-all">Type</th><th class="break-all">Reused Gene Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for fam in intezer_result.code_reuse.families %}
+                            <tr>
+                              <td class="break-all">{{ fam.family_name }}</td>
+                              <td class="break-all">{{ fam.family_type }}</td>
+                              <td class="break-all">{{ fam.reused_gene_count }}</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% endif %}
+                  {% if intezer_result.indicators %}
+                    <div class="mb-4">
+                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
+                      <table class="data-table mb-2 w-full text-xs">
+                        <thead>
+                          <tr class="bg-gray-700 text-blue-200">
+                            <th class="break-all">Name</th><th class="break-all">Classification</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for ind in intezer_result.indicators %}
+                            <tr>
+                              <td class="break-all">{{ ind.name }}</td>
+                              <td class="break-all">{{ ind.classification }}</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% endif %}
+                  {% if intezer_result.metadata %}
+                    <div class="mb-4">
+                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
+                      <table class="data-table mb-2 w-full text-xs">
+                        <tbody>
+                          {% for k, v in intezer_result.metadata.items() %}
+                            <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% endif %}
+                  <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
+                    <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
+                  </details>
+                </div>
+              {% endif %}
+              {% if alienvault %}
+                <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col [grid-column:1/-1] overflow-x-auto">
+                  <div class="flex items-center mb-4">
+                    <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
+                    <h3 class="text-xl font-bold text-blue-300">AlienVault OTX</h3>
+                  </div>
+                  <table class="mb-4 w-full text-sm">
+                    {% for k, v in alienvault.summary.items() %}
+                      <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
+                    {% endfor %}
+                  </table>
+                  {% if alienvault and alienvault.raw %}
+                    {% set general = alienvault.raw.get('general', {}) %}
+                    {% set geo = alienvault.raw.get('geo', {}) %}
+                    <div class="mb-4">
+                      {% if general.false_positives or general.whitelist %}
+                        <h4 class="text-lg font-semibold text-blue-400 mb-2">False Positives & Whitelist</h4>
+                        <ul class="text-xs text-gray-200 space-y-1">
+                          {% for item in (general.false_positives or []) %}
+                            <li>
+                              <span class="font-semibold text-gray-400 break-all">{{ item.name }}:</span>
+                              <span class="break-all">{{ item.message }} (Source: {{ item.source }})</span>
+                            </li>
+                          {% endfor %}
+                          {% for item in (general.whitelist or []) %}
+                            <li>
+                              <span class="font-semibold text-gray-400 break-all">{{ item.name }}:</span>
+                              <span class="break-all">{{ item.message }} (Source: {{ item.source }})</span>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      {% endif %}
+                      {% if general.whois %}
+                        <div class="mt-2">
+                          <span class="font-semibold text-gray-400 break-all">WHOIS:</span>
+                          <a href="{{ general.whois }}" target="_blank" class="text-blue-400 hover:underline break-all">{{ general.whois }}</a>
+                        </div>
+                      {% endif %}
+                      {% if geo %}
+                        <div class="mt-4">
+                          <h4 class="text-lg font-semibold text-blue-400 mb-2">Geo Data</h4>
+                          <table class="w-full text-xs">
+                            <tbody>
+                              {% for k, v in geo.items() %}
+                                <tr>
+                                  <th class="pr-4 text-gray-400 break-all">{{ k|replace('_', ' ')|title }}</th>
+                                  <td class="break-all">{{ v }}</td>
+                                </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                  {% for table_name, rows in alienvault.tables.items() %}
+                    <div class="mb-4 overflow-y-auto" style="max-height: 350px;">
+                      <h5 class="font-semibold text-blue-300 mb-2 break-all">{{ table_name|replace('_', ' ')|title }}</h5>
+                      <table class="data-table w-full text-xs">
+                        <thead>
+                          <tr class="bg-gray-800 text-blue-200">
+                            {% for col in rows[0].keys() %}
+                              <th class="px-3 py-2 break-all">{{ col|replace('_', ' ')|title }}</th>
+                            {% endfor %}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for row in rows %}
+                            <tr class="even:bg-gray-900 odd:bg-gray-800">
+                              {% for col in row.keys() %}
+                                <td class="px-3 py-2 break-all">{{ row[col] }}</td>
+                              {% endfor %}
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% endfor %}
+                  <details class="mt-2">
+                    <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                    {% if alienvault and alienvault.raw %}
+                      <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ alienvault.raw | tojson(indent=2) }}</pre>
+                    {% else %}
+                      <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
+                    {% endif %}
+                  </details>
+                </div>
+              {% endif %}
+              {% if result %}
+                <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+                  <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
+                  <div class="space-y-2">
+                    <p class="text-gray-300"><span class="text-gray-400 break-all">Type:</span> <span class="break-all">{{ result.type }}</span></p>
+                    <p class="text-gray-300"><span class="text-gray-400 break-all">Value:</span> <span class="break-all">{{ result.hash }}</span></p>
+                  </div>
+                  <div class="mt-4">
+                    <h4 class="text-lg font-medium text-blue-400 mb-2">Sources</h4>
+                    <ul>
+                      {% for source, info in result.sources.items() %}
+                        <li class="text-gray-300">
+                          <span class="text-gray-400 break-all">{{ source|capitalize }}:</span> <span class="break-all">{{ info.message }}</span>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                </div>
+              {% endif %}
             </div>
         </div>
     </div>
