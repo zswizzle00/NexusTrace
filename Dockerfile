@@ -27,8 +27,9 @@ RUN apt-get update && apt-get install -y \
     libffi8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python packages from builder
+# Copy Python packages and binaries from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
 COPY . .
@@ -49,7 +50,8 @@ ENV FLASK_APP=app.py \
     FLASK_ENV=production \
     PORT=5000 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/usr/local/bin:${PATH}"
 
 # Expose the port
 EXPOSE 5000
