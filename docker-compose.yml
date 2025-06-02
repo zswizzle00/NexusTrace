@@ -20,6 +20,7 @@ services:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
       - ./logs:/app/logs
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]

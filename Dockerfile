@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -23,6 +24,7 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    libffi7 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
@@ -30,6 +32,10 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/pyth
 
 # Copy application code
 COPY . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs && \
+    mkdir -p /app/data
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
