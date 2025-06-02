@@ -8,6 +8,7 @@ from app.services.url_service import analyze_url
 import os
 import requests
 from dotenv import load_dotenv
+from app.services.event_service import get_event_info
 
 # Load environment variables
 load_dotenv()
@@ -142,18 +143,18 @@ def parse_abuseipdb(abuse_data):
 @home_bp.route('/analyze', methods=['POST'])
 def analyze():
     indicator = request.form.get('indicator', '').strip()
-    # Simple regexes for hash detection
     md5_re = re.compile(r'^[a-fA-F0-9]{32}$')
     sha1_re = re.compile(r'^[a-fA-F0-9]{40}$')
     sha256_re = re.compile(r'^[a-fA-F0-9]{64}$')
     ip_re = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
     domain_re = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.(?:[A-Za-z]{2,})$')
     url_re = re.compile(r'^(https?://)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*/?$')
-    event_id_re = re.compile(r'^\d{1,5}$')  # Windows Event IDs are typically 1-5 digits
+    event_id_re = re.compile(r'^\d{1,5}$')
 
     hash_type = None
     indicator_type = None
     result_data = {}
+    card_count = 0
 
     if md5_re.match(indicator):
         hash_type = 'MD5'
@@ -173,7 +174,6 @@ def analyze():
     elif event_id_re.match(indicator):
         indicator_type = 'event'
         try:
-            from app.services.event_service import get_event_info
             event_info = get_event_info(indicator)
             if event_info:
                 result_data['event_info'] = event_info
@@ -223,6 +223,7 @@ def analyze():
             print("[DEBUG] User Agent API key not configured.")
             result_data['user_agent_error'] = "User Agent API key not configured."
             indicator_type = 'user_agent'
+
     print(f"[DEBUG] indicator_type: {indicator_type}")
     print(f"[DEBUG] result_data: {result_data}")
 
@@ -232,6 +233,7 @@ def analyze():
             result_data['intezer_result'] = intezer_result
         else:
             result_data['hash_info'] = get_hash_info(indicator)
+        card_count = sum(1 for k in ['intezer_result', 'alienvault', 'hash_info'] if result_data.get(k))
     elif indicator_type == 'ip':
         result_data['ipinfo'] = get_ipinfo_data(indicator)
         result_data['ip2location'] = get_ip2location_data(indicator)
@@ -243,6 +245,7 @@ def analyze():
         result_data['abuseipdb'] = parse_abuseipdb(abuseipdb_raw)
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw)
+        card_count = sum(1 for k in ['ipinfo', 'ip2location', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault'] if result_data.get(k))
     elif indicator_type == 'domain':
         result_data['domain_info'] = get_domain_info(indicator)
         result_data['whois'] = get_whois_info(indicator)
@@ -250,13 +253,25 @@ def analyze():
             ip = result_data['domain_info']['ip_address']
             result_data['ipinfo'] = get_ipinfo_data(ip)
             result_data['ip2location'] = get_ip2location_data(ip)
+        card_count = sum(1 for k in ['domain_info', 'whois', 'url_analysis', 'ipinfo', 'ip2location'] if result_data.get(k))
     elif indicator_type == 'url':
-        # Normalize URL: prepend https:// if no scheme is present
         if not indicator.lower().startswith(('http://', 'https://')):
             indicator = f'https://{indicator}'
         result_data['url_analysis'] = analyze_url(indicator)
+        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois', 'ipinfo', 'ip2location'] if result_data.get(k))
+    elif indicator_type == 'user_agent':
+        card_count = sum(1 for k in ['user_agent', 'user_agent_error'] if result_data.get(k))
+    elif indicator_type == 'event':
+        card_count = sum(1 for k in ['event_info', 'event_error'] if result_data.get(k))
 
-    return render_template('analyze_result.html', indicator=indicator, hash_type=hash_type, indicator_type=indicator_type, **result_data)
+    return render_template(
+        'analyze_result.html',
+        indicator=indicator,
+        hash_type=hash_type,
+        indicator_type=indicator_type,
+        card_count=card_count,
+        **result_data
+    )
 
 # Serve favicon.ico at the root
 @home_bp.route('/favicon.ico')

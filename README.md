@@ -73,17 +73,19 @@ NexusTrace/
 │   │
 │   └── app.py            # Main application file
 │
+├── data/                 # Data storage directory
 ├── templates/            # Jinja2 HTML templates
 ├── static/              # CSS, JS, images, favicon, etc.
 ├── frontend/            # Static HTML/assets
 ├── CyberChef_v10.19.4/  # External tool
 ├── icon_tools/          # Icon/favicon scripts
 ├── logs/                # Application logs
-├── build/               # Build artifacts (if any)
+├── build/               # Build artifacts
 ├── tailwind-test/       # Tailwind experiments
 ├── app.py               # Flask entry point
 ├── wsgi.py              # WSGI entry point
 ├── run.py               # Flask run script
+├── test_api.py          # API test suite
 ├── requirements.txt     # Python dependencies
 ├── Dockerfile           # Docker configuration
 ├── docker-compose.yml   # Docker Compose configuration
@@ -144,6 +146,12 @@ IP2WHOIS_KEY=your_ip2whois_key
 - Detailed error tracking
 - Request logging in debug mode
 
+### Testing
+- Unit tests for each service
+- Integration tests for API endpoints
+- Performance testing for batch operations
+- API test suite (test_api.py) for comprehensive endpoint testing
+
 ## Error Handling
 - Comprehensive error handling across all services
 - Detailed error logging
@@ -172,9 +180,9 @@ IP2WHOIS_KEY=your_ip2whois_key
 4. Run the application: `python run.py`
 
 ### Testing
-- Unit tests for each service
-- Integration tests for API endpoints
-- Performance testing for batch operations
+- Run unit tests: `python -m pytest app/tests/`
+- Run API tests: `python test_api.py`
+- Run integration tests: `python -m pytest app/tests/test_endpoints.py`
 
 ## Contributing
 1. Fork the repository

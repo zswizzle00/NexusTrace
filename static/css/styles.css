@@ -183,16 +183,11 @@
 
 /* Cards */
 .card {
+    background: var(--card-bg);
     border-radius: 1rem;
-    padding: var(--spacing-lg);
-    transition: var(--transition-normal);
-    box-shadow: 0 4px 24px 0 #00000022;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--color-primary);
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease-in-out;
 }
 
 /* Navigation */
@@ -1782,4 +1777,11 @@ body {
 .enterprise-brand .accent {
   color: var(--accent-orange);
   font-size: 1.5rem;
+}
+
+.single-centered-card {
+  max-width: 672px;
+  margin-left: auto;
+  margin-right: auto;
+  word-break: break-word;
 } 
