@@ -4,7 +4,7 @@ services:
   web:
     build: .
     ports:
-      - "5050:5050"
+      - "0.0.0.0:5050:5050"
     volumes:
       - .:/app
       - ./logs:/app/logs
@@ -12,4 +12,10 @@ services:
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
-    restart: unless-stopped 
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge 
