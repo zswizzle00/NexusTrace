@@ -11,11 +11,12 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 def create_app():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = Flask(
         __name__,
-        static_folder='static',
+        static_folder=os.path.join(project_root, 'static'),
         static_url_path='/static',
-        template_folder='templates'
+        template_folder=os.path.join(project_root, 'templates')
     )
     
     # Configure Flask app
