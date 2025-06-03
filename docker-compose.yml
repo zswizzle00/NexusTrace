@@ -6,7 +6,7 @@ services:
     expose:
       - "5050"
     volumes:
-      - ./logs:/app/logs
+      - app_logs:/app/logs
     env_file:
       - .env
     restart: always
@@ -28,3 +28,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  app_logs:
+    driver: local
