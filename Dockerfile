@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY . .
 
+# Create the data directory and set permissions
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+
 # Create a non-root user
 RUN adduser --disabled-password --gecos '' appuser
 USER appuser
