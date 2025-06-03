@@ -29,6 +29,10 @@ COPY . .
 # Create the data directory and set permissions
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 
+# Ensure static files are accessible
+RUN chown -R appuser:appuser /app/static && \
+    chmod -R 755 /app/static
+
 USER appuser
 
 # Expose port (internal)

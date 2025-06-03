@@ -25,6 +25,10 @@ def create_app():
     app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
     
+    # Configure static file serving
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year
+    app.config['STATIC_FOLDER'] = os.path.join(root_dir, 'static')
+    
     # Register blueprints
     from app.routes import register_routes
     register_routes(app)
