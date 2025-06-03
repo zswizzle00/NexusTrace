@@ -26,4 +26,4 @@ USER appuser
 EXPOSE 5050
 
 # Start Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5050", "app:app"]
+CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:5050", "app:app"]
