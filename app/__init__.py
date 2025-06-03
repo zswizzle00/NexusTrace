@@ -11,12 +11,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 def create_app():
-    root_dir = os.path.dirname(os.path.dirname(__file__))
     app = Flask(
         __name__,
-        static_folder=os.path.join(root_dir, 'static'),
+        static_folder='static',
         static_url_path='/static',
-        template_folder=os.path.join(root_dir, 'templates')
+        template_folder='templates'
     )
     
     # Configure Flask app
@@ -27,7 +26,7 @@ def create_app():
     
     # Configure static file serving
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year
-    app.config['STATIC_FOLDER'] = os.path.join(root_dir, 'static')
+    app.config['STATIC_FOLDER'] = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
     
     # Register blueprints
     from app.routes import register_routes
