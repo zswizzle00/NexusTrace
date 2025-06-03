@@ -8,15 +8,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # System dependencies (if needed)
-RUN apt-get update && apt-get install -y --no-install-recommends gcc curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create logs directory and set permissions
+RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create a non-root user
-RUN adduser --disabled-password --gecos '' appuser
+RUN useradd -m appuser && chown -R appuser:appuser /app
 
 # Copy app code
 COPY . .
