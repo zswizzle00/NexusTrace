@@ -26,7 +26,6 @@ def create_app():
     
     # Configure static file serving
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year
-    app.config['STATIC_FOLDER'] = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
     
     # Register blueprints
     from app.routes import register_routes
