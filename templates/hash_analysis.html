@@ -13,11 +13,11 @@
                 </p>
             </div>
 
-            <!-- Search Form -->
+            <!-- Unified Search Form -->
             <div class="unified-search">
-                <form action="/hash/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
+                <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
                     <input type="text" 
-                           name="hash" 
+                           name="indicator" 
                            placeholder="Enter MD5, SHA1, or SHA256 hash" 
                            class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
                            required>
@@ -36,7 +36,6 @@
               {% if intezer_result %}
                 <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
                   <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-                    <img src="https://www.intezer.com/wp-content/uploads/2021/10/cropped-intezer-favicon-192x192-1.png" alt="Intezer" class="w-5 h-5 inline-block"> Intezer Analysis
                   </h3>
                   <table class="mb-4 w-full text-sm">
                     <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all">{{ intezer_result.sha256 }}</td></tr>

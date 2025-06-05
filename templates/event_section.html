@@ -18,7 +18,7 @@
                 </p>
             </div>
 
-            <!-- Search Form -->
+            <!-- Unified Search Form -->
             <div class="unified-search">
                 <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
                     <input type="text" 
@@ -34,118 +34,7 @@
                     </button>
                 </form>
             </div>
-
-            <!-- Results Section -->
-            <div id="searchResults" class="hidden">
-                <div class="card bg-gray-800 border border-gray-700 p-6">
-                    <h2 class="text-2xl font-bold text-blue-400 mb-6">Event Details</h2>
-                    <div id="eventDetails" class="space-y-6">
-                        <!-- Event details will be populated here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Error Message -->
-            <div id="errorMessage" class="hidden mt-4 p-4 bg-red-900/50 border border-red-700 text-red-200 rounded-lg"></div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.getElementById('eventSearchForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const eventId = document.getElementById('eventId').value;
-    const resultsDiv = document.getElementById('searchResults');
-    const errorDiv = document.getElementById('errorMessage');
-    const eventDetails = document.getElementById('eventDetails');
-    
-    try {
-        const response = await fetch('/api/event/search', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `event_id=${encodeURIComponent(eventId)}`
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            errorDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            
-            // Populate event details
-            eventDetails.innerHTML = `
-                <div class="grid gap-6 md:grid-cols-2">
-                    <div class="card bg-gray-700 border border-gray-600 p-4">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h3>
-                        <div class="space-y-2">
-                            <p class="flex justify-between">
-                                <span class="text-gray-400">Event ID:</span>
-                                <span class="text-white">${data.event_id}</span>
-                            </p>
-                            <p class="flex justify-between">
-                                <span class="text-gray-400">Title:</span>
-                                <span class="text-white">${data.title || 'N/A'}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="card bg-gray-700 border border-gray-600 p-4">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-2">Summary</h3>
-                        <p class="text-gray-300">${data.summary || 'No summary available'}</p>
-                    </div>
-                </div>
-                ${data.details_table.length > 0 ? `
-                <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h3>
-                    <div class="overflow-x-auto">
-                        <table class="table">
-                            <tbody>
-                                ${data.details_table.map(row => `
-                                    <tr class="border-b border-gray-600">
-                                        ${row.map(cell => `<td class="py-2 px-4 text-gray-300">${cell}</td>`).join('')}
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                ` : ''}
-                ${data.fields ? `
-                <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-                    <div class="flex items-center justify-end gap-2 mb-2">
-                        <button 
-                            type="button"
-                            class="btn btn-secondary text-sm"
-                            onclick="const details = this.parentElement.nextElementSibling; details.classList.toggle('hidden'); this.querySelector('span').textContent = details.classList.contains('hidden') ? 'Show' : 'Hide';"
-                        >
-                            <span>Hide</span> Field Details
-                        </button>
-                        <button 
-                            type="button"
-                            class="btn btn-primary text-sm"
-                            onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
-                        >
-                            Copy
-                        </button>
-                    </div>
-                    <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
-                        ${data.fields}
-                    </div>
-                </div>
-                ` : ''}
-            `;
-        } else {
-            throw new Error(data.error || 'Failed to fetch event information');
-        }
-    } catch (error) {
-        errorDiv.textContent = error.message;
-        errorDiv.classList.remove('hidden');
-        resultsDiv.classList.add('hidden');
-    }
-});
-</script>
 {% endblock %}

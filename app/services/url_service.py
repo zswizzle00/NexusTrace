@@ -8,6 +8,7 @@ import builtwith
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from ..utils.cache import timed_lru_cache
+import hashlib
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -61,6 +62,32 @@ def submit_to_urlscan(url):
     except Exception as e:
         logger.error(f"Error submitting to urlscan.io: {str(e)}")
         return None
+
+def get_favicon_hash(url):
+    try:
+        parsed = urlparse(url)
+        favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+        resp = requests.get(favicon_url, timeout=5)
+        if resp.status_code == 200:
+            h = hashlib.md5(resp.content).hexdigest()
+            return {'url': favicon_url, 'md5': h}
+    except Exception as e:
+        logger.error(f"Error fetching favicon: {str(e)}")
+    return None
+
+def parse_opengraph_twitter(soup):
+    og = {}
+    twitter = {}
+    for tag in soup.find_all('meta'):
+        if tag.get('property', '').startswith('og:'):
+            og[tag['property']] = tag.get('content', '')
+        if tag.get('name', '').startswith('twitter:'):
+            twitter[tag['name']] = tag.get('content', '')
+    return {'opengraph': og, 'twitter': twitter}
+
+def check_phishtank_url(url):
+    # Placeholder: PhishTank API requires registration, but you can show a link
+    return f'https://phishtank.org/search.php?valid=y&active=y&Search={url}'
 
 @timed_lru_cache(seconds=1800)
 def analyze_url(url):
@@ -123,9 +150,11 @@ def analyze_url(url):
             meta_tags = [{'name': tag.get('name', ''), 'content': tag.get('content', '')} 
                         for tag in soup.find_all('meta')]
             title = soup.title.string if soup.title else ''
+            og_twitter = parse_opengraph_twitter(soup)
         else:
             meta_tags = []
             title = ''
+            og_twitter = {'opengraph': {}, 'twitter': {}}
 
         # Get Intezer analysis if API key is configured
         intezer_analysis = None
@@ -148,6 +177,13 @@ def analyze_url(url):
         # Get urlscan.io analysis
         urlscan_analysis = submit_to_urlscan(url)
         
+        screenshot_url = None
+        if urlscan_analysis and 'screenshotURL' in urlscan_analysis:
+            screenshot_url = urlscan_analysis['screenshotURL']
+        
+        favicon = get_favicon_hash(url)
+        phishtank_url = check_phishtank_url(url)
+        
         return {
             'url_analysis': {
                 'parsed_url': {
@@ -164,7 +200,12 @@ def analyze_url(url):
                 'meta_tags': meta_tags,
                 'title': title,
                 'intezer_analysis': intezer_analysis,
-                'urlscan_analysis': urlscan_analysis
+                'urlscan_analysis': urlscan_analysis,
+                'screenshot_url': screenshot_url,
+                'favicon': favicon,
+                'opengraph': og_twitter['opengraph'],
+                'twitter': og_twitter['twitter'],
+                'phishtank_url': phishtank_url
             }
         }
     except Exception as e:

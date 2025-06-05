@@ -13,6 +13,7 @@ import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
 import json
+import re
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -229,51 +230,65 @@ def get_proxycheck_data(ip_address):
         logger.error(f"ProxyCheck.io API request failed: {str(e)}")
         return None
 
-@timed_lru_cache(seconds=1800)
-def get_alienvault_data(ip_address):
-    """Get IP information from AlienVault OTX."""
-    api_key = os.getenv('ALIENVAULT')
+def get_alienvault_data(indicator):
+    """Get data from AlienVault OTX API"""
+    api_key = os.getenv('ALIENVAULT_API_KEY')
     if not api_key:
-        logger.warning("AlienVault API key not configured")
         return None
 
-    base_url = 'https://otx.alienvault.com/api/v1/indicators/IPv4'
-    headers = {
-        'X-OTX-API-KEY': api_key,
-        'Accept': 'application/json'
-    }
+    # Determine if the indicator is an IP or domain
+    ip_pattern = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
+    is_ip = bool(ip_pattern.match(indicator))
     
-    sections = ['general', 'vpn', 'geo']
-    results = {}
+    # Use the appropriate endpoint type
+    endpoint_type = 'IPv4' if is_ip else 'domain'
     
-    with alienvault_limiter:
-        def fetch_section(section):
-            try:
-                url = f"{base_url}/{ip_address}/{section}"
-                resp = requests.get(
-                    url, 
-                    headers=headers, 
-                    timeout=30,
-                    verify=True
-                )
-                resp.raise_for_status()
-                return section, resp.json()
-            except Exception as e:
-                logger.error(f"AlienVault OTX error for section {section}: {str(e)}")
-                return section, None
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_section = {
-                executor.submit(fetch_section, section): section 
-                for section in sections
-            }
-            
-            for future in concurrent.futures.as_completed(future_to_section):
-                section, data = future.result()
-                results[section] = data
-                time.sleep(0.5)
-
-    return results
+    base_url = f'https://otx.alienvault.com/api/v1/indicators/{endpoint_type}/{indicator}'
+    headers = {'X-OTX-API-KEY': api_key}
+    
+    try:
+        # Get general information
+        response = requests.get(f'{base_url}/general', headers=headers)
+        response.raise_for_status()
+        general_data = response.json()
+        
+        # Get geo information
+        geo_data = {}
+        try:
+            response = requests.get(f'{base_url}/geo', headers=headers)
+            response.raise_for_status()
+            geo_data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"AlienVault OTX error for section geo: {e}")
+        
+        # Get malware information
+        malware_data = {}
+        try:
+            response = requests.get(f'{base_url}/malware', headers=headers)
+            response.raise_for_status()
+            malware_data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"AlienVault OTX error for section malware: {e}")
+        
+        # Get passive DNS information
+        passive_dns_data = {}
+        try:
+            response = requests.get(f'{base_url}/passive_dns', headers=headers)
+            response.raise_for_status()
+            passive_dns_data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"AlienVault OTX error for section passive_dns: {e}")
+        
+        # Combine all data
+        return {
+            'general': general_data,
+            'geo': geo_data,
+            'malware': malware_data,
+            'passive_dns': passive_dns_data
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"AlienVault OTX error: {e}")
+        return None
 
 def get_vpn_data(ip_address):
     """Get IP information from VPNapi.io."""
@@ -386,3 +401,25 @@ def get_ip2location_data(ip_address):
     except Exception as e:
         logger.error(f"IP2Location.io API request failed: {str(e)}")
         return None 
+
+def get_ip_info(ip):
+    result = {}
+    # ... existing code ...
+    # Add AlienVault OTX
+    try:
+        from .alienvault_service import get_alienvault_data, parse_alienvault_otx
+        alienvault_raw = get_alienvault_data(ip)
+        if alienvault_raw:
+            result['alienvault'] = parse_alienvault_otx(alienvault_raw)
+    except Exception as e:
+        logger.error(f"AlienVault OTX error: {str(e)}")
+    # Add Intezer (if available for IPs)
+    try:
+        from .file_service import get_intezer_analysis
+        intezer_result = get_intezer_analysis(ip=ip)
+        if intezer_result:
+            result['intezer_result'] = intezer_result
+    except Exception as e:
+        logger.error(f"Intezer enrichment error: {str(e)}")
+    # ... existing code ...
+    return result 

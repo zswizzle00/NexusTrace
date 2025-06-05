@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
+    <div class="w-full max-w-3xl mx-auto px-2 py-8 md:py-16">
+        <div class="card p-8 md:p-14 space-y-12">
+            <div class="text-center mb-4 md:mb-8">
+                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                    User Agent Analysis
+                </h1>
+                <p class="text-lg md:text-2xl text-gray-300">
+                    Analyze and decode User Agent strings to identify browser, device, and operating system information.
+                </p>
+            </div>
+            {% if user_agent %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto w-full max-w-2xl mx-auto">
+                <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Details</h3>
+                <table class="mb-4 w-full text-sm">
+                    <tr><th class="pr-4 text-gray-400">Browser</th><td>{{ user_agent.browser.name }} {{ user_agent.browser.version }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">OS</th><td>{{ user_agent.os.name }} {{ user_agent.os.version }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Device</th><td>{{ user_agent.device.type }}{% if user_agent.device.brand %} ({{ user_agent.device.brand }}){% endif %}{% if user_agent.device.model %} - {{ user_agent.device.model }}{% endif %}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Is Mobile</th><td>{{ 'Yes' if user_agent.is_mobile else 'No' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Is Tablet</th><td>{{ 'Yes' if user_agent.is_tablet else 'No' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Is Desktop</th><td>{{ 'Yes' if user_agent.is_desktop else 'No' }}</td></tr>
+                </table>
+                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                    <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ user_agent | tojson(indent=2) }}</pre>
+                </details>
+            </div>
+            {% elif user_agent_error %}
+            <div class="bg-red-900 rounded-2xl shadow-lg p-8 flex flex-col items-center justify-center text-red-300 w-full max-w-2xl mx-auto">
+                <span>{{ user_agent_error }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

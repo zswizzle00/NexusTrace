@@ -31,7 +31,7 @@ def check_hash():
         logger.error(f"Error in check_hash: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@hash_bp.route('/hash/analyze', methods=['GET', 'POST'])
+@hash_bp.route('/analyze', methods=['GET', 'POST'])
 def analyze_hash():
     result = None
     error = None

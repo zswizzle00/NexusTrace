@@ -6,343 +6,516 @@
 <div class="w-full py-10">
   <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
   
-  {% if card_count == 1 %}
-    <div class="w-full flex justify-center mt-8">
-      <!-- Place all single card logic here, each card wrapped in overflow-x-auto and using break-all on table cells -->
-      {% if domain_info %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">Domain Info</h4>
-          <table class="mb-4 w-full text-sm">
-            <tr><th class="break-all">Domain</th><td class="break-all font-mono">{{ indicator }}</td></tr>
-            {% if domain_info %}
-              <tr><th class="break-all">IP Address</th><td class="break-all">{{ domain_info.ip_address }}</td></tr>
-            {% else %}
-              <tr><td colspan="2"><span class="text-yellow-400">No domain info found.</span></td></tr>
-            {% endif %}
-          </table>
-        </div>
-      {% endif %}
-      {% if whois %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">WHOIS (IP2WHOIS)</h4>
-          <table class="data-table mb-2 w-full text-sm">
-            {% for k, v in whois.items() %}
-              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-          <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-            <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ whois | tojson(indent=2) }}</pre>
-          </details>
-        </div>
-      {% endif %}
-      {% if domain_info %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">DNS Records</h4>
-          <table class="data-table mb-2 w-full text-xs">
-            <thead>
-              <tr class="bg-gray-700 text-blue-200">
-                <th class="break-all">Type</th><th class="break-all">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for k, v in domain_info.dns_records.items() %}
-                <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-            <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
-          </details>
-        </div>
-      {% endif %}
-      {% if domain_info %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">SSL Info</h4>
-          <table class="data-table mb-2 w-full text-xs">
-            <thead>
-              <tr class="bg-gray-700 text-blue-200">
-                <th class="break-all">Field</th><th class="break-all">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for k, v in domain_info.ssl_info.items() %}
-                <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-            <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
-          </details>
-        </div>
-      {% endif %}
-      {% if ipinfo or ip2location %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">Resolved IP Enrichment</h4>
-          {% if ipinfo %}
-            <span class="font-semibold text-gray-400">IPInfo:</span>
-            <table class="data-table mb-2 w-full text-sm">
-              <tr><th class="break-all">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
-              <tr><th class="break-all">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
-              <tr><th class="break-all">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
-              <tr><th class="break-all">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
-            </table>
-            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-              <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
-            </details>
-          {% endif %}
-          {% if ip2location %}
-            <span class="font-semibold text-gray-400">IP2Location:</span>
-            <table class="data-table mb-2 w-full text-sm">
-              {% for k, v in ip2location.items() %}
-                <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-              {% endfor %}
-            </table>
-            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-              <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ip2location | tojson(indent=2) }}</pre>
-            </details>
-          {% endif %}
-        </div>
-      {% endif %}
-      {% if user_agent %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Analysis</h3>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Browser Information</h4>
-            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.browser.name }}</span></p>
-            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.browser.version }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Operating System</h4>
-            <p class="text-gray-300">Name: <span class="text-white">{{ user_agent.os.name }}</span></p>
-            <p class="text-gray-300">Version: <span class="text-white">{{ user_agent.os.version }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Device Information</h4>
-            <p class="text-gray-300">Type: <span class="text-white">{{ user_agent.device.type }}</span></p>
-            <p class="text-gray-300">Brand: <span class="text-white">{{ user_agent.device.brand }}</span></p>
-            <p class="text-gray-300">Model: <span class="text-white">{{ user_agent.device.model }}</span></p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Additional Information</h4>
-            <p class="text-gray-300">Is Mobile: <span class="text-white">{{ user_agent.is_mobile }}</span></p>
-            <p class="text-gray-300">Is Tablet: <span class="text-white">{{ user_agent.is_tablet }}</span></p>
-            <p class="text-gray-300">Is Desktop: <span class="text-white">{{ user_agent.is_desktop }}</span></p>
-          </div>
-        </div>
-      {% elif user_agent_error %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <span class="text-yellow-400">{{ user_agent_error }}</span>
-        </div>
-      {% endif %}
-      {% if event_info %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <h3 class="text-xl font-bold text-blue-400 mb-4">Windows Event Analysis</h3>
-          <div class="grid gap-6 md:grid-cols-2">
-            <div class="card bg-gray-700 border border-gray-600 p-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Basic Information</h4>
-              <div class="space-y-2">
-                <p class="flex justify-between">
-                  <span class="text-gray-400">Event ID:</span>
-                  <span class="text-white">{{ event_info.event_id }}</span>
-                </p>
-                <p class="flex justify-between">
-                  <span class="text-gray-400">Title:</span>
-                  <span class="text-white">{{ event_info.title or 'N/A' }}</span>
-                </p>
-              </div>
-            </div>
-            <div class="card bg-gray-700 border border-gray-600 p-4">
-              <h4 class="text-lg font-semibold text-blue-400 mb-2">Summary</h4>
-              <p class="text-gray-300">{{ event_info.summary or 'No summary available' }}</p>
-            </div>
-          </div>
-
-          {% if event_info.details_table %}
-          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-            <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
-            <div class="overflow-x-auto">
-              <table class="table">
-                <tbody>
-                  {% for row in event_info.details_table %}
-                    <tr class="border-b border-gray-600">
-                      {% for cell in row %}
-                        <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
-                      {% endfor %}
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          {% endif %}
-
-          {% if event_info.fields %}
-          <div class="card bg-gray-700 border border-gray-600 p-4 mt-4">
-            <div class="flex items-center justify-end mb-2">
-              <button 
-                type="button"
-                class="btn btn-primary text-sm"
-                onclick="navigator.clipboard.writeText(this.closest('.card').querySelector('.field-details-box').textContent);"
-              >
-                Copy Field Details
-              </button>
-            </div>
-            <div class="field-details-box max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
-              {{ event_info.fields }}
-            </div>
-          </div>
-          {% endif %}
-        </div>
-      {% elif event_error %}
-        <div class="single-centered-card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words">
-          <span class="text-yellow-400">{{ event_error }}</span>
-        </div>
-      {% endif %}
-    </div>
-  {% else %}
-    <div class="w-full grid gap-8 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-      {% if ipinfo %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">IPInfo</h4>
-          <table class="mb-4 w-full text-sm">
-            <tr><th class="break-all pr-4 py-2">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
-            <tr><th class="break-all pr-4 py-2">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
-            <tr><th class="break-all pr-4 py-2">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
-            <tr><th class="break-all pr-4 py-2">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
-          </table>
-        </div>
-      {% endif %}
-      {% if ip2location %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">IP2Location</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in ip2location.items() %}
-              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if vpnapi %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">VPNAPI</h4>
-          <table class="mb-4 w-full text-sm">
-            <tr><th class="break-all">IP</th><td class="break-all">{{ vpnapi.ip }}</td></tr>
-            <tr><th class="break-all">VPN</th><td class="break-all">{{ 'Yes' if vpnapi.security.vpn else 'No' }}</td></tr>
-            <tr><th class="break-all">Proxy</th><td class="break-all">{{ 'Yes' if vpnapi.security.proxy else 'No' }}</td></tr>
-            <tr><th class="break-all">Tor</th><td class="break-all">{{ 'Yes' if vpnapi.security.tor else 'No' }}</td></tr>
-            <tr><th class="break-all">Relay</th><td class="break-all">{{ 'Yes' if vpnapi.security.relay else 'No' }}</td></tr>
-          </table>
-        </div>
-      {% endif %}
-      {% if proxycheck %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">ProxyCheck</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in proxycheck.proxycheck.items() %}
-              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if shodan %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">Shodan</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in shodan.summary.items() %}
-              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if abuseipdb %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">AbuseIPDB</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in abuseipdb.summary.items() %}
-              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if alienvault %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">AlienVault OTX</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in alienvault.summary.items() %}
-              <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if domain_info %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">Domain Info</h4>
-          <table class="mb-4 w-full text-sm">
-            <tr><th class="break-all">Domain</th><td class="break-all font-mono">{{ indicator }}</td></tr>
-            {% if domain_info %}
-              <tr><th class="break-all">IP Address</th><td class="break-all">{{ domain_info.ip_address }}</td></tr>
-            {% else %}
-              <tr><td colspan="2"><span class="text-yellow-400">No domain info found.</span></td></tr>
-            {% endif %}
-          </table>
-        </div>
-      {% endif %}
-      {% if whois %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">WHOIS (IP2WHOIS)</h4>
-          <table class="data-table mb-2 w-full text-sm">
-            {% for k, v in whois.items() %}
-              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-      {% if domain_info %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">DNS Records</h4>
-          <table class="data-table mb-2 w-full text-xs">
-            <thead>
-              <tr class="bg-gray-700 text-blue-200">
-                <th class="break-all">Type</th><th class="break-all">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for k, v in domain_info.dns_records.items() %}
-                <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v | join(', ') if v is iterable and v is not string else v }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% endif %}
-      {% if domain_info %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">SSL Info</h4>
-          <table class="data-table mb-2 w-full text-xs">
-            <thead>
-              <tr class="bg-gray-700 text-blue-200">
-                <th class="break-all">Field</th><th class="break-all">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for k, v in domain_info.ssl_info.items() %}
-                <tr><td class="break-all">{{ k }}</td><td class="break-all">{{ v }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% endif %}
-      {% if url_analysis %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
-          <h4 class="text-lg font-semibold text-blue-400 mb-2">URL Analysis</h4>
-          <table class="mb-4 w-full text-sm">
-            {% for k, v in url_analysis.items() %}
-              <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
-    </div>
+  {% if not (ipinfo or ip2location or vpnapi or proxycheck or shodan or abuseipdb or alienvault or intezer_result or hash_info or domain_info or whois_info or url_analysis or user_agent or event_info) %}
+    <div class="text-yellow-400 text-center mt-8">No analysis results found for this indicator.</div>
   {% endif %}
+
+  {% set ip_card_count = (1 if ipinfo else 0) + (1 if ip2location else 0) + (1 if vpnapi else 0) + (1 if proxycheck else 0) + (1 if shodan else 0) + (1 if abuseipdb else 0) + (1 if alienvault else 0) %}
+  <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 justify-center">
+    {% if ipinfo %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">IPInfo</h4>
+        <table class="mb-4 w-full text-sm">
+          <tr><th class="break-all pr-4 py-2">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
+          <tr><th class="break-all pr-4 py-2">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
+          <tr><th class="break-all pr-4 py-2">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
+          <tr><th class="break-all pr-4 py-2">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
+        </table>
+      </div>
+    {% endif %}
+    {% if ip2location %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">IP2Location</h4>
+        <table class="mb-4 w-full text-sm">
+          {% for k, v in ip2location.items() %}
+            <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+    {% if vpnapi %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">VPNAPI</h4>
+        <table class="mb-4 w-full text-sm">
+          <tr><th class="break-all">IP</th><td class="break-all">{{ vpnapi.ip }}</td></tr>
+          <tr><th class="break-all">VPN</th><td class="break-all">{{ 'Yes' if vpnapi.security.vpn else 'No' }}</td></tr>
+          <tr><th class="break-all">Proxy</th><td class="break-all">{{ 'Yes' if vpnapi.security.proxy else 'No' }}</td></tr>
+          <tr><th class="break-all">Tor</th><td class="break-all">{{ 'Yes' if vpnapi.security.tor else 'No' }}</td></tr>
+          <tr><th class="break-all">Relay</th><td class="break-all">{{ 'Yes' if vpnapi.security.relay else 'No' }}</td></tr>
+        </table>
+      </div>
+    {% endif %}
+    {% if proxycheck %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">ProxyCheck</h4>
+        <table class="mb-4 w-full text-sm">
+          {% for k, v in proxycheck.proxycheck.items() %}
+            <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+    {% if shodan %}
+      <div class="card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words mb-6">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">Shodan Report</h4>
+        {% if shodan.summary %}
+          <table class="data-table mb-2 w-full text-sm">
+            {% for k, v in shodan.summary.items() %}
+              <tr><th class="break-all">{{ k|capitalize }}</th><td class="break-all">{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+        {% if shodan.tables.open_ports and shodan.raw.ports %}
+          <div class="mb-2">
+            <span class="font-semibold text-gray-400">Open Ports:</span>
+            <table class="data-table mb-2 w-full text-xs">
+              <thead>
+                <tr class="bg-gray-700 text-blue-200">
+                  <th>Port</th><th>Service</th><th>Product</th><th>Version</th><th>Banner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for port in shodan.raw.ports %}
+                  <tr>
+                    <td>{{ port.port }}</td>
+                    <td>{{ port.service }}</td>
+                    <td>{{ port.product }}</td>
+                    <td>{{ port.version }}</td>
+                    <td class="break-all">{{ port.banner[:60] }}{% if port.banner and port.banner|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ port.banner }}</span>{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+        {% if shodan.tables.vulnerabilities %}
+          <div class="mb-2"><span class="font-semibold text-gray-400">Vulnerabilities:</span> {{ shodan.tables.vulnerabilities|join(', ') }}</div>
+        {% endif %}
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ shodan.raw | tojson(indent=2) }}</pre>
+        </details>
+      </div>
+    {% endif %}
+    {% if abuseipdb %}
+      <div class="card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words mb-6">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">AbuseIPDB Report</h4>
+        {% if abuseipdb.summary %}
+          <table class="data-table mb-2 w-full text-sm">
+            {% for k, v in abuseipdb.summary.items() %}
+              <tr><th class="break-all">{{ k|capitalize }}</th><td class="break-all">{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+        {% if abuseipdb.tables.reports %}
+          <div class="mb-2">
+            <span class="font-semibold text-gray-400">Reports:</span>
+            <table class="data-table mb-2 w-full text-xs">
+              <thead>
+                <tr class="bg-gray-700 text-blue-200">
+                  <th>Date</th><th>Comment</th><th>Country</th><th>Reporter</th><th>Categories</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for report in abuseipdb.tables.reports[:10] %}
+                  <tr>
+                    <td>{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                    <td class="break-all">{{ report.comment[:60] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ report.comment }}</span>{% endif %}</td>
+                    <td>{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
+                    <td>{{ report.reporterUsername or report.reporter_username or 'N/A' }}</td>
+                    <td>{{ report.categories|join(', ') if report.categories else 'N/A' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if abuseipdb.tables.reports|length > 10 %}
+              <details><summary class="text-blue-400 cursor-pointer">Show All ({{ abuseipdb.tables.reports|length }})</summary>
+                <table class="data-table mb-2 w-full text-xs">
+                  <tbody>
+                    {% for report in abuseipdb.tables.reports[10:] %}
+                      <tr>
+                        <td>{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                        <td class="break-all">{{ report.comment[:60] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ report.comment }}</span>{% endif %}</td>
+                        <td>{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
+                        <td>{{ report.reporterUsername or report.reporter_username or 'N/A' }}</td>
+                        <td>{{ report.categories|join(', ') if report.categories else 'N/A' }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </details>
+            {% endif %}
+          </div>
+        {% endif %}
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ abuseipdb.raw | tojson(indent=2) }}</pre>
+        </details>
+      </div>
+    {% endif %}
+    {% if alienvault %}
+      <div class="card bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto break-words mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">AlienVault OTX</h4>
+        {% if alienvault.summary %}
+          <table class="data-table mb-2 w-full text-sm">
+            {% for k, v in alienvault.summary.items() %}
+              <tr><th class="break-all">{{ k|capitalize }}</th><td class="break-all">{{ v }}</td></tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+        {% if alienvault.tables.pulses %}
+          <div class="mb-2"><span class="font-semibold text-gray-400">Pulses:</span>
+            <ul class="list-disc list-inside">
+              {% for pulse in alienvault.tables.pulses[:5] %}
+                <li class="text-gray-600">{{ pulse.name }} by {{ pulse.author }} ({{ pulse.created }}) <a href="{{ pulse.link }}" class="text-blue-400 underline" target="_blank">View</a></li>
+              {% endfor %}
+            </ul>
+            {% if alienvault.tables.pulses|length > 5 %}
+              <details><summary class="text-blue-400 cursor-pointer">Show All</summary>
+                <ul class="list-disc list-inside">
+                  {% for pulse in alienvault.tables.pulses[5:] %}
+                    <li class="text-gray-600">{{ pulse.name }} by {{ pulse.author }} ({{ pulse.created }}) <a href="{{ pulse.link }}" class="text-blue-400 underline" target="_blank">View</a></li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+          </div>
+        {% endif %}
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ alienvault.raw | tojson(indent=2) }}</pre>
+        </details>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+    {# --- SSL Info Card --- #}
+    {% if domain_info and domain_info.ssl_info %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">SSL Certificate Information</h4>
+        <table class="data-table mb-2 w-full text-xs">
+          <thead>
+            <tr class="bg-gray-700 text-blue-200">
+              <th class="break-all">Field</th><th class="break-all">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for k, v in domain_info.ssl_info.items() %}
+              <tr>
+                <td class="break-all font-semibold">{{ k|replace('_', ' ')|title }}</td>
+                <td class="break-all">
+                  {% if v is defined and v is not none and v.__class__.__name__ in ['list', 'tuple'] %}
+                    {% for item in v[:3] %}
+                      <div>{{ item[:80] if item is string else item }}{% if item is string and item|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ item }}</span>{% endif %}</div>
+                    {% endfor %}
+                    {% if v|length > 3 %}
+                      <details><summary class="text-blue-400 cursor-pointer">Show All ({{ v|length }})</summary>
+                        <ul class="list-disc list-inside text-xs">
+                          {% for item in v[3:] %}
+                            <li>{{ item }}</li>
+                          {% endfor %}
+                        </ul>
+                      </details>
+                    {% endif %}
+                  {% else %}
+                    {{ v if v else 'N/A' }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {# --- DNS Records Card --- #}
+    {% if domain_info and domain_info.dns_records %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">DNS Records</h4>
+        <table class="data-table mb-2 w-full text-xs">
+          <thead>
+            <tr class="bg-gray-700 text-blue-200">
+              <th class="break-all">Type</th><th class="break-all">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for k, v in domain_info.dns_records.items() %}
+              <tr>
+                <td class="break-all font-semibold">
+                  <span class="px-2 py-1 rounded bg-blue-900 text-blue-200 text-xs uppercase">{{ k }}</span>
+                </td>
+                <td class="break-all">
+                  {% if v is defined and v is not none and v.__class__.__name__ in ['list', 'tuple'] %}
+                    {% for rec in v[:3] %}
+                      <div>{{ rec[:80] if rec is string else rec }}{% if rec is string and rec|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ rec }}</span>{% endif %}</div>
+                    {% endfor %}
+                    {% if v|length > 3 %}
+                      <details><summary class="text-blue-400 cursor-pointer">Show All ({{ v|length }})</summary>
+                        <ul class="list-disc list-inside text-xs">
+                          {% for rec in v[3:] %}
+                            <li>{{ rec }}</li>
+                          {% endfor %}
+                        </ul>
+                      </details>
+                    {% endif %}
+                  {% else %}
+                    {{ v if v else 'N/A' }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {# --- URL Analysis Card --- #}
+    {% if url_analysis %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">URL Analysis</h4>
+        {% set ua = url_analysis %}
+        {# --- URL Details --- #}
+        <div class="mb-4">
+          <h5 class="text-md font-semibold text-blue-300 mb-1">URL Details</h5>
+          <table class="w-full text-sm">
+            <tr><th class="pr-4 py-1 text-gray-400">Scheme</th><td>{{ ua.parsed_url.scheme or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Domain</th><td>{{ ua.parsed_url.netloc or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Path</th><td>{{ ua.parsed_url.path or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Query</th><td>{{ ua.parsed_url.query or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Fragment</th><td>{{ ua.parsed_url.fragment or 'N/A' }}</td></tr>
+          </table>
+        </div>
+        {# --- HTTP Response --- #}
+        <div class="mb-4">
+          <h5 class="text-md font-semibold text-blue-300 mb-1">HTTP Response</h5>
+          <table class="w-full text-sm">
+            <tr><th class="pr-4 py-1 text-gray-400">Status Code</th><td>{{ ua.response.status_code or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Content Type</th><td>{{ ua.response.content_type or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Final URL</th><td class="break-all">{{ ua.response.url or 'N/A' }}</td></tr>
+          </table>
+        </div>
+        {# --- Security Headers --- #}
+        <div class="mb-4">
+          <h5 class="text-md font-semibold text-blue-300 mb-1">Security Headers</h5>
+          <table class="w-full text-sm">
+            {% for k, v in ua.security_headers.items() %}
+              <tr>
+                <th class="pr-4 py-1 text-gray-400">{{ k }}</th>
+                <td>{% if v != 'Not Set' %}<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs">Set</span>{% else %}<span class="px-2 py-1 rounded bg-red-900 text-red-300 text-xs">Not Set</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        </div>
+        {# --- Technologies --- #}
+        {% if ua.technologies %}
+          <div class="mb-4">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">Detected Technologies</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {% for cat, techs in ua.technologies.items() %}
+                <div>
+                  <span class="font-semibold text-gray-400">{{ cat }}:</span>
+                  <ul class="list-disc list-inside text-sm">
+                    {% for t in techs %}
+                      <li>{{ t }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+        {# --- Meta Tags --- #}
+        {% if ua.meta_tags %}
+          <div class="mb-4">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">Meta Tags</h5>
+            <table class="w-full text-xs">
+              <thead><tr><th class="text-gray-400">Name</th><th class="text-gray-400">Content</th></tr></thead>
+              <tbody>
+                {% for tag in ua.meta_tags[:5] %}
+                  <tr><td>{{ tag.name }}</td><td>{{ tag.content[:60] }}{% if tag.content|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ tag.content }}</span>{% endif %}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if ua.meta_tags|length > 5 %}
+              <details><summary class="text-blue-400 cursor-pointer">Show All</summary>
+                <table class="w-full text-xs">
+                  <tbody>
+                    {% for tag in ua.meta_tags[5:] %}
+                      <tr><td>{{ tag.name }}</td><td>{{ tag.content }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </details>
+            {% endif %}
+          </div>
+        {% endif %}
+        {# --- Redirect Chain --- #}
+        {% if ua.response.redirect_chain %}
+          <div class="mb-4">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">Redirect Chain</h5>
+            <ul class="list-disc list-inside text-sm">
+              {% for r in ua.response.redirect_chain %}
+                <li><span class="text-gray-400">[{{ r.status_code }}]</span> <span class="break-all">{{ r.url }}</span></li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        {# --- Favicon --- #}
+        {% if ua.favicon %}
+          <div class="mb-4 flex items-center gap-4">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">Favicon</h5>
+            <img src="{{ ua.favicon.url }}" alt="favicon" class="w-8 h-8 rounded border border-gray-700">
+            <span class="font-mono text-xs">MD5: {{ ua.favicon.md5 }}</span>
+          </div>
+        {% endif %}
+        {# --- OpenGraph/Twitter --- #}
+        {% if ua.opengraph or ua.twitter %}
+          <div class="mb-4">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">OpenGraph / Twitter Meta</h5>
+            {% if ua.opengraph %}
+              <div class="mb-2"><span class="font-semibold text-gray-400">OpenGraph:</span>
+                <ul class="list-disc list-inside text-xs">
+                  {% for k, v in ua.opengraph.items() %}
+                    <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ v }}</span>{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+            {% if ua.twitter %}
+              <div><span class="font-semibold text-gray-400">Twitter:</span>
+                <ul class="list-disc list-inside text-xs">
+                  {% for k, v in ua.twitter.items() %}
+                    <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ v }}</span>{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+        {# --- Screenshot --- #}
+        {% if ua.screenshot_url %}
+          <div class="mb-4 flex flex-col items-center">
+            <h5 class="text-md font-semibold text-blue-300 mb-1">Screenshot (urlscan.io)</h5>
+            <img src="{{ ua.screenshot_url }}" alt="Screenshot" class="rounded shadow max-w-xs max-h-64 border border-gray-700">
+          </div>
+        {% endif %}
+        {# --- PhishTank --- #}
+        {% if ua.phishtank_url %}
+          <div class="mb-4">
+            <a href="{{ ua.phishtank_url }}" class="btn btn-primary w-fit" target="_blank">Check on PhishTank</a>
+          </div>
+        {% endif %}
+        {# --- Raw Data --- #}
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ua | tojson(indent=2) }}</pre>
+        </details>
+      </div>
+    {% endif %}
+  </div>
+
+  {# --- Enrichment Cards Section --- #}
+  <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-8">
+    {% if domain_info and domain_info.mxtoolbox_email_security %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">MXToolbox Email Security</h4>
+        <table class="mb-4 w-full text-sm">
+          {% for record in ['spf', 'dkim', 'dmarc'] %}
+            <tr>
+              <th class="break-all pr-4 py-2 uppercase">{{ record }}</th>
+              <td class="break-all">
+                {% set val = domain_info.mxtoolbox_email_security[record] %}
+                {% if val %}
+                  <span class="inline-flex items-center gap-2">
+                    <span class="text-green-400">&#10003;</span>
+                    <span>{{ val[:60] }}{% if val|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ val }}</span>{% endif %}</span>
+                  </span>
+                {% else %}
+                  <span class="text-red-400">&#10007; N/A</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.mxtoolbox_email_security.raw | tojson(indent=2) }}</pre>
+        </details>
+      </div>
+    {% endif %}
+    {% if domain_info and domain_info.reverse_domains %}
+      {% if domain_info.reverse_domains[0] and 'API count exceeded' in domain_info.reverse_domains[0] %}
+        <div class="bg-yellow-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+          <h4 class="text-lg font-semibold text-yellow-400 mb-2">Reverse IP Domains (API Limit)</h4>
+          <span class="text-yellow-400">API count exceeded - Increase Quota with Membership or try again later.</span>
+        </div>
+      {% else %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+          <h4 class="text-lg font-semibold text-blue-400 mb-2">Reverse IP Domains</h4>
+          {% set domains = domain_info.reverse_domains %}
+          {% if domains|length > 0 %}
+            <ul class="list-disc list-inside text-sm">
+              {% for d in domains[:5] %}
+                <li class="break-all">{{ d }}</li>
+              {% endfor %}
+            </ul>
+            {% if domains|length > 5 %}
+              <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs mt-2">Show All ({{ domains|length }})</a>
+              <ul class="hidden list-disc list-inside text-sm mt-2">
+                {% for d in domains[5:] %}
+                  <li class="break-all">{{ d }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% else %}
+            <span class="text-yellow-400">No other domains found on this IP.</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endif %}
+    {% if domain_info and domain_info.subdomains %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2">Subdomains (crt.sh)</h4>
+        {% set subs = domain_info.subdomains %}
+        {% if subs|length > 0 %}
+          <ul class="list-disc list-inside text-sm">
+            {% for sub in subs[:5] %}
+              <li class="break-all">{{ sub }}</li>
+            {% endfor %}
+          </ul>
+          {% if subs|length > 5 %}
+            <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs mt-2">Show All ({{ subs|length }})</a>
+            <ul class="hidden list-disc list-inside text-sm mt-2">
+              {% for sub in subs[5:] %}
+                <li class="break-all">{{ sub }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% else %}
+          <span class="text-yellow-400">No subdomains found.</span>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if domain_info and domain_info.phishtank_url %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2 flex items-center gap-2">PhishTank Check
+          <span class="ml-2 px-2 py-1 rounded text-xs font-bold bg-blue-900 text-blue-300">External</span>
+        </h4>
+        <a href="{{ domain_info.phishtank_url }}" class="btn btn-primary w-fit mt-2" target="_blank">Check on PhishTank</a>
+      </div>
+    {% endif %}
+    {% if domain_info and domain_info.talos_reputation %}
+      <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto mb-4">
+        <h4 class="text-lg font-semibold text-blue-400 mb-2 flex items-center gap-2">
+          Cisco Talos Reputation
+          {% set verdict = domain_info.talos_reputation.verdict|lower %}
+          <span class="ml-2 px-2 py-1 rounded text-xs font-bold
+            {% if 'malicious' in verdict or 'untrusted' in verdict or 'suspicious' in verdict %}bg-red-900 text-red-300
+            {% elif 'neutral' in verdict %}bg-yellow-900 text-yellow-300
+            {% elif 'trusted' in verdict or 'benign' in verdict %}bg-green-900 text-green-300
+            {% else %}bg-gray-800 text-gray-300{% endif %}">
+            {{ domain_info.talos_reputation.verdict or 'External' }}
+          </span>
+        </h4>
+        <a href="{{ domain_info.talos_reputation.talos_url }}" class="btn btn-primary w-fit mt-2" target="_blank">View on Talos</a>
+      </div>
+    {% endif %}
+  </div>
+
   <div class="flex flex-col items-center justify-center mt-12 gap-4 w-full max-w-md mx-auto">
     <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto">
       <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full" required>

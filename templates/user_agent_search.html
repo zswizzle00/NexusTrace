@@ -13,7 +13,7 @@
                 </p>
             </div>
 
-            <!-- Search Form -->
+            <!-- Unified Search Form -->
             <div class="unified-search">
                 <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
                     <input type="text" 
@@ -29,61 +29,6 @@
                     </button>
                 </form>
             </div>
-
-            <!-- Results Section -->
-            {% if results %}
-            <div class="mt-8">
-                <div class="bg-gray-700 rounded-lg p-6 space-y-4">
-                    <h2 class="text-2xl font-bold text-white mb-4">Analysis Results</h2>
-                    
-                    <!-- Browser Information -->
-                    <div class="bg-gray-600 rounded-lg p-4">
-                        <h3 class="text-xl font-semibold text-white mb-2">Browser Information</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-300">Name: <span class="text-white">{{ results.browser.name }}</span></p>
-                                <p class="text-gray-300">Version: <span class="text-white">{{ results.browser.version }}</span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Operating System -->
-                    <div class="bg-gray-600 rounded-lg p-4">
-                        <h3 class="text-xl font-semibold text-white mb-2">Operating System</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-300">Name: <span class="text-white">{{ results.os.name }}</span></p>
-                                <p class="text-gray-300">Version: <span class="text-white">{{ results.os.version }}</span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Device Information -->
-                    <div class="bg-gray-600 rounded-lg p-4">
-                        <h3 class="text-xl font-semibold text-white mb-2">Device Information</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-300">Type: <span class="text-white">{{ results.device.type }}</span></p>
-                                <p class="text-gray-300">Brand: <span class="text-white">{{ results.device.brand }}</span></p>
-                                <p class="text-gray-300">Model: <span class="text-white">{{ results.device.model }}</span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Additional Information -->
-                    <div class="bg-gray-600 rounded-lg p-4">
-                        <h3 class="text-xl font-semibold text-white mb-2">Additional Information</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-300">Is Mobile: <span class="text-white">{{ results.is_mobile }}</span></p>
-                                <p class="text-gray-300">Is Tablet: <span class="text-white">{{ results.is_tablet }}</span></p>
-                                <p class="text-gray-300">Is Desktop: <span class="text-white">{{ results.is_desktop }}</span></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>

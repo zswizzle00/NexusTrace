@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">Domain/URL Analysis Results</h1>
+    
+    {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+        <span class="block sm:inline">{{ error }}</span>
+    </div>
+    {% endif %}
+
+    {% if result_data %}
+        <!-- URL Analysis -->
+        {% if result_data.url_analysis %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">URL Analysis</h2>
+            
+            <!-- URL Details -->
+            <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">URL Details</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-gray-600">Scheme: <span class="font-medium">{{ result_data.url_analysis.url_analysis.parsed_url.scheme }}</span></p>
+                        <p class="text-gray-600">Domain: <span class="font-medium">{{ result_data.url_analysis.url_analysis.parsed_url.netloc }}</span></p>
+                        <p class="text-gray-600">Path: <span class="font-medium">{{ result_data.url_analysis.url_analysis.parsed_url.path }}</span></p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Status Code: <span class="font-medium">{{ result_data.url_analysis.url_analysis.response.status_code }}</span></p>
+                        <p class="text-gray-600">Content Type: <span class="font-medium">{{ result_data.url_analysis.url_analysis.response.content_type }}</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Headers -->
+            {% if result_data.url_analysis.url_analysis.security_headers %}
+            <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">Security Headers</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for header, value in result_data.url_analysis.url_analysis.security_headers.items() %}
+                    <div class="flex items-center">
+                        <span class="text-gray-600 w-48">{{ header }}:</span>
+                        <span class="font-medium {% if value == 'Not Set' %}text-red-600{% else %}text-green-600{% endif %}">{{ value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Technologies -->
+            {% if result_data.url_analysis.url_analysis.technologies %}
+            <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">Detected Technologies</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for category, technologies in result_data.url_analysis.url_analysis.technologies.items() %}
+                    <div class="mb-4">
+                        <h4 class="font-medium text-gray-700">{{ category }}</h4>
+                        <ul class="list-disc list-inside">
+                            {% for tech in technologies %}
+                            <li class="text-gray-600">{{ tech }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Meta Tags -->
+            {% if result_data.url_analysis.url_analysis.meta_tags %}
+            <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">Meta Tags</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for tag in result_data.url_analysis.url_analysis.meta_tags %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ tag.name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ tag.content }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Redirect Chain -->
+            {% if result_data.url_analysis.url_analysis.response.redirect_chain %}
+            <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">Redirect Chain</h3>
+                <div class="space-y-2">
+                    {% for redirect in result_data.url_analysis.url_analysis.response.redirect_chain %}
+                    <div class="bg-gray-50 p-3 rounded">
+                        <p class="text-gray-600">URL: <span class="font-medium">{{ redirect.url }}</span></p>
+                        <p class="text-gray-600">Status: <span class="font-medium">{{ redirect.status_code }}</span></p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Domain Information -->
+        {% if result_data.domain_info %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Domain Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-600">Domain: <span class="font-medium">{{ result_data.domain_info.domain }}</span></p>
+                    {% if result_data.domain_info.ip_address %}
+                    <p class="text-gray-600">IP Address: <span class="font-medium">{{ result_data.domain_info.ip_address }}</span></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- DNS Records -->
+        {% if result_data.domain_info and result_data.domain_info.dns_records %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">DNS Records</h2>
+            {% for record_type, records in result_data.domain_info.dns_records.items() %}
+                {% if records %}
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium mb-2">{{ record_type }} Records</h3>
+                    <ul class="list-disc list-inside">
+                        {% for record in records %}
+                        <li class="text-gray-600">{{ record }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- SSL Information -->
+        {% if result_data.domain_info and result_data.domain_info.ssl_info %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">SSL Certificate Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-600">Issuer: <span class="font-medium">{{ result_data.domain_info.ssl_info.issuer.get('organizationName', 'N/A') }}</span></p>
+                    <p class="text-gray-600">Valid From: <span class="font-medium">{{ result_data.domain_info.ssl_info.not_before }}</span></p>
+                    <p class="text-gray-600">Valid Until: <span class="font-medium">{{ result_data.domain_info.ssl_info.not_after }}</span></p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Cipher: <span class="font-medium">{{ result_data.domain_info.ssl_info.cipher[0] }}</span></p>
+                    <p class="text-gray-600">Version: <span class="font-medium">{{ result_data.domain_info.ssl_info.version }}</span></p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- WHOIS Information -->
+        {% if result_data.whois_info %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">WHOIS Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% if result_data.whois_info.registrar %}
+                <div>
+                    <p class="text-gray-600">Registrar: <span class="font-medium">{{ result_data.whois_info.registrar }}</span></p>
+                    <p class="text-gray-600">Registration Date: <span class="font-medium">{{ result_data.whois_info.creation_date }}</span></p>
+                    <p class="text-gray-600">Expiration Date: <span class="font-medium">{{ result_data.whois_info.expiration_date }}</span></p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- AlienVault OTX Information -->
+        {% if result_data.alienvault %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">AlienVault OTX Information</h2>
+            {% if result_data.alienvault.summary %}
+            <div class="mb-4">
+                <h3 class="text-lg font-medium mb-2">Summary</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <p class="text-gray-600">Reputation: <span class="font-medium">{{ result_data.alienvault.summary.reputation }}</span></p>
+                    <p class="text-gray-600">Pulse Count: <span class="font-medium">{{ result_data.alienvault.summary.pulse_count }}</span></p>
+                    {% if result_data.alienvault.summary.tags %}
+                    <p class="text-gray-600">Tags: <span class="font-medium">{{ result_data.alienvault.summary.tags }}</span></p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result_data.alienvault.tables and result_data.alienvault.tables.pulses %}
+            <div class="mb-4">
+                <h3 class="text-lg font-medium mb-2">Pulses</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for pulse in result_data.alienvault.tables.pulses %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <a href="{{ pulse.link }}" target="_blank" class="text-blue-600 hover:text-blue-800">{{ pulse.name }}</a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pulse.author }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pulse.created }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pulse.tags }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %} 

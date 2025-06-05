@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
+    <div class="w-full max-w-3xl mx-auto px-2 py-8 md:py-16">
+        <div class="card p-8 md:p-14 space-y-12">
+            <div class="text-center mb-4 md:mb-8">
+                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                    Windows Event / AD Event Analysis
+                </h1>
+                <p class="text-lg md:text-2xl text-gray-300">
+                    Analyze Windows Event IDs and Active Directory events for security insights.
+                </p>
+            </div>
+            {% if event_info %}
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto w-full max-w-2xl mx-auto">
+                <h3 class="text-xl font-bold text-blue-400 mb-4">Event Details</h3>
+                <table class="mb-4 w-full text-sm">
+                    <tr><th class="pr-4 text-gray-400">Event ID</th><td>{{ event_info.event_id }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Title</th><td>{{ event_info.title or 'N/A' }}</td></tr>
+                    <tr><th class="pr-4 text-gray-400">Summary</th><td>{{ event_info.summary or 'N/A' }}</td></tr>
+                </table>
+                {% if event_info.details_table %}
+                <div class="mb-4">
+                    <h4 class="text-lg font-semibold text-blue-400 mb-2">Details Table</h4>
+                    <div class="overflow-x-auto">
+                        <table class="table w-full text-xs">
+                            <tbody>
+                                {% for row in event_info.details_table %}
+                                <tr class="border-b border-gray-600">
+                                    {% for cell in row %}
+                                    <td class="py-2 px-4 text-gray-300">{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                {% if event_info.fields %}
+                <div class="mb-4">
+                    <h4 class="text-lg font-semibold text-blue-400 mb-2">Field Details</h4>
+                    <div class="max-h-64 overflow-auto bg-gray-800 rounded p-3 font-mono text-sm text-gray-200 whitespace-pre-wrap border border-gray-600">
+                        {{ event_info.fields }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% elif event_error %}
+            <div class="bg-red-900 rounded-2xl shadow-lg p-8 flex flex-col items-center justify-center text-red-300 w-full max-w-2xl mx-auto">
+                <span>{{ event_error }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 
