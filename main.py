@@ -9,4 +9,7 @@ from app import create_app
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050) 
+    # Ensure we bind to all interfaces in Docker
+    host = os.getenv('FLASK_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_PORT', 5050))
+    app.run(host=host, port=port, threaded=True) 

@@ -61,6 +61,10 @@ def domain_search():
 def hash_analysis_form():
     return render_template('hash_analysis.html')
 
+@home_bp.route('/health')
+def health_check():
+    return {'status': 'healthy'}, 200
+
 def parse_alienvault_otx(raw_data):
     if not raw_data or not isinstance(raw_data, dict):
         return None
