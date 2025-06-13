@@ -9,6 +9,7 @@ from ..services.ip_service import (
     get_alienvault_data,
     get_vpn_data
 )
+import socket
 
 ip_bp = Blueprint('ip', __name__)
 
@@ -103,9 +104,19 @@ def check_ips():
         valid_ips = []
         for ip in ip_addresses:
             try:
-                # Basic IP validation
-                if isinstance(ip, str) and len(ip.split('.')) == 4:
-                    valid_ips.append(ip)
+                # Use socket.inet_pton to validate both IPv4 and IPv6 addresses
+                if isinstance(ip, str):
+                    try:
+                        # Try IPv4 first
+                        socket.inet_pton(socket.AF_INET, ip)
+                        valid_ips.append(ip)
+                    except socket.error:
+                        try:
+                            # Try IPv6 if IPv4 fails
+                            socket.inet_pton(socket.AF_INET6, ip)
+                            valid_ips.append(ip)
+                        except socket.error:
+                            continue
             except:
                 continue
         

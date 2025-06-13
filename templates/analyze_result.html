@@ -38,10 +38,10 @@
         <h4 class="text-lg font-semibold text-blue-400 mb-2">VPNAPI</h4>
         <table class="mb-4 w-full text-sm">
           <tr><th class="break-all">IP</th><td class="break-all">{{ vpnapi.ip }}</td></tr>
-          <tr><th class="break-all">VPN</th><td class="break-all">{{ 'Yes' if vpnapi.security.vpn else 'No' }}</td></tr>
-          <tr><th class="break-all">Proxy</th><td class="break-all">{{ 'Yes' if vpnapi.security.proxy else 'No' }}</td></tr>
-          <tr><th class="break-all">Tor</th><td class="break-all">{{ 'Yes' if vpnapi.security.tor else 'No' }}</td></tr>
-          <tr><th class="break-all">Relay</th><td class="break-all">{{ 'Yes' if vpnapi.security.relay else 'No' }}</td></tr>
+          <tr><th class="break-all">VPN</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.vpn else 'No' }}</td></tr>
+          <tr><th class="break-all">Proxy</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.proxy else 'No' }}</td></tr>
+          <tr><th class="break-all">Tor</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.tor else 'No' }}</td></tr>
+          <tr><th class="break-all">Relay</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.relay else 'No' }}</td></tr>
         </table>
       </div>
     {% endif %}

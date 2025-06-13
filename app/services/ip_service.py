@@ -38,7 +38,7 @@ def setup_ip_services(app):
 @timed_lru_cache(seconds=1800)
 def check_abuseipdb(ip_address):
     """Check IP address against AbuseIPDB."""
-    abuseipdb_api_key = '0292dbf8d7f5cf73d1b3111c92a7455e3984a8167b7b67054029f5775288be330b64336ef7192141'
+    abuseipdb_api_key = os.getenv('ABUSEIPDB_KEY')
     if not abuseipdb_api_key:
         logger.warning("AbuseIPDB API key not configured")
         return None
@@ -49,6 +49,7 @@ def check_abuseipdb(ip_address):
                 'Key': abuseipdb_api_key,
                 'Accept': 'application/json'
             }
+            # URL encode the IP address to handle IPv6 addresses properly
             encoded_ip = quote(ip_address)
             response = requests.get(
                 f'https://api.abuseipdb.com/api/v2/check',
@@ -93,7 +94,9 @@ def get_ipinfo_data(ip_address):
     """Get IP information from IPinfo."""
     with ipinfo_limiter:
         try:
-            details = ipinfo_handler.getDetails(ip_address)
+            # URL encode the IP address to handle IPv6 addresses properly
+            encoded_ip = quote(ip_address)
+            details = ipinfo_handler.getDetails(encoded_ip)
             return {
                 'ipinfo': {
                     'ip': getattr(details, 'ip', None),
@@ -299,8 +302,10 @@ def get_vpn_data(ip_address):
 
     with vpnapi_limiter:
         try:
+            # URL encode the IP address to handle IPv6 addresses properly
+            encoded_ip = quote(ip_address)
             response = requests.get(
-                f'https://vpnapi.io/api/{ip_address}?key={api_key}',
+                f'https://vpnapi.io/api/{encoded_ip}?key={api_key}',
                 timeout=5
             )
             response.raise_for_status()

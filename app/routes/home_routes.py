@@ -10,6 +10,7 @@ import requests
 from dotenv import load_dotenv
 from app.services.event_service import get_event_info
 from urllib.parse import urlparse
+import socket
 
 # Load environment variables
 load_dotenv()
@@ -145,48 +146,50 @@ def parse_abuseipdb(abuse_data):
         'raw': abuse_data
     }
 
-# Unified analyze endpoint
+def is_valid_ip(ip):
+    """Check if the string is a valid IPv4 or IPv6 address."""
+    try:
+        # Try IPv4 first
+        socket.inet_pton(socket.AF_INET, ip)
+        return True
+    except socket.error:
+        try:
+            # Try IPv6 if IPv4 fails
+            socket.inet_pton(socket.AF_INET6, ip)
+            return True
+        except socket.error:
+            return False
+
 @home_bp.route('/analyze', methods=['POST'])
 def analyze():
     indicator = request.form.get('indicator', '').strip()
-    md5_re = re.compile(r'^[a-fA-F0-9]{32}$')
-    sha1_re = re.compile(r'^[a-fA-F0-9]{40}$')
-    sha256_re = re.compile(r'^[a-fA-F0-9]{64}$')
-    ip_re = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
-    domain_re = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.(?:[A-Za-z]{2,})$')
-    url_re = re.compile(r'^(https?://)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*/?$')
-    event_id_re = re.compile(r'^\d{1,5}$')
+    if not indicator:
+        flash('Please enter an indicator to analyze.', 'error')
+        return redirect(url_for('home.home'))
 
-    hash_type = None
-    indicator_type = None
+    # Initialize result_data and card_count
     result_data = {}
     card_count = 0
 
-    if md5_re.match(indicator):
-        hash_type = 'MD5'
-        indicator_type = 'hash'
-    elif sha1_re.match(indicator):
-        hash_type = 'SHA1'
-        indicator_type = 'hash'
-    elif sha256_re.match(indicator):
-        hash_type = 'SHA256'
-        indicator_type = 'hash'
-    elif ip_re.match(indicator):
+    # Determine indicator type
+    indicator_type = None
+    
+    # Check for IP address (both IPv4 and IPv6)
+    if is_valid_ip(indicator):
         indicator_type = 'ip'
-    elif url_re.match(indicator) or indicator.lower().startswith(('http://', 'https://')):
-        indicator_type = 'domain'  # Treat URLs as domains for unified analysis
-    elif domain_re.match(indicator):
+    # Check for domain
+    elif re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$', indicator):
         indicator_type = 'domain'
-    elif event_id_re.match(indicator):
+    # Check for URL
+    elif re.match(r'^https?://', indicator):
+        indicator_type = 'url'
+    # Check for hash
+    elif re.match(r'^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$', indicator):
+        indicator_type = 'hash'
+    # Check for event ID
+    elif re.match(r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$', indicator):
         indicator_type = 'event'
-        try:
-            event_info = get_event_info(indicator)
-            if event_info:
-                result_data['event_info'] = event_info
-            else:
-                result_data['event_error'] = "Could not find information for this Event ID"
-        except Exception as e:
-            result_data['event_error'] = f"Error analyzing Event ID: {str(e)}"
+    # Default to user agent if no other type matches
     else:
         print(f"[DEBUG] Treating as User Agent: {indicator}")
         api_key = os.getenv('APILAYER_API_KEY')
