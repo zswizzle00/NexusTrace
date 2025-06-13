@@ -190,6 +190,9 @@ def analyze():
     # Check for event ID
     elif re.match(r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$', indicator):
         indicator_type = 'event'
+    # Check for AD code (assuming it's a numeric code)
+    elif re.match(r'^\d+$', indicator):
+        indicator_type = 'ad_code'
     # Default to user agent if no other type matches
     else:
         print(f"[DEBUG] Treating as User Agent: {indicator}")
@@ -226,6 +229,16 @@ def analyze():
                               indicator_type=indicator_type,
                               **result_data)
     elif indicator_type == 'event':
+        return render_template('event_analysis.html',
+                              indicator=indicator,
+                              indicator_type=indicator_type,
+                              **result_data)
+    elif indicator_type == 'ad_code':
+        # Get event information for the AD code
+        event_info = get_event_info(indicator)
+        result_data['event_info'] = event_info if event_info else None
+        if not result_data['event_info']:
+            result_data['ad_error'] = 'No AD code analysis results found.'
         return render_template('event_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
