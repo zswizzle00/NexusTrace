@@ -59,16 +59,20 @@ def analyze_domain():
         else:
             # Check if it's a URL
             if indicator.lower().startswith(('http://', 'https://')):
-                # Normalize URL if needed
-                if not is_valid_url(indicator):
-                    indicator = f'https://{indicator}'
                 # Get URL analysis
                 url_analysis = analyze_url(indicator)
                 result_data['url_analysis'] = url_analysis if url_analysis else None
                 # Extract domain from URL for additional analysis
                 domain = urlparse(indicator).netloc
             else:
-                domain = indicator
+                # Try to normalize as URL first
+                normalized_url = f'https://{indicator}'
+                if is_valid_url(normalized_url):
+                    url_analysis = analyze_url(normalized_url)
+                    result_data['url_analysis'] = url_analysis if url_analysis else None
+                    domain = urlparse(normalized_url).netloc
+                else:
+                    domain = indicator
             # Get domain information
             domain_info = get_domain_info(domain)
             result_data['domain_info'] = domain_info if domain_info else None

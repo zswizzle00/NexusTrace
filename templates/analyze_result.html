@@ -274,27 +274,27 @@
         <div class="mb-4">
           <h5 class="text-md font-semibold text-blue-300 mb-1">URL Details</h5>
           <table class="w-full text-sm">
-            <tr><th class="pr-4 py-1 text-gray-400">Scheme</th><td>{{ ua.parsed_url.scheme or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Domain</th><td>{{ ua.parsed_url.netloc or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Path</th><td>{{ ua.parsed_url.path or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Query</th><td>{{ ua.parsed_url.query or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Fragment</th><td>{{ ua.parsed_url.fragment or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Scheme</th><td>{{ ua.get('parsed_url', {}).get('scheme', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Domain</th><td>{{ ua.get('parsed_url', {}).get('netloc', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Path</th><td>{{ ua.get('parsed_url', {}).get('path', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Query</th><td>{{ ua.get('parsed_url', {}).get('query', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Fragment</th><td>{{ ua.get('parsed_url', {}).get('fragment', 'N/A') }}</td></tr>
           </table>
         </div>
         {# --- HTTP Response --- #}
         <div class="mb-4">
           <h5 class="text-md font-semibold text-blue-300 mb-1">HTTP Response</h5>
           <table class="w-full text-sm">
-            <tr><th class="pr-4 py-1 text-gray-400">Status Code</th><td>{{ ua.response.status_code or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Content Type</th><td>{{ ua.response.content_type or 'N/A' }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400">Final URL</th><td class="break-all">{{ ua.response.url or 'N/A' }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Status Code</th><td>{{ ua.get('response', {}).get('status_code', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Content Type</th><td>{{ ua.get('response', {}).get('content_type', 'N/A') }}</td></tr>
+            <tr><th class="pr-4 py-1 text-gray-400">Final URL</th><td class="break-all">{{ ua.get('response', {}).get('url', 'N/A') }}</td></tr>
           </table>
         </div>
         {# --- Security Headers --- #}
         <div class="mb-4">
           <h5 class="text-md font-semibold text-blue-300 mb-1">Security Headers</h5>
           <table class="w-full text-sm">
-            {% for k, v in ua.security_headers.items() %}
+            {% for k, v in ua.get('security_headers', {}).items() %}
               <tr>
                 <th class="pr-4 py-1 text-gray-400">{{ k }}</th>
                 <td>{% if v != 'Not Set' %}<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs">Set</span>{% else %}<span class="px-2 py-1 rounded bg-red-900 text-red-300 text-xs">Not Set</span>{% endif %}</td>
@@ -303,11 +303,11 @@
           </table>
         </div>
         {# --- Technologies --- #}
-        {% if ua.technologies %}
+        {% if ua.get('technologies') %}
           <div class="mb-4">
             <h5 class="text-md font-semibold text-blue-300 mb-1">Detected Technologies</h5>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {% for cat, techs in ua.technologies.items() %}
+              {% for cat, techs in ua.get('technologies', {}).items() %}
                 <div>
                   <span class="font-semibold text-gray-400">{{ cat }}:</span>
                   <ul class="list-disc list-inside text-sm">
@@ -321,23 +321,23 @@
           </div>
         {% endif %}
         {# --- Meta Tags --- #}
-        {% if ua.meta_tags %}
+        {% if ua.get('meta_tags') %}
           <div class="mb-4">
             <h5 class="text-md font-semibold text-blue-300 mb-1">Meta Tags</h5>
             <table class="w-full text-xs">
               <thead><tr><th class="text-gray-400">Name</th><th class="text-gray-400">Content</th></tr></thead>
               <tbody>
-                {% for tag in ua.meta_tags[:5] %}
-                  <tr><td>{{ tag.name }}</td><td>{{ tag.content[:60] }}{% if tag.content|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ tag.content }}</span>{% endif %}</td></tr>
+                {% for tag in ua.get('meta_tags', [])[:5] %}
+                  <tr><td>{{ tag.get('name', 'N/A') }}</td><td>{{ tag.get('content', '')[:60] }}{% if tag.get('content', '')|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ tag.get('content', '') }}</span>{% endif %}</td></tr>
                 {% endfor %}
               </tbody>
             </table>
-            {% if ua.meta_tags|length > 5 %}
+            {% if ua.get('meta_tags', [])|length > 5 %}
               <details><summary class="text-blue-400 cursor-pointer">Show All</summary>
                 <table class="w-full text-xs">
                   <tbody>
-                    {% for tag in ua.meta_tags[5:] %}
-                      <tr><td>{{ tag.name }}</td><td>{{ tag.content }}</td></tr>
+                    {% for tag in ua.get('meta_tags', [])[5:] %}
+                      <tr><td>{{ tag.get('name', 'N/A') }}</td><td>{{ tag.get('content', '') }}</td></tr>
                     {% endfor %}
                   </tbody>
                 </table>
@@ -346,41 +346,41 @@
           </div>
         {% endif %}
         {# --- Redirect Chain --- #}
-        {% if ua.response.redirect_chain %}
+        {% if ua.get('response', {}).get('redirect_chain') %}
           <div class="mb-4">
             <h5 class="text-md font-semibold text-blue-300 mb-1">Redirect Chain</h5>
             <ul class="list-disc list-inside text-sm">
-              {% for r in ua.response.redirect_chain %}
-                <li><span class="text-gray-400">[{{ r.status_code }}]</span> <span class="break-all">{{ r.url }}</span></li>
+              {% for r in ua.get('response', {}).get('redirect_chain', []) %}
+                <li><span class="text-gray-400">[{{ r.get('status_code', 'N/A') }}]</span> <span class="break-all">{{ r.get('url', 'N/A') }}</span></li>
               {% endfor %}
             </ul>
           </div>
         {% endif %}
         {# --- Favicon --- #}
-        {% if ua.favicon %}
+        {% if ua.get('favicon') %}
           <div class="mb-4 flex items-center gap-4">
             <h5 class="text-md font-semibold text-blue-300 mb-1">Favicon</h5>
-            <img src="{{ ua.favicon.url }}" alt="favicon" class="w-8 h-8 rounded border border-gray-700">
-            <span class="font-mono text-xs">MD5: {{ ua.favicon.md5 }}</span>
+            <img src="{{ ua.get('favicon', {}).get('url', '') }}" alt="favicon" class="w-8 h-8 rounded border border-gray-700">
+            <span class="font-mono text-xs">MD5: {{ ua.get('favicon', {}).get('md5', 'N/A') }}</span>
           </div>
         {% endif %}
         {# --- OpenGraph/Twitter --- #}
-        {% if ua.opengraph or ua.twitter %}
+        {% if ua.get('opengraph') or ua.get('twitter') %}
           <div class="mb-4">
             <h5 class="text-md font-semibold text-blue-300 mb-1">OpenGraph / Twitter Meta</h5>
-            {% if ua.opengraph %}
+            {% if ua.get('opengraph') %}
               <div class="mb-2"><span class="font-semibold text-gray-400">OpenGraph:</span>
                 <ul class="list-disc list-inside text-xs">
-                  {% for k, v in ua.opengraph.items() %}
+                  {% for k, v in ua.get('opengraph', {}).items() %}
                     <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ v }}</span>{% endif %}</li>
                   {% endfor %}
                 </ul>
               </div>
             {% endif %}
-            {% if ua.twitter %}
+            {% if ua.get('twitter') %}
               <div><span class="font-semibold text-gray-400">Twitter:</span>
                 <ul class="list-disc list-inside text-xs">
-                  {% for k, v in ua.twitter.items() %}
+                  {% for k, v in ua.get('twitter', {}).items() %}
                     <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">Show More</a><span class="hidden">{{ v }}</span>{% endif %}</li>
                   {% endfor %}
                 </ul>
@@ -389,16 +389,16 @@
           </div>
         {% endif %}
         {# --- Screenshot --- #}
-        {% if ua.screenshot_url %}
+        {% if ua.get('screenshot_url') %}
           <div class="mb-4 flex flex-col items-center">
             <h5 class="text-md font-semibold text-blue-300 mb-1">Screenshot (urlscan.io)</h5>
-            <img src="{{ ua.screenshot_url }}" alt="Screenshot" class="rounded shadow max-w-xs max-h-64 border border-gray-700">
+            <img src="{{ ua.get('screenshot_url', '') }}" alt="Screenshot" class="rounded shadow max-w-xs max-h-64 border border-gray-700">
           </div>
         {% endif %}
         {# --- PhishTank --- #}
-        {% if ua.phishtank_url %}
+        {% if ua.get('phishtank_url') %}
           <div class="mb-4">
-            <a href="{{ ua.phishtank_url }}" class="btn btn-primary w-fit" target="_blank">Check on PhishTank</a>
+            <a href="{{ ua.get('phishtank_url', '') }}" class="btn btn-primary w-fit" target="_blank">Check on PhishTank</a>
           </div>
         {% endif %}
         {# --- Raw Data --- #}

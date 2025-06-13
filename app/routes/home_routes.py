@@ -5,6 +5,7 @@ from app.services.hash_service import get_hash_info
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
 from app.services.domain_service import get_domain_info, get_whois_info
 from app.services.url_service import analyze_url
+from app.services.user_agent_service import parse_user_agent
 import os
 import requests
 from dotenv import load_dotenv
@@ -192,45 +193,12 @@ def analyze():
     # Default to user agent if no other type matches
     else:
         print(f"[DEBUG] Treating as User Agent: {indicator}")
-        api_key = os.getenv('APILAYER_API_KEY')
-        if api_key:
-            url = "https://api.apilayer.com/user_agent/parse"
-            headers = {"apikey": api_key}
-            params = {"ua": indicator}
-            try:
-                response = requests.get(url, headers=headers, params=params)
-                print(f"[DEBUG] User Agent API status code: {response.status_code}")
-                print(f"[DEBUG] User Agent API response text: {response.text}")
-                response.raise_for_status()
-                results = response.json()
-                print(f"[DEBUG] User Agent API response: {results}")
-                formatted_results = {
-                    'browser': {
-                        'name': results.get('browser', {}).get('name', 'Unknown'),
-                        'version': results.get('browser', {}).get('version', 'Unknown')
-                    },
-                    'os': {
-                        'name': results.get('os', {}).get('name', 'Unknown'),
-                        'version': results.get('os', {}).get('version', 'Unknown')
-                    },
-                    'device': {
-                        'type': results.get('device', {}).get('type', 'Unknown'),
-                        'brand': results.get('device', {}).get('brand', 'Unknown'),
-                        'model': results.get('device', {}).get('model', 'Unknown')
-                    },
-                    'is_mobile': results.get('is_mobile', False),
-                    'is_tablet': results.get('is_tablet', False),
-                    'is_desktop': results.get('is_desktop', False)
-                }
-                result_data['user_agent'] = formatted_results
-                indicator_type = 'user_agent'
-            except Exception as e:
-                print(f"[DEBUG] User Agent API error: {e}")
-                result_data['user_agent_error'] = f"User Agent analysis failed: {str(e)}"
-                indicator_type = 'user_agent'
-        else:
-            print("[DEBUG] User Agent API key not configured.")
-            result_data['user_agent_error'] = "User Agent API key not configured."
+        try:
+            result_data['user_agent'] = parse_user_agent(indicator)
+            indicator_type = 'user_agent'
+        except Exception as e:
+            print(f"[DEBUG] User Agent parsing error: {e}")
+            result_data['user_agent_error'] = f"User Agent analysis failed: {str(e)}"
             indicator_type = 'user_agent'
 
     print(f"[DEBUG] indicator_type: {indicator_type}")
@@ -282,36 +250,49 @@ def analyze():
                               indicator_type=indicator_type,
                               card_count=card_count,
                               **result_data)
-    elif indicator_type == 'domain':
-        # If it's a URL, use as is; if just a domain, prepend https:// for URL analysis
-        if indicator.lower().startswith(('http://', 'https://')):
-            url_to_analyze = indicator
-        else:
-            url_to_analyze = f'https://{indicator}'
-        url_analysis = analyze_url(url_to_analyze)
-        if url_analysis and 'url_analysis' in url_analysis:
-            result_data['url_analysis'] = url_analysis['url_analysis']
-        elif url_analysis:
-            result_data['url_analysis'] = url_analysis
-        # Extract domain for additional analysis
-        domain = urlparse(url_to_analyze).netloc if url_to_analyze.startswith('http') else indicator
-
+    elif indicator_type == 'url':
+        # Get URL analysis
+        url_analysis = analyze_url(indicator)
+        result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
+        # Extract domain from URL for additional analysis
+        domain = urlparse(indicator).netloc
         # Get domain information
         domain_info = get_domain_info(domain)
-        if domain_info:
-            result_data['domain_info'] = domain_info
-        
+        result_data['domain_info'] = domain_info if domain_info else None
         # Get WHOIS information
         whois_info = get_whois_info(domain)
-        if whois_info:
-            result_data['whois_info'] = whois_info
-        
+        result_data['whois_info'] = whois_info if whois_info else None
         # Get AlienVault OTX information
         alienvault_raw = get_alienvault_data(domain)
-        if alienvault_raw:
-            result_data['alienvault'] = parse_alienvault_otx(alienvault_raw)
+        result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+        # If all are None, set an error
+        if not any([result_data['url_analysis'], result_data['domain_info'], result_data['whois_info'], result_data['alienvault']]):
+            result_data['url_error'] = 'No URL analysis results found.'
+        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
+        return render_template('analyze_result.html',
+                              indicator=indicator,
+                              indicator_type=indicator_type,
+                              card_count=card_count,
+                              **result_data)
+    elif indicator_type == 'domain':
+        # First try to analyze as URL
+        normalized_url = f'https://{indicator}'
+        url_analysis = analyze_url(normalized_url)
+        result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
         
-        card_count = sum(1 for k in ['domain_info', 'whois_info', 'alienvault', 'url_analysis'] if result_data.get(k))
+        # Get domain information
+        domain_info = get_domain_info(indicator)
+        result_data['domain_info'] = domain_info if domain_info else None
+        # Get WHOIS information
+        whois_info = get_whois_info(indicator)
+        result_data['whois_info'] = whois_info if whois_info else None
+        # Get AlienVault OTX information
+        alienvault_raw = get_alienvault_data(indicator)
+        result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+        # If all are None, set an error
+        if not any([result_data['url_analysis'], result_data['domain_info'], result_data['whois_info'], result_data['alienvault']]):
+            result_data['domain_error'] = 'No domain analysis results found.'
+        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
