@@ -6,6 +6,7 @@ from .file_routes import file_bp
 from .health_routes import health_bp
 from .hash_routes import hash_bp
 from .event_routes import event_bp
+from .azure_error_routes import azure_error_bp
 from .cyberchef_routes import register_cyberchef_routes
 from .cyberchef_api import cyberchef_api
 from .user_agent_routes import user_agent_bp
@@ -24,6 +25,7 @@ def register_routes(app):
     
     # Additional routes
     app.register_blueprint(event_bp)
+    app.register_blueprint(azure_error_bp)
     app.register_blueprint(user_agent_bp)
     
     # CyberChef routes

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
+    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
+        <div class="card p-8 md:p-14 space-y-12">
+            <div class="text-center mb-4 md:mb-8">
+                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                    Azure Error Code Search
+                </h1>
+                <p class="text-lg md:text-2xl text-gray-300">
+                    Search and analyze Azure/Microsoft Entra ID error codes for troubleshooting and resolution.
+                    <br>
+                    <br>
+                    <span class="text-blue-400">
+                        Powered by Microsoft's official error lookup service
+                    </span>
+                </p>
+            </div>
+
+            <!-- Search Form -->
+            <div class="unified-search">
+                <form id="azureErrorForm" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
+                    <input type="text" 
+                           id="errorCodeInput"
+                           name="error_code" 
+                           placeholder="Enter Azure Error Code (e.g., AADSTS50058 or 50058)" 
+                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
+                           required>
+                    <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto text-lg md:text-xl py-4 md:py-5 px-6 md:px-8 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Search
+                    </button>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div id="loadingSpinner" class="hidden text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        <p class="mt-4 text-gray-300">Searching for error information...</p>
+                    </div>
+                    
+                    <div id="errorMessage" class="hidden text-center py-8">
+                        <div class="text-red-400 text-lg font-semibold mb-2">Error</div>
+                        <p id="errorText" class="text-gray-300"></p>
+                    </div>
+                    
+                    <div id="resultsContent" class="hidden space-y-6">
+                        <!-- Error Code Header -->
+                        <div class="border-b border-gray-700 pb-4">
+                            <h2 id="errorTitle" class="text-2xl font-bold text-white mb-2"></h2>
+                            <div class="flex flex-wrap gap-4 text-sm">
+                                <span id="errorType" class="px-3 py-1 bg-blue-600 text-white rounded-full"></span>
+                                <span id="errorSeverity" class="px-3 py-1 bg-yellow-600 text-white rounded-full"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <div id="descriptionSection" class="hidden">
+                            <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
+                            <p id="errorDescription" class="text-gray-300 leading-relaxed"></p>
+                        </div>
+                        
+                        <!-- Solutions -->
+                        <div id="solutionsSection" class="hidden">
+                            <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
+                            <ul id="solutionsList" class="list-disc list-inside space-y-2 text-gray-300"></ul>
+                        </div>
+                        
+                        <!-- Additional Information -->
+                        <div id="additionalInfoSection" class="hidden">
+                            <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
+                            <p id="additionalInfo" class="text-gray-300 leading-relaxed"></p>
+                        </div>
+                        
+                        <!-- External Links -->
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="flex flex-wrap gap-4">
+                                <a href="https://login.microsoftonline.com/error" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
+                                    Microsoft Error Lookup
+                                </a>
+                                <a href="https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
+                                    Official Documentation
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('azureErrorForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const errorCode = document.getElementById('errorCodeInput').value.trim();
+    const resultsSection = document.getElementById('resultsSection');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const errorMessage = document.getElementById('errorMessage');
+    const resultsContent = document.getElementById('resultsContent');
+    const errorText = document.getElementById('errorText');
+    
+    // Show results section and loading spinner
+    resultsSection.classList.remove('hidden');
+    loadingSpinner.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+    resultsContent.classList.add('hidden');
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('error_code', errorCode);
+    
+    // Make API request
+    fetch('/api/azure_error/search', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        loadingSpinner.classList.add('hidden');
+        
+        if (data.error) {
+            // Show error message
+            errorMessage.classList.remove('hidden');
+            errorText.textContent = data.error;
+        } else {
+            // Show results
+            displayResults(data);
+        }
+    })
+    .catch(error => {
+        loadingSpinner.classList.add('hidden');
+        errorMessage.classList.remove('hidden');
+        errorText.textContent = 'An error occurred while searching. Please try again.';
+        console.error('Error:', error);
+    });
+});
+
+function displayResults(data) {
+    const resultsContent = document.getElementById('resultsContent');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorType = document.getElementById('errorType');
+    const errorSeverity = document.getElementById('errorSeverity');
+    const descriptionSection = document.getElementById('descriptionSection');
+    const errorDescription = document.getElementById('errorDescription');
+    const solutionsSection = document.getElementById('solutionsSection');
+    const solutionsList = document.getElementById('solutionsList');
+    const additionalInfoSection = document.getElementById('additionalInfoSection');
+    const additionalInfo = document.getElementById('additionalInfo');
+    
+    // Set title and metadata
+    errorTitle.textContent = data.title || data.error_code;
+    errorType.textContent = data.error_type || 'Unknown';
+    errorSeverity.textContent = data.severity || 'Unknown';
+    
+    // Set description
+    if (data.description) {
+        descriptionSection.classList.remove('hidden');
+        errorDescription.textContent = data.description;
+    } else {
+        descriptionSection.classList.add('hidden');
+    }
+    
+    // Set solutions
+    if (data.solutions && data.solutions.length > 0) {
+        solutionsSection.classList.remove('hidden');
+        solutionsList.innerHTML = '';
+        data.solutions.forEach(solution => {
+            const li = document.createElement('li');
+            li.textContent = solution;
+            solutionsList.appendChild(li);
+        });
+    } else {
+        solutionsSection.classList.add('hidden');
+    }
+    
+    // Set additional information
+    if (data.additional_info) {
+        additionalInfoSection.classList.remove('hidden');
+        additionalInfo.textContent = data.additional_info;
+    } else {
+        additionalInfoSection.classList.add('hidden');
+    }
+    
+    // Show results
+    resultsContent.classList.remove('hidden');
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Azure Error Analysis - {{ indicator }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
+    <div class="w-full max-w-7xl mx-auto px-2 py-8 md:py-16">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Azure Error Analysis
+            </h1>
+            <p class="text-xl text-gray-300 mb-2">
+                Analysis results for: <span class="font-mono text-blue-400">{{ indicator }}</span>
+            </p>
+            <p class="text-lg text-gray-400">
+                Powered by Microsoft's official error lookup service
+            </p>
+        </div>
+
+        <!-- Results -->
+        <div class="space-y-6">
+            {% if azure_error_info %}
+                <div class="card p-8 space-y-6">
+                    <!-- Error Header -->
+                    <div class="border-b border-gray-700 pb-4">
+                        <h2 class="text-2xl font-bold text-white mb-2">
+                            {{ azure_error_info.title or azure_error_info.error_code }}
+                        </h2>
+                        <div class="flex flex-wrap gap-4 text-sm">
+                            {% if azure_error_info.error_type %}
+                                <span class="px-3 py-1 bg-blue-600 text-white rounded-full">
+                                    {{ azure_error_info.error_type }}
+                                </span>
+                            {% endif %}
+                            {% if azure_error_info.severity %}
+                                <span class="px-3 py-1 bg-yellow-600 text-white rounded-full">
+                                    {{ azure_error_info.severity }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    {% if azure_error_info.description %}
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
+                            <p class="text-gray-300 leading-relaxed">{{ azure_error_info.description }}</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Solutions -->
+                    {% if azure_error_info.solutions and azure_error_info.solutions|length > 0 %}
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
+                            <ul class="list-disc list-inside space-y-2 text-gray-300">
+                                {% for solution in azure_error_info.solutions %}
+                                    <li>{{ solution }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <!-- Additional Information -->
+                    {% if azure_error_info.additional_info %}
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
+                            <p class="text-gray-300 leading-relaxed">{{ azure_error_info.additional_info }}</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- External Links -->
+                    <div class="border-t border-gray-700 pt-4">
+                        <div class="flex flex-wrap gap-4">
+                            <a href="https://login.microsoftonline.com/error" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
+                                Microsoft Error Lookup
+                            </a>
+                            <a href="https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
+                                Official Documentation
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% elif azure_error %}
+                <div class="card p-8 text-center">
+                    <div class="text-red-400 text-lg font-semibold mb-2">Error</div>
+                    <p class="text-gray-300">{{ azure_error }}</p>
+                </div>
+            {% else %}
+                <div class="card p-8 text-center">
+                    <div class="text-yellow-400 text-lg font-semibold mb-2">No Results</div>
+                    <p class="text-gray-300">No analysis results found for this Azure error code.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Back to Search -->
+        <div class="text-center mt-8">
+            <a href="/" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to Search
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

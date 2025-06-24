@@ -6,6 +6,7 @@ from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abus
 from app.services.domain_service import get_domain_info, get_whois_info
 from app.services.url_service import analyze_url
 from app.services.user_agent_service import parse_user_agent
+from app.services.azure_error_service import get_azure_error_info
 import os
 import requests
 from dotenv import load_dotenv
@@ -190,6 +191,9 @@ def analyze():
     # Check for event ID
     elif re.match(r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$', indicator):
         indicator_type = 'event'
+    # Check for Azure error code (AADSTS + numbers, or just numbers that could be Azure codes)
+    elif re.match(r'^AADSTS\d+$', indicator, re.IGNORECASE) or (re.match(r'^\d+$', indicator) and len(indicator) >= 5):
+        indicator_type = 'azure_error'
     # Check for AD code (assuming it's a numeric code)
     elif re.match(r'^\d+$', indicator):
         indicator_type = 'ad_code'
@@ -230,6 +234,16 @@ def analyze():
                               **result_data)
     elif indicator_type == 'event':
         return render_template('event_analysis.html',
+                              indicator=indicator,
+                              indicator_type=indicator_type,
+                              **result_data)
+    elif indicator_type == 'azure_error':
+        # Get Azure error information
+        azure_error_info = get_azure_error_info(indicator)
+        result_data['azure_error_info'] = azure_error_info if azure_error_info else None
+        if not result_data['azure_error_info']:
+            result_data['azure_error'] = 'No Azure error code analysis results found.'
+        return render_template('azure_error_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
                               **result_data)
