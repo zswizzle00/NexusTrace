@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}No Results Found - {{ indicator }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh] px-4">
+    <div class="w-full max-w-4xl mx-auto text-center">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-red-400 to-orange-500 bg-clip-text text-transparent">
+                No Results Found
+            </h1>
+            <p class="text-xl text-gray-300 mb-2">
+                Analysis for: <span class="font-mono text-blue-400">{{ indicator }}</span>
+            </p>
+            <p class="text-lg text-gray-400">
+                We couldn't find any analysis results for this indicator
+            </p>
+        </div>
+
+        <!-- Error Icon -->
+        <div class="mb-8">
+            <div class="w-24 h-24 mx-auto bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Error Details -->
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 mb-8">
+            <h2 class="text-2xl font-bold text-red-400 mb-4">What happened?</h2>
+            
+            {% if error_type %}
+                <div class="text-left space-y-4">
+                    {% if error_type == 'ip' %}
+                        <p class="text-gray-300">No IP analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The IP address is not in any threat intelligence databases</li>
+                            <li>External API services are temporarily unavailable</li>
+                            <li>The IP address format is invalid or private</li>
+                            <li>API rate limits have been exceeded</li>
+                        </ul>
+                    {% elif error_type == 'domain' %}
+                        <p class="text-gray-300">No domain analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The domain is not registered or doesn't exist</li>
+                            <li>External WHOIS or domain services are unavailable</li>
+                            <li>The domain is not in any threat intelligence databases</li>
+                            <li>API rate limits have been exceeded</li>
+                        </ul>
+                    {% elif error_type == 'url' %}
+                        <p class="text-gray-300">No URL analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The URL is not accessible or doesn't exist</li>
+                            <li>External services are temporarily unavailable</li>
+                            <li>The URL is not in any threat intelligence databases</li>
+                            <li>API rate limits have been exceeded</li>
+                        </ul>
+                    {% elif error_type == 'hash' %}
+                        <p class="text-gray-300">No hash analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The hash is not in any malware databases</li>
+                            <li>External threat intelligence services are unavailable</li>
+                            <li>The hash format is invalid</li>
+                            <li>API rate limits have been exceeded</li>
+                        </ul>
+                    {% elif error_type == 'azure_error' %}
+                        <p class="text-gray-300">No Azure error code analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The error code is not in Microsoft's official database</li>
+                            <li>The error code format is invalid</li>
+                            <li>Microsoft's error lookup service is temporarily unavailable</li>
+                            <li>The error code is too new or deprecated</li>
+                        </ul>
+                    {% elif error_type == 'event' %}
+                        <p class="text-gray-300">No event analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The event ID is not in our database</li>
+                            <li>The event ID format is invalid</li>
+                            <li>The event is too new or not yet documented</li>
+                            <li>Database services are temporarily unavailable</li>
+                        </ul>
+                    {% else %}
+                        <p class="text-gray-300">No analysis results were found. This could be because:</p>
+                        <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                            <li>The indicator format is not recognized</li>
+                            <li>External services are temporarily unavailable</li>
+                            <li>The indicator is not in any threat intelligence databases</li>
+                            <li>API rate limits have been exceeded</li>
+                        </ul>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p class="text-gray-300">No analysis results were found for this indicator. This could be due to:</p>
+                <ul class="list-disc list-inside text-gray-400 space-y-2 ml-4">
+                    <li>Invalid indicator format</li>
+                    <li>External services being temporarily unavailable</li>
+                    <li>The indicator not being in any threat intelligence databases</li>
+                    <li>API rate limits being exceeded</li>
+                </ul>
+            {% endif %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{{ url_for('home.home') }}" 
+               class="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+                Back to Home
+            </a>
+            
+            <button onclick="history.back()" 
+                    class="inline-flex items-center px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors duration-200">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Go Back
+            </button>
+            
+            <button onclick="location.reload()" 
+                    class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Try Again
+            </button>
+        </div>
+
+        <!-- Additional Help -->
+        <div class="mt-8 p-6 bg-gray-800 rounded-xl">
+            <h3 class="text-lg font-semibold text-blue-400 mb-3">Need Help?</h3>
+            <p class="text-gray-400 mb-4">
+                If you believe this indicator should return results, try:
+            </p>
+            <ul class="text-left text-gray-400 space-y-2 ml-4">
+                <li class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <span>Check the indicator format and try again</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <span>Wait a few minutes and retry (API rate limits)</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <span>Try a different indicator type</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-blue-400 mr-2">•</span>
+                    <span>Contact support if the issue persists</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %} 

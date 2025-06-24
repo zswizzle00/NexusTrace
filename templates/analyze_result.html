@@ -6,10 +6,6 @@
 <div class="w-full py-10">
   <h2 class="text-4xl font-extrabold mb-12 text-blue-400 text-center">Analysis Result</h2>
   
-  {% if not (ipinfo or ip2location or vpnapi or proxycheck or shodan or abuseipdb or alienvault or intezer_result or hash_info or domain_info or whois_info or url_analysis or user_agent or event_info) %}
-    <div class="text-yellow-400 text-center mt-8">No analysis results found for this indicator.</div>
-  {% endif %}
-
   {% set ip_card_count = (1 if ipinfo else 0) + (1 if ip2location else 0) + (1 if vpnapi else 0) + (1 if proxycheck else 0) + (1 if shodan else 0) + (1 if abuseipdb else 0) + (1 if alienvault else 0) %}
   <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 justify-center">
     {% if ipinfo %}

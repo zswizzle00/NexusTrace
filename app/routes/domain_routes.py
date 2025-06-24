@@ -82,9 +82,19 @@ def analyze_domain():
             # Get AlienVault OTX information
             alienvault_raw = get_alienvault_data(domain)
             result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-            # If all are None, set an error
-            if not any([result_data['url_analysis'], result_data['domain_info'], result_data['whois_info'], result_data['alienvault']]):
-                error = 'No analysis results found for this domain or URL.'
+            
+            # Check if we got meaningful domain analysis results
+            has_meaningful_data = (
+                (result_data['url_analysis'] and result_data['url_analysis'].get('url_analysis', {}).get('status_code') is not None) or
+                (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
+                (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
+                (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
+            )
+            
+            # If no meaningful data found, redirect to no results page
+            if not has_meaningful_data:
+                return render_template('no_results.html', indicator=indicator, error_type='domain')
+            
             card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
     return render_template('analyze_result.html', error=error, card_count=card_count, **result_data)
 
