@@ -31,6 +31,28 @@ ipinfo_handler = ipinfo.getHandler(ipinfo_token) if ipinfo_token else None
 shodan_key = os.getenv('SHODAN_KEY', '***REMOVED***')
 shodan_api = shodan.Shodan(shodan_key)
 
+# Try to import geoip2 for MMDB support
+try:
+    import geoip2.database
+    MMDB_AVAILABLE = True
+except ImportError:
+    MMDB_AVAILABLE = False
+    logger.warning("geoip2 library not available. MMDB database support disabled.")
+
+# Initialize MMDB reader if available
+mmdb_reader = None
+if MMDB_AVAILABLE:
+    mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))
+    if os.path.exists(mmdb_path):
+        try:
+            mmdb_reader = geoip2.database.Reader(mmdb_path)
+            logger.info("MMDB database loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load MMDB database: {e}")
+            mmdb_reader = None
+    else:
+        logger.info("MMDB database file not found. Download from https://ipinfo.io/lite")
+
 def setup_ip_services(app):
     """Setup IP-related services."""
     pass  # Add any necessary setup code here
@@ -91,36 +113,22 @@ def check_abuseipdb(ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_ipinfo_data(ip_address):
-    """Get IP information from IPinfo."""
-    with ipinfo_limiter:
-        try:
-            # URL encode the IP address to handle IPv6 addresses properly
-            encoded_ip = quote(ip_address)
-            details = ipinfo_handler.getDetails(encoded_ip)
-            return {
-                'ipinfo': {
-                    'ip': getattr(details, 'ip', None),
-                    'hostname': getattr(details, 'hostname', None),
-                    'city': getattr(details, 'city', None),
-                    'region': getattr(details, 'region', None),
-                    'country': getattr(details, 'country', None),
-                    'loc': getattr(details, 'loc', None),
-                    'org': getattr(details, 'org', None),
-                    'postal': getattr(details, 'postal', None),
-                    'timezone': getattr(details, 'timezone', None),
-                    'asn': getattr(details, 'asn', None),
-                    'company': getattr(details, 'company', None),
-                    'privacy': getattr(details, 'privacy', None),
-                    'anycast': getattr(details, 'anycast', None),
-                    'abuse': getattr(details, 'abuse', None),
-                    'carrier': getattr(details, 'carrier', None),
-                    'domains': getattr(details, 'domains', None),
-                    'bogon': getattr(details, 'bogon', None),
-                }
-            }
-        except Exception as e:
-            logger.error(f"IPinfo API request failed: {str(e)}")
-            return None
+    """Get IP information from IPinfo Lite API (no MMDB support, supports flat IPinfo Lite response)."""
+    token = os.getenv('IPINFO_TOKEN')
+    url = f"https://api.ipinfo.io/lite/{ip_address}?token={token}"
+    result = {'ip': ip_address}
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        # Map all non-None fields
+        for k, v in data.items():
+            if v is not None:
+                result[k] = v
+        return result
+    except Exception as e:
+        logger.error(f"IPinfo Lite API request failed: {str(e)}")
+        return result
 
 @timed_lru_cache(seconds=1800)
 def get_shodan_info(ip_address):
@@ -342,9 +350,9 @@ def process_single_ip(ip):
         
         # Get WHOIS data if domain is available
         whois_data = None
-        if ipinfo_data and ipinfo_data.get('ipinfo', {}).get('hostname'):
+        if ipinfo_data and ipinfo_data.get('hostname'):
             from .domain_service import get_whois_info
-            whois_data = get_whois_info(ipinfo_data['ipinfo']['hostname'])
+            whois_data = get_whois_info(ipinfo_data['hostname'])
 
         return {
             'ip': ip,
@@ -374,11 +382,11 @@ def process_single_ip(ip):
             'abuse_domain': abuse_data.get('domain') if abuse_data else None,
             'abuse_whitelisted': abuse_data.get('is_whitelisted') if abuse_data else None,
             # IPinfo
-            'ipinfo_hostname': ipinfo_data.get('ipinfo', {}).get('hostname') if ipinfo_data else None,
-            'ipinfo_org': ipinfo_data.get('ipinfo', {}).get('org') if ipinfo_data else None,
-            'ipinfo_city': ipinfo_data.get('ipinfo', {}).get('city') if ipinfo_data else None,
-            'ipinfo_region': ipinfo_data.get('ipinfo', {}).get('region') if ipinfo_data else None,
-            'ipinfo_country': ipinfo_data.get('ipinfo', {}).get('country') if ipinfo_data else None,
+            'ipinfo_hostname': ipinfo_data.get('hostname') if ipinfo_data else None,
+            'ipinfo_org': ipinfo_data.get('org') if ipinfo_data else None,
+            'ipinfo_city': ipinfo_data.get('city') if ipinfo_data else None,
+            'ipinfo_region': ipinfo_data.get('region') if ipinfo_data else None,
+            'ipinfo_country': ipinfo_data.get('country') if ipinfo_data else None,
             # WHOIS
             'whois_domain': whois_data.get('domain') if whois_data else None,
             'whois_registrar': whois_data.get('registrar', {}).get('name') if whois_data and whois_data.get('registrar') else None,

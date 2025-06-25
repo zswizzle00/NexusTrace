@@ -12,10 +12,55 @@
       <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto">
         <h4 class="text-lg font-semibold text-blue-400 mb-2">IPInfo</h4>
         <table class="mb-4 w-full text-sm">
-          <tr><th class="break-all pr-4 py-2">Location</th><td class="break-all">{{ ipinfo.ipinfo.city }}, {{ ipinfo.ipinfo.region }}, {{ ipinfo.ipinfo.country }}</td></tr>
-          <tr><th class="break-all pr-4 py-2">Org</th><td class="break-all">{{ ipinfo.ipinfo.org }}</td></tr>
-          <tr><th class="break-all pr-4 py-2">ASN</th><td class="break-all">{{ ipinfo.ipinfo.asn.asn if ipinfo.ipinfo.asn else 'N/A' }}</td></tr>
-          <tr><th class="break-all pr-4 py-2">Hostname</th><td class="break-all">{{ ipinfo.ipinfo.hostname }}</td></tr>
+          {% if ipinfo.ip %}
+            <tr><th class="break-all pr-4 py-2">IP</th><td class="break-all">{{ ipinfo.ip }}</td></tr>
+          {% endif %}
+          {% if ipinfo.city or ipinfo.region or ipinfo.country %}
+            <tr><th class="break-all pr-4 py-2">Location</th><td class="break-all">
+              {% if ipinfo.city %}{{ ipinfo.city }}{% endif %}
+              {% if ipinfo.region %}{% if ipinfo.city %}, {% endif %}{{ ipinfo.region }}{% endif %}
+              {% if ipinfo.country %}{% if ipinfo.city or ipinfo.region %}, {% endif %}{{ ipinfo.country }}{% endif %}
+            </td></tr>
+          {% endif %}
+          {% if ipinfo.continent %}
+            <tr><th class="break-all pr-4 py-2">Continent</th><td class="break-all">{{ ipinfo.continent }}{% if ipinfo.continent_code %} ({{ ipinfo.continent_code }}){% endif %}</td></tr>
+          {% endif %}
+          {% if ipinfo.org %}
+            <tr><th class="break-all pr-4 py-2">Organization</th><td class="break-all">{{ ipinfo.org }}</td></tr>
+          {% endif %}
+          {% if ipinfo.asn %}
+            <tr><th class="break-all pr-4 py-2">ASN</th><td class="break-all">
+              {% if ipinfo.as_name %}{{ ipinfo.as_name }} {% endif %}({{ ipinfo.asn }})
+              {% if ipinfo.as_domain %}<br><span class="text-gray-400">Domain: {{ ipinfo.as_domain }}</span>{% endif %}
+            </td></tr>
+          {% endif %}
+          {% if ipinfo.hostname %}
+            <tr><th class="break-all pr-4 py-2">Hostname</th><td class="break-all">{{ ipinfo.hostname }}</td></tr>
+          {% endif %}
+          {% if ipinfo.loc %}
+            <tr><th class="break-all pr-4 py-2">Coordinates</th><td class="break-all">{{ ipinfo.loc }}</td></tr>
+          {% endif %}
+          {% if ipinfo.postal %}
+            <tr><th class="break-all pr-4 py-2">Postal Code</th><td class="break-all">{{ ipinfo.postal }}</td></tr>
+          {% endif %}
+          {% if ipinfo.timezone %}
+            <tr><th class="break-all pr-4 py-2">Timezone</th><td class="break-all">{{ ipinfo.timezone }}</td></tr>
+          {% endif %}
+          {% if ipinfo.company %}
+            <tr><th class="break-all pr-4 py-2">Company</th><td class="break-all">{{ ipinfo.company }}</td></tr>
+          {% endif %}
+          {% if ipinfo.carrier %}
+            <tr><th class="break-all pr-4 py-2">Carrier</th><td class="break-all">{{ ipinfo.carrier }}</td></tr>
+          {% endif %}
+          {% if ipinfo.privacy %}
+            <tr><th class="break-all pr-4 py-2">Privacy</th><td class="break-all">{{ ipinfo.privacy }}</td></tr>
+          {% endif %}
+          {% if ipinfo.anycast %}
+            <tr><th class="break-all pr-4 py-2">Anycast</th><td class="break-all">{{ ipinfo.anycast }}</td></tr>
+          {% endif %}
+          {% if ipinfo.bogon %}
+            <tr><th class="break-all pr-4 py-2">Bogon</th><td class="break-all">{{ ipinfo.bogon }}</td></tr>
+          {% endif %}
         </table>
       </div>
     {% endif %}
