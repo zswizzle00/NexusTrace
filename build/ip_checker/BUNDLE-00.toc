@@ -1,3 +1,0 @@
-([('IP Checker',
-   '/Users/zmckone/Desktop/ip_checker/dist/IP Checker',
-   'EXECUTABLE')],)

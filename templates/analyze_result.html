@@ -62,6 +62,9 @@
             <tr><th class="break-all pr-4 py-2">Bogon</th><td class="break-all">{{ ipinfo.bogon }}</td></tr>
           {% endif %}
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ipinfo | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {% if ip2location %}
@@ -72,6 +75,9 @@
             <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
           {% endfor %}
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ ip2location | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {% if vpnapi %}
@@ -84,6 +90,9 @@
           <tr><th class="break-all">Tor</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.tor else 'No' }}</td></tr>
           <tr><th class="break-all">Relay</th><td class="break-all">{{ 'Yes' if vpnapi.security and vpnapi.security.relay else 'No' }}</td></tr>
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ vpnapi | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {% if proxycheck %}
@@ -94,6 +103,9 @@
             <tr><th class="break-all">{{ k }}</th><td class="break-all">{{ v }}</td></tr>
           {% endfor %}
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ proxycheck | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {% if shodan %}
@@ -264,6 +276,9 @@
             {% endfor %}
           </tbody>
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {# --- DNS Records Card --- #}
@@ -304,6 +319,9 @@
             {% endfor %}
           </tbody>
         </table>
+        <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+          <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
+        </details>
       </div>
     {% endif %}
     {# --- URL Analysis Card --- #}
