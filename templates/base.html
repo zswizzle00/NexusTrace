@@ -2,15 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NexusTrace">
+    <meta name="application-name" content="NexusTrace">
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="msapplication-TileColor" content="#3B82F6">
+    <meta name="msapplication-config" content="/static/favicon_io/browserconfig.xml">
+    
     <title>{% block title %}NexusTrace{% endblock %}</title>
+    
+    <!-- Favicon and App Icons -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon_io/favicon.ico') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_io/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon_io/favicon-16x16.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="152x152" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="144x144" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="114x114" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="76x76" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="72x72" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="60x60" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="57x57" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='favicon_io/site.webmanifest') }}">
-    <meta name="msapplication-TileColor" content="#3B82F6">
-    <meta name="theme-color" content="#3B82F6">
+    
     <!-- Update to latest Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -562,6 +580,8 @@
         });
     });
     </script>
+    <!-- Mobile-specific JavaScript -->
+    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html> 

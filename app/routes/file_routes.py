@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 import os
-from ..services.file_service import get_intezer_analysis
+from ..services.file_service import get_combined_file_analysis
 
 file_bp = Blueprint('file', __name__)
 
@@ -21,7 +21,7 @@ def analyze_file():
 
         try:
             # Analyze the file
-            analysis_result = get_intezer_analysis(file_path=temp_path)
+            analysis_result = get_combined_file_analysis(file_path=temp_path)
             
             if not analysis_result:
                 return jsonify({'error': 'Could not analyze file'}), 500

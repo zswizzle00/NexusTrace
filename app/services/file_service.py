@@ -3,6 +3,7 @@ import logging
 from intezer_sdk import api
 from intezer_sdk.analysis import FileAnalysis
 from ..utils.cache import timed_lru_cache
+from OTXv2 import OTXv2, IndicatorTypes
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -60,3 +61,35 @@ def get_intezer_analysis(file_path=None, file_hash=None):
     except Exception as e:
         logger.error(f"Intezer analysis failed: {str(e)}")
         return None 
+
+def get_alienvault_analysis(file_hash):
+    """Analyze a file hash using AlienVault OTX API."""
+    otx_api_key = os.getenv('OTX_API_KEY')
+    if not otx_api_key:
+        logger.warning("AlienVault OTX API key not configured")
+        return None
+    try:
+        otx = OTXv2(otx_api_key)
+        # Query OTX for file hash (supports md5, sha1, sha256)
+        result = otx.get_indicator_details(IndicatorTypes.FILE_HASH_MD5, file_hash)
+        # Try SHA1/SHA256 if MD5 fails
+        if not result or 'general' not in result:
+            result = otx.get_indicator_details(IndicatorTypes.FILE_HASH_SHA1, file_hash)
+        if not result or 'general' not in result:
+            result = otx.get_indicator_details(IndicatorTypes.FILE_HASH_SHA256, file_hash)
+        return result
+    except Exception as e:
+        logger.error(f"AlienVault OTX analysis failed: {str(e)}")
+        return None
+
+@timed_lru_cache(seconds=1800)
+def get_combined_file_analysis(file_path=None, file_hash=None):
+    """Get combined analysis from Intezer and AlienVault OTX."""
+    intezer_result = get_intezer_analysis(file_path=file_path, file_hash=file_hash)
+    otx_result = None
+    if file_hash:
+        otx_result = get_alienvault_analysis(file_hash)
+    return {
+        'intezer': intezer_result,
+        'alienvault_otx': otx_result
+    } 

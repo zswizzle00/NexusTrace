@@ -39,13 +39,18 @@
                   </h3>
                   <table class="mb-4 w-full text-sm">
                     <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all">{{ intezer_result.sha256 }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Verdict</th><td class="break-all">{{ intezer_result.verdict or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Sub Verdict</th><td class="break-all">{{ intezer_result.sub_verdict or 'N/A' }}</td></tr>
                     <tr><th class="pr-4 text-gray-400 break-all">Family</th><td class="break-all">{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
                     <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ intezer_result.file_type or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Architecture</th><td class="break-all">{{ intezer_result.metadata.architecture if intezer_result.metadata and intezer_result.metadata.architecture else 'N/A' }}</td></tr>
                     <tr><th class="pr-4 text-gray-400 break-all">Analysis Time</th><td class="break-all">{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Analysis URL</th><td class="break-all">{% if intezer_result.analysis_url %}<a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline" target="_blank">View Report</a>{% else %}N/A{% endif %}</td></tr>
+                    <tr><th class="pr-4 text-gray-400 break-all">Analysis URL</th><td class="break-all">
+                      {% if intezer_result.analysis_url %}
+                        <a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline mr-4" target="_blank">View Intezer Report</a>
+                      {% endif %}
+                      {% if intezer_result.sha256 %}
+                        <a href="https://otx.alienvault.com/indicator/file/{{ intezer_result.sha256 }}" class="text-green-400 underline" target="_blank">View AlienVault Report</a>
+                      {% endif %}
+                      {% if not intezer_result.analysis_url and not intezer_result.sha256 %}N/A{% endif %}
+                    </td></tr>
                   </table>
                   {% if intezer_result.code_reuse %}
                     <div class="mb-4">

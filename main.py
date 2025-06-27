@@ -5,8 +5,14 @@ import os
 load_dotenv()
 
 from app import create_app
+from flask import send_from_directory
 
 app = create_app()
+
+# Serve the service worker at /sw.js
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory('static', 'sw.js')
 
 if __name__ == '__main__':
     # Ensure we bind to all interfaces in Docker
