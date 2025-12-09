@@ -1,5 +1,5 @@
 .vs
-
+*.pyc
 /app/routes/__pycache__/azure_error_routes.cpython-313.pyc
 /app/routes/__pycache__/cyberchef_api.cpython-313.pyc
 /app/routes/__pycache__/cyberchef_routes.cpython-313.pyc
@@ -18,7 +18,6 @@
 /app/services/__pycache__/event_service.cpython-313.pyc
 /app/services/__pycache__/file_service.cpython-313.pyc
 /app/services/__pycache__/hash_service.cpython-313.pyc
-*.pyc
 /app/services/__pycache__/health_service.cpython-313.pyc
 /app/services/__pycache__/ip_service.cpython-313.pyc
 /app/services/__pycache__/url_service.cpython-313.pyc
