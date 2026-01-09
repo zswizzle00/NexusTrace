@@ -2,16 +2,23 @@ import os
 import requests
 import logging
 import time
+import tempfile
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import builtwith
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from ..utils.cache import timed_lru_cache
+from ..utils.rate_limiter import RateLimiter
+from datetime import timedelta
 import hashlib
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiters
+urlscan_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+builtwith_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 def setup_url_services(app):
     """Setup URL-related services."""
@@ -28,18 +35,22 @@ def submit_to_urlscan(url):
         'API-Key': api_key,
         'Content-Type': 'application/json'
     }
-    
+
     data = {
         'url': url,
         'visibility': 'public'
     }
-    
+
     try:
+        # Rate limit before API call
+        urlscan_limiter.acquire()
+
         # Submit URL for scanning
         response = requests.post(
             'https://urlscan.io/api/v1/scan/',
             headers=headers,
-            json=data
+            json=data,
+            timeout=15
         )
         response.raise_for_status()
         result = response.json()
@@ -53,7 +64,8 @@ def submit_to_urlscan(url):
             time.sleep(5)
             result_response = requests.get(
                 f'https://urlscan.io/api/v1/result/{scan_id}/',
-                headers=headers
+                headers=headers,
+                timeout=10
             )
             if result_response.status_code == 200:
                 return result_response.json()
@@ -140,8 +152,10 @@ def analyze_url(url):
         
         # Detect technologies
         try:
+            builtwith_limiter.acquire()
             tech_stack = builtwith.builtwith(url)
-        except:
+        except Exception as e:
+            logger.debug(f"Could not detect technologies: {e}")
             tech_stack = {}
         
         # Parse content if it's HTML
@@ -161,16 +175,24 @@ def analyze_url(url):
         if os.getenv('INTEZER_API_KEY'):
             try:
                 from .file_service import get_intezer_analysis
-                # Create a temporary file with the URL content
-                temp_file = f'/tmp/url_content_{hash(url)}.html'
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                
-                # Analyze the file
-                intezer_analysis = get_intezer_analysis(file_path=temp_file)
-                
-                # Clean up temporary file
-                os.remove(temp_file)
+                # Create a secure temporary file
+                with tempfile.NamedTemporaryFile(
+                    mode='w',
+                    suffix='.html',
+                    prefix='nexustrace_url_',
+                    delete=False,
+                    encoding='utf-8'
+                ) as temp_file:
+                    temp_file.write(response.text)
+                    temp_path = temp_file.name
+
+                try:
+                    # Analyze the file
+                    intezer_analysis = get_intezer_analysis(file_path=temp_path)
+                finally:
+                    # Clean up temporary file
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
             except Exception as e:
                 logger.error(f"Intezer URL analysis failed: {str(e)}")
 
@@ -208,6 +230,6 @@ def analyze_url(url):
                 'phishtank_url': phishtank_url
             }
         }
-    except Exception as e:
-        logging.error(f"Error analyzing URL: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error analyzing URL: {str(e)}")
         return None 

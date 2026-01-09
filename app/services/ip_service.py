@@ -23,13 +23,17 @@ alienvault_limiter = RateLimiter(max_requests=4, time_window=timedelta(seconds=1
 vpnapi_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 abuseipdb_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 ipinfo_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+proxycheck_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 
 # Initialize API clients
 ipinfo_token = os.getenv('IPINFO_TOKEN')
 ipinfo_handler = ipinfo.getHandler(ipinfo_token) if ipinfo_token else None
 
-shodan_key = os.getenv('SHODAN_KEY', '***REMOVED***')
-shodan_api = shodan.Shodan(shodan_key)
+shodan_key = os.getenv('SHODAN_KEY')
+if not shodan_key:
+    logger.warning("SHODAN_KEY not configured")
+shodan_api = shodan.Shodan(shodan_key) if shodan_key else None
 
 # Try to import geoip2 for MMDB support
 try:
@@ -133,7 +137,11 @@ def get_ipinfo_data(ip_address):
 @timed_lru_cache(seconds=1800)
 def get_shodan_info(ip_address):
     """Get IP information from Shodan, flattening nested data for frontend rendering."""
+    if not shodan_api:
+        logger.warning("Shodan API not available - SHODAN_KEY not configured")
+        return None
     try:
+        shodan_limiter.acquire()
         host = shodan_api.host(ip_address)
         def flatten_dict(d):
             # Only keep primitives, serialize nested objects
@@ -212,6 +220,7 @@ def get_shodan_info(ip_address):
 def get_proxycheck_data(ip_address):
     """Get IP information from ProxyCheck.io."""
     try:
+        proxycheck_limiter.acquire()
         proxycheck_key = os.getenv('PROXYCHECK_KEY')
         params = {
             'vpn': 1,
@@ -259,36 +268,36 @@ def get_alienvault_data(indicator):
     
     try:
         # Get general information
-        response = requests.get(f'{base_url}/general', headers=headers)
+        response = requests.get(f'{base_url}/general', headers=headers, timeout=10)
         response.raise_for_status()
         general_data = response.json()
         
         # Get geo information
         geo_data = {}
         try:
-            response = requests.get(f'{base_url}/geo', headers=headers)
+            response = requests.get(f'{base_url}/geo', headers=headers, timeout=10)
             response.raise_for_status()
             geo_data = response.json()
         except requests.exceptions.RequestException as e:
-            print(f"AlienVault OTX error for section geo: {e}")
+            logger.error(f"AlienVault OTX error for section geo: {e}")
         
         # Get malware information
         malware_data = {}
         try:
-            response = requests.get(f'{base_url}/malware', headers=headers)
+            response = requests.get(f'{base_url}/malware', headers=headers, timeout=10)
             response.raise_for_status()
             malware_data = response.json()
         except requests.exceptions.RequestException as e:
-            print(f"AlienVault OTX error for section malware: {e}")
+            logger.error(f"AlienVault OTX error for section malware: {e}")
         
         # Get passive DNS information
         passive_dns_data = {}
         try:
-            response = requests.get(f'{base_url}/passive_dns', headers=headers)
+            response = requests.get(f'{base_url}/passive_dns', headers=headers, timeout=10)
             response.raise_for_status()
             passive_dns_data = response.json()
         except requests.exceptions.RequestException as e:
-            print(f"AlienVault OTX error for section passive_dns: {e}")
+            logger.error(f"AlienVault OTX error for section passive_dns: {e}")
         
         # Combine all data
         return {
@@ -298,7 +307,7 @@ def get_alienvault_data(indicator):
             'passive_dns': passive_dns_data
         }
     except requests.exceptions.RequestException as e:
-        print(f"AlienVault OTX error: {e}")
+        logger.error(f"AlienVault OTX error: {e}")
         return None
 
 def get_vpn_data(ip_address):

@@ -1,6 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory
 import re
+import logging
 from app.services.file_service import get_intezer_analysis
+
+logger = logging.getLogger(__name__)
 from app.services.hash_service import get_hash_info
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
 from app.services.domain_service import get_domain_info, get_whois_info
@@ -199,17 +202,16 @@ def analyze():
         indicator_type = 'ad_code'
     # Default to user agent if no other type matches
     else:
-        print(f"[DEBUG] Treating as User Agent: {indicator}")
+        logger.debug(f"Treating as User Agent: {indicator}")
         try:
             result_data['user_agent'] = parse_user_agent(indicator)
             indicator_type = 'user_agent'
-        except Exception as e:
-            print(f"[DEBUG] User Agent parsing error: {e}")
+        except ValueError as e:
+            logger.debug(f"User Agent parsing error: {e}")
             result_data['user_agent_error'] = f"User Agent analysis failed: {str(e)}"
             indicator_type = 'user_agent'
 
-    print(f"[DEBUG] indicator_type: {indicator_type}")
-    print(f"[DEBUG] result_data: {result_data}")
+    logger.debug(f"indicator_type: {indicator_type}")
 
     if indicator_type == 'hash':
         intezer_result = get_intezer_analysis(file_hash=indicator)

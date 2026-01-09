@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, send_file
 import pandas as pd
 import io
+import ipaddress
+import logging
 from ..services.ip_service import (
     check_abuseipdb,
     get_ipinfo_data,
@@ -11,14 +13,40 @@ from ..services.ip_service import (
 )
 import socket
 
+logger = logging.getLogger(__name__)
+
 ip_bp = Blueprint('ip', __name__)
+
+
+def is_valid_ip(ip_str):
+    """
+    Validate IP address format (IPv4 or IPv6).
+    Returns the normalized IP address string or None if invalid.
+    """
+    if not ip_str or not isinstance(ip_str, str):
+        return None
+    try:
+        # This handles both IPv4 and IPv6, and normalizes the format
+        ip_obj = ipaddress.ip_address(ip_str.strip())
+        return str(ip_obj)
+    except ValueError:
+        return None
 
 @ip_bp.route('/check_ip', methods=['POST'])
 def check_ip():
-    ip_address = request.json.get('ip')
-    if not ip_address:
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Request body is required'}), 400
+
+    ip_input = data.get('ip', '').strip() if data.get('ip') else ''
+    if not ip_input:
         return jsonify({'error': 'IP address is required'}), 400
-    
+
+    # Validate IP address format
+    ip_address = is_valid_ip(ip_input)
+    if not ip_address:
+        return jsonify({'error': 'Invalid IP address format. Please provide a valid IPv4 or IPv6 address.'}), 400
+
     try:
         # Get VPN API data first (primary source)
         vpn_data = get_vpn_data(ip_address)

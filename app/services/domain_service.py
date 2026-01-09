@@ -10,9 +10,14 @@ import json
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse
+from datetime import timedelta
+from ..utils.rate_limiter import RateLimiter
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiters
+ip2whois_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 def setup_domain_services(app):
     """Setup domain-related services."""
@@ -21,7 +26,11 @@ def setup_domain_services(app):
 def get_whois_info(domain):
     """Fetch WHOIS information for a domain using IP2Location API."""
     try:
-        ip2whois_key = os.getenv('IP2WHOIS_KEY', '***REMOVED***')
+        ip2whois_key = os.getenv('IP2WHOIS_KEY')
+        if not ip2whois_key:
+            logger.warning("IP2WHOIS_KEY not configured")
+            return None
+        ip2whois_limiter.acquire()
         response = requests.get(
             f'https://api.ip2whois.com/v2',
             params={

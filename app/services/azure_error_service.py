@@ -18,7 +18,7 @@ def get_azure_error_info(error_code):
         
         # Construct the URL for the error lookup
         url = f"https://login.microsoftonline.com/error?code={clean_code}"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
