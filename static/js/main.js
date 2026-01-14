@@ -127,6 +127,15 @@ function showToast(message, type = 'info', duration = CONFIG.TOAST_DURATION) {
 // =============================================================================
 
 /**
+ * Get CSRF token from meta tag
+ * @returns {string} CSRF token
+ */
+function getCSRFToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
+/**
  * Make an API call with consistent error handling and loading states
  * @param {string} endpoint - API endpoint
  * @param {Object} data - Request data
@@ -151,7 +160,10 @@ async function apiCall(endpoint, data, options = {}) {
     try {
         const response = await fetch(endpoint, {
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
             body: JSON.stringify(data),
             signal: controller.signal
         });

@@ -18,6 +18,7 @@
             </div>
             <!-- Search Bar -->
             <form class="search-form w-full mx-auto" action="/analyze" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input class="search-input" type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or user agent..." required />
                 <button class="btn btn-primary" type="submit">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">

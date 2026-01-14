@@ -577,6 +577,7 @@
 
   <div class="flex flex-col items-center justify-center mt-12 gap-4 w-full max-w-md mx-auto">
     <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full" required>
       <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto">Analyze</button>
     </form>

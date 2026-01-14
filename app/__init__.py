@@ -44,13 +44,6 @@ def create_app():
     from flask_wtf.csrf import CSRFProtect
     csrf = CSRFProtect(app)
 
-    # Exempt API endpoints that use JSON (they should use other auth mechanisms)
-    # CSRF is mainly for form submissions from browsers
-    @csrf.exempt
-    @app.before_request
-    def csrf_exempt_api():
-        pass  # Individual routes will be exempted as needed
-
     # Security Headers via Flask-Talisman
     from flask_talisman import Talisman
 
@@ -60,11 +53,15 @@ def create_app():
         'script-src': [
             "'self'",
             "'unsafe-inline'",  # Required for some inline scripts
-            "'unsafe-eval'",  # Required for CyberChef
+            "'unsafe-eval'",  # Required for CyberChef and Tailwind
+            "https://cdn.tailwindcss.com",
+            "https://cdnjs.cloudflare.com",
         ],
         'style-src': [
             "'self'",
             "'unsafe-inline'",  # Required for inline styles
+            "https://fonts.googleapis.com",
+            "https://cdn.tailwindcss.com",
         ],
         'img-src': [
             "'self'",
@@ -74,6 +71,7 @@ def create_app():
         'font-src': [
             "'self'",
             "data:",
+            "https://fonts.gstatic.com",
         ],
         'connect-src': [
             "'self'",

@@ -21,7 +21,7 @@
             <!-- Search Form -->
             <div class="unified-search">
                 <form id="azureErrorForm" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
-                    <input type="text" 
+                    <input type="text"
                            id="errorCodeInput"
                            name="error_code" 
                            placeholder="Enter Azure Error Code (e.g., AADSTS50058 or 50058)" 
@@ -115,10 +115,13 @@ document.getElementById('azureErrorForm').addEventListener('submit', function(e)
     // Create form data
     const formData = new FormData();
     formData.append('error_code', errorCode);
-    
-    // Make API request
+
+    // Make API request with CSRF token in header
     fetch('/api/azure_error/search', {
         method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
         body: formData
     })
     .then(response => response.json())
