@@ -29,6 +29,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Runtime files
+.nexustrace.pid
+logs/
+
 # Data files
 *.mmdb
 data/*.mmdb

@@ -30,14 +30,16 @@ show_help() {
     echo "Usage: ./start.sh [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  (none)      Start development server (Flask debug mode)"
+    echo "  (none)      Start development server (background, logs to logs/nexustrace.log)"
     echo "  --docker    Start Docker containers (rebuild if code changed)"
     echo "  --prod      Production Docker deployment (full rebuild)"
+    echo "  --logs      Tail the dev server log (logs/nexustrace.log)"
     echo "  --help      Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./start.sh              # Dev server on port 5050"
     echo "  ./start.sh --docker     # Docker on ports 80 (nginx) & 5050"
+    echo "  ./start.sh --logs       # Follow server logs"
 }
 
 # Parse arguments
@@ -48,6 +50,15 @@ case "${1:-}" in
         ;;
     --prod)
         MODE="prod"
+        ;;
+    --logs)
+        if [ -f "logs/nexustrace.log" ]; then
+            tail -f logs/nexustrace.log
+        else
+            log_warn "No log file found at logs/nexustrace.log"
+            log_warn "Start the server first with: ./start.sh"
+        fi
+        exit 0
         ;;
     --help|-h)
         show_help
@@ -144,16 +155,20 @@ else
         sleep 1
     fi
 
+    # Ensure logs directory exists
+    mkdir -p logs
+
     # Start the server
     log_step "Starting Flask development server..."
     echo ""
 
-    # Save PID for stop script (use venv python)
-    "$PYTHON" main.py &
+    # Save PID for stop script (use venv python), redirect output to log file
+    "$PYTHON" main.py > logs/nexustrace.log 2>&1 &
     echo $! > .nexustrace.pid
 
     log_info "Server started with PID $(cat .nexustrace.pid)"
     log_info "Running at http://0.0.0.0:5050"
+    log_info "Logs: logs/nexustrace.log  (./start.sh --logs to tail)"
     log_info "Use './stop.sh' to stop the server"
 
     # Wait for server to be ready
@@ -161,6 +176,6 @@ else
     if curl -s http://localhost:5050/ > /dev/null 2>&1; then
         log_info "Server is ready!"
     else
-        log_warn "Server may still be starting up..."
+        log_warn "Server may still be starting up. Check: ./start.sh --logs"
     fi
 fi

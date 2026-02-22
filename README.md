@@ -1,337 +1,263 @@
-# NexusTrace - Comprehensive OSINT Analysis Tool
+# NexusTrace
 
-NexusTrace is a powerful OSINT (Open Source Intelligence) tool designed for analyzing IP addresses, domains, URLs, files, hashes, and more. It provides comprehensive security and technical analysis through multiple data sources and APIs, with an integrated web interface and CyberChef integration.
+**Open-source threat intelligence and OSINT analysis platform.** Submit an IP, domain, URL, file hash, or user agent string and get enriched context from across the threat intelligence ecosystem — all in one dashboard.
+
+Built for security analysts, incident responders, and researchers who need fast, cross-referenced context on indicators of compromise without jumping between a dozen tools.
+
+---
 
 ## Features
 
-- **IP Analysis**
-  - VPN/Proxy detection
-  - Geolocation data
-  - Network information
-  - Abuse reports
-  - Security scoring
-  - WHOIS data
-  - Port scanning
-  - Vulnerability assessment
-  - AlienVault OTX integration
+### IP Analysis
+- Geolocation, ASN, and network data (IPinfo + IP2Location)
+- VPN / Proxy / Tor detection (VPNapi + ProxyCheck)
+- Open ports and running services (Shodan)
+- Known CVEs and vulnerabilities (Shodan)
+- Abuse history and confidence score (AbuseIPDB)
+- Threat intelligence pulses (AlienVault OTX)
 
-- **Domain Analysis**
-  - WHOIS information
-  - DNS records
-  - SSL/TLS certificate details
-  - IP resolution
-  - Technology stack detection
-  - Security headers analysis
+### Domain & URL Analysis
+- WHOIS registration data (IP2WHOIS)
+- DNS records — A, AAAA, MX, NS, TXT, CNAME, SOA
+- SSL/TLS certificate details
+- HTTP security headers analysis
+- SPF / DKIM / DMARC email security posture
+- Subdomain enumeration via certificate transparency logs (crt.sh)
+- Redirect chain tracking
+- Technology stack fingerprinting
+- Meta tags, OpenGraph, and favicon extraction
+- Threat intelligence (AlienVault OTX)
 
-- **URL Analysis**
-  - Security headers
-  - Redirect chain analysis
-  - Technology stack detection
-  - Meta information
-  - Content analysis
-  - Malware scanning
+### File & Hash Analysis
+- Malware classification and code reuse analysis (Intezer)
+- Multi-source reputation lookup (VirusTotal, MalwareBazaar, ThreatFox)
+- Threat intelligence cross-reference (AlienVault OTX)
 
-- **File Analysis**
-  - Malware detection via Intezer
-  - Code reuse analysis
-  - Threat classification
-  - Family identification
-  - Metadata extraction
+### Additional Tools
+- **Azure AD Error Decoder** — Look up AADSTS error codes with descriptions and remediation steps
+- **Windows Event ID Reference** — Decode Windows Security event IDs
+- **User Agent Parser** — Break down browser, OS, device, and bot flags from any UA string
+- **CyberChef** — Embedded CyberChef v10.19.4 for in-browser data encoding, decoding, and transformation
 
-- **Hash Analysis**
-  - Hash type detection
-  - Malware analysis via Intezer
-  - AlienVault OTX threat intelligence
-  - Hash validation and formatting
+---
 
-- **Azure Error Analysis**
-  - Azure AD error code lookup
-  - Detailed error descriptions
-  - Troubleshooting guidance
-  - Error code validation
+## Quick Start
 
-- **User Agent Analysis**
-  - User agent string parsing
-  - Browser and OS detection
-  - Device information extraction
-  - Security analysis
+### Option 1: Dev Server (Recommended for testing)
 
-- **Event Analysis**
-  - Event log analysis
-  - Security event correlation
-  - Timeline analysis
+```bash
+git clone https://github.com/your-org/NexusTrace.git
+cd NexusTrace
+cp .env.example .env
+# Edit .env with your API keys
+./start.sh
+```
 
-- **CyberChef Integration**
-  - Embedded CyberChef interface
-  - Custom recipe management
-  - Recipe saving and loading
-  - Data transformation tools
+Server starts at `http://localhost:5050`
 
-## Project Structure
+### Option 2: Docker (Recommended for deployment)
+
+```bash
+git clone https://github.com/your-org/NexusTrace.git
+cd NexusTrace
+cp .env.example .env
+# Edit .env with your API keys
+./start.sh --docker
+```
+
+- Flask app: `http://localhost:5050`
+- Nginx reverse proxy: `http://localhost:80`
+
+### Option 3: Production Docker (full rebuild)
+
+```bash
+./start.sh --prod
+```
+
+### Stopping the server
+
+```bash
+./stop.sh            # Stop dev server
+./stop.sh --docker   # Stop Docker containers
+./stop.sh --status   # Show what's running
+./stop.sh --clean    # Stop and clean Python cache
+```
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your API keys:
+
+```env
+# IP Analysis
+VPNAPI_KEY=            # https://vpnapi.io/
+IPINFO_TOKEN=          # https://ipinfo.io/account/token
+SHODAN_KEY=            # https://account.shodan.io/
+ABUSEIPDB_KEY=         # https://www.abuseipdb.com/account/api
+PROXYCHECK_KEY=        # https://proxycheck.io/dashboard
+IP2LOCATION_KEY=       # https://www.ip2location.io/
+
+# Domain Analysis
+IP2WHOIS_KEY=          # https://www.ip2whois.com/
+URLSCAN_API_KEY=       # https://urlscan.io/user/profile/
+
+# File / Hash Analysis
+INTEZER_KEY=           # https://analyze.intezer.com/account-details
+VIRUSTOTAL_API_KEY=    # https://www.virustotal.com/gui/my-apikey
+
+# Threat Intelligence
+ALIENVAULT_KEY=        # https://otx.alienvault.com/api
+
+# Server
+SECRET_KEY=your-random-secret-key
+FLASK_DEBUG=False
+HOST=0.0.0.0
+PORT=5050
+
+# Optional: offline IP lookups
+# MMDB_PATH=/path/to/ipinfo_lite.mmdb
+```
+
+> **All API keys are optional.** The tool gracefully skips any service whose key is not configured — cards for that service simply won't appear in results.
+
+### IPinfo MMDB (optional, offline mode)
+
+For faster lookups without API rate limits, download the IPinfo Lite MMDB database:
+
+1. Sign up at [ipinfo.io/lite](https://ipinfo.io/lite)
+2. Download and extract `ipinfo_lite.mmdb`
+3. Place it in `data/ipinfo_lite.mmdb`
+4. Set `MMDB_PATH=data/ipinfo_lite.mmdb` in `.env`
+
+---
+
+## Architecture
 
 ```
 NexusTrace/
 ├── app/
-│   ├── routes/              # API endpoints
-│   │   ├── __init__.py     # Route registration
-│   │   ├── home_routes.py  # Main web interface routes
-│   │   ├── ip_routes.py    # IP analysis endpoints
-│   │   ├── domain_routes.py # Domain analysis endpoints
-│   │   ├── file_routes.py  # File analysis endpoints
-│   │   ├── hash_routes.py  # Hash analysis endpoints
-│   │   ├── health_routes.py # Health check endpoints
-│   │   ├── azure_error_routes.py # Azure error analysis
-│   │   ├── cyberchef_routes.py # CyberChef integration
-│   │   ├── cyberchef_api.py # CyberChef API endpoints
-│   │   ├── user_agent_routes.py # User agent analysis
-│   │   └── event_routes.py # Event analysis
+│   ├── routes/          # Blueprint-organized HTTP handlers
+│   │   ├── home_routes.py       # Main analyze endpoint + type detection
+│   │   ├── ip_routes.py         # Batch IP analysis (CSV/XLSX/TXT)
+│   │   ├── domain_routes.py     # Domain/URL analysis
+│   │   ├── hash_routes.py       # Hash reputation lookup
+│   │   ├── file_routes.py       # File malware analysis
+│   │   ├── azure_error_routes.py
+│   │   ├── user_agent_routes.py
+│   │   └── event_routes.py
 │   │
-│   ├── services/           # Business logic
-│   │   ├── __init__.py     # Service setup
-│   │   ├── ip_service.py   # IP analysis services
-│   │   ├── domain_service.py # Domain analysis services
-│   │   ├── url_service.py  # URL analysis services
-│   │   ├── file_service.py # File analysis services
-│   │   ├── hash_service.py # Hash analysis services
-│   │   ├── health_service.py # Health check services
-│   │   ├── azure_error_service.py # Azure error services
-│   │   ├── cyberchef.py    # CyberChef services
-│   │   ├── user_agent_service.py # User agent services
-│   │   └── event_service.py # Event services
+│   ├── services/        # Business logic + API integrations
+│   │   ├── ip_service.py        # VPNapi, IPinfo, IP2Location, Shodan, AbuseIPDB, OTX
+│   │   ├── domain_service.py    # WHOIS, DNS, SSL, crt.sh, email security
+│   │   ├── url_service.py       # Security headers, redirect chains, BuiltWith
+│   │   ├── file_service.py      # Intezer file analysis
+│   │   ├── hash_service.py      # VirusTotal, MalwareBazaar, ThreatFox, Intezer
+│   │   ├── user_agent_service.py
+│   │   ├── azure_error_service.py
+│   │   └── event_service.py
 │   │
-│   ├── utils/             # Utility functions
-│   │   ├── __init__.py    # Utility setup
-│   │   ├── cache.py       # Caching functionality
-│   │   └── logging.py     # Logging configuration
-│   │
-│   ├── tests/             # Test files
-│   │   ├── minimal_flask_test.py
-│   │   └── test_endpoints.py
-│   │
-│   └── app.py            # Main application file
+│   └── utils/
+│       ├── cache.py       # Thread-safe LRU cache with TTL
+│       └── rate_limiter.py  # Sliding window rate limiter
 │
-├── data/                 # Data storage directory
-│   └── cyberchef_recipes/ # Saved CyberChef recipes
-├── templates/            # Jinja2 HTML templates
-├── static/              # CSS, JS, images, favicon, etc.
-├── CyberChef_v10.19.4/  # Embedded CyberChef tool
-├── icon_tools/          # Icon/favicon scripts
-├── logs/                # Application logs
-├── main.py              # Application entry point
-├── requirements.txt     # Python dependencies
-├── Dockerfile           # Docker configuration
-├── docker-compose.yml   # Docker Compose configuration
-├── nginx.conf           # Nginx configuration
-└── README.md            # This documentation
+├── templates/           # Jinja2 HTML templates
+├── static/              # CSS, JS, images, PWA service worker
+├── CyberChef_v10.19.4/  # Embedded CyberChef (offline capable)
+├── main.py              # App entry point
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── start.sh             # Start script (dev / docker / prod modes)
+└── stop.sh              # Stop script (dev / docker / all / status)
 ```
+
+**How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format — IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string — and routes to the appropriate analysis pipeline.
+
+---
 
 ## API Endpoints
 
-### Web Interface
-- `GET /`: Main web interface
-- `GET /ip_search`: IP analysis interface
-- `GET /domain_search`: Domain analysis interface
-- `GET /hash_analysis`: Hash analysis interface
-- `GET /azure_error_search`: Azure error analysis interface
-- `GET /user_agent_search`: User agent analysis interface
-- `GET /event_section`: Event analysis interface
-- `GET /cyberchef`: CyberChef integration interface
+| Method | Route | Description |
+|--------|-------|-------------|
+| `POST` | `/analyze` | Auto-detect and analyze any indicator |
+| `POST` | `/api/ip/check_ip` | Single IP analysis |
+| `POST` | `/api/ip/check_ips` | Batch IP analysis (CSV/XLSX/TXT upload) |
+| `POST` | `/api/domain/check_domain` | Domain info lookup |
+| `POST` | `/api/domain/analyze` | Full domain/URL analysis |
+| `POST` | `/api/file/analyze_file` | File malware analysis (upload) |
+| `POST` | `/api/hash/check_hash` | Hash reputation lookup |
+| `POST` | `/api/azure_error/search` | Azure AD error code lookup |
+| `GET`  | `/api/health` | Health check |
+| `GET`  | `/api/cyberchef/recipes` | List saved CyberChef recipes |
+| `POST` | `/api/cyberchef/recipes` | Save a CyberChef recipe |
 
-### IP Analysis
-- `POST /api/ip/check_ip`: Analyze a single IP address
-- `POST /api/ip/check_ips`: Batch analyze multiple IP addresses from a file
-
-### Domain Analysis
-- `POST /api/domain/check_domain`: Analyze a domain name
-
-### File Analysis
-- `POST /api/file/analyze_file`: Analyze a file for malware
-
-### Hash Analysis
-- `POST /api/hash/check_hash`: Analyze a hash value
-- `GET /api/hash/analyze`: Hash analysis web interface
-
-### Azure Error Analysis
-- `POST /api/azure_error/search`: Search Azure error codes
-
-### CyberChef Integration
-- `GET /api/cyberchef/recipes`: Get saved recipes
-- `POST /api/cyberchef/recipes`: Save a new recipe
-- `GET /api/cyberchef/recipes/<filename>`: Load a specific recipe
-
-### Health Check
-- `GET /api/health`: Check application health status
-
-## Configuration
-
-The application requires several API keys for full functionality:
-
-```env
-VPNAPI_KEY=your_vpnapi_key
-IPINFO_TOKEN=your_ipinfo_token
-SHODAN_KEY=your_shodan_key
-ABUSEIPDB_KEY=your_abuseipdb_key
-PROXYCHECK_KEY=your_proxycheck_key
-ALIENVAULT_KEY=your_alienvault_key
-INTEZER_API_KEY=your_intezer_key
-IP2WHOIS_KEY=your_ip2whois_key
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5050
-MMDB_PATH=/path/to/ipinfo_lite.mmdb  # Optional: Path to IPinfo MMDB database
-```
-
-### IPinfo MMDB Database Integration
-
-For enhanced performance and additional data fields, you can use the IPinfo MMDB database:
-
-1. **Download the MMDB database:**
-   - Visit [IPinfo Lite](https://ipinfo.io/lite)
-   - Sign up for a free account
-   - Download the MMDB database file
-   - Extract and place `ipinfo_lite.mmdb` in the `data/` directory
-
-2. **Run the setup script:**
-   ```bash
-   python scripts/download_ipinfo_mmdb.py
-   ```
-
-3. **Benefits of MMDB integration:**
-   - Faster lookups (no API rate limits)
-   - Additional fields: city, postal code, coordinates
-   - Offline capability
-   - Reduced API usage
-
-The application will automatically use the MMDB database if available, falling back to the API for missing data.
-
-## Features
-
-### Web Interface
-- Modern, responsive design
-- Real-time analysis results
-- Interactive data visualization
-- Tabbed interface for different analysis types
-- Export functionality for results
-
-### Caching
-- Implements LRU cache with TTL (Time To Live)
-- Cache size limit: 1000 items
-- Cache duration: 30 minutes
-- Automatic cache clearing
-
-### Rate Limiting
-- Sliding window rate limiting
-- Configurable request limits per time window
-- Thread-safe implementation
-
-### Logging
-- Rotating file logs (10MB max size)
-- Console output
-- Detailed error tracking
-- Request logging in debug mode
-
-### Testing
-- Unit tests for each service
-- Integration tests for API endpoints
-- Performance testing for batch operations
-- API test suite for comprehensive endpoint testing
-
-## Error Handling
-- Comprehensive error handling across all services
-- Detailed error logging
-- Graceful degradation when services are unavailable
-- User-friendly error messages
-- Input validation and sanitization
-
-## Security Features
-- Secure session configuration
-- Rate limiting to prevent abuse
-- API key validation
-- Input validation and sanitization
-- Secure file handling
-- CORS configuration
-
-## Performance Optimizations
-- Concurrent processing for batch operations
-- Caching of API responses
-- Efficient rate limiting
-- Optimized database queries
-- Static file serving via Nginx
-
-## Development
-
-### Setup
-1. Clone the repository
-2. Create a virtual environment: `python -m venv venv`
-3. Activate the virtual environment:
-   - Windows: `venv\Scripts\activate`
-   - macOS/Linux: `source venv/bin/activate`
-4. Install dependencies: `pip install -r requirements.txt`
-5. Set up environment variables in a `.env` file
-6. Run the application: `python main.py`
-
-### Docker Setup
-1. Build the Docker image: `docker build -t nexustrace .`
-2. Run with Docker Compose: `docker-compose up -d`
-3. Access the application at `http://localhost:5050`
-
-### Testing
-- Run unit tests: `python -m pytest app/tests/`
-- Run API tests: `python test_api.py`
-- Run integration tests: `python -m pytest app/tests/test_endpoints.py`
+---
 
 ## Deployment
 
-### Docker Deployment
-The application includes Docker support for easy deployment:
+### Docker Compose (recommended)
+
+The included `docker-compose.yml` runs Flask behind Nginx:
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up -d
-
-# Or build and run manually
-docker build -t nexustrace .
-docker run -p 5050:5050 nexustrace
+cp .env.example .env   # configure your keys
+./start.sh --docker    # build and start
+./stop.sh --docker     # stop
 ```
 
-### Production Deployment
-For production deployment, the application uses:
-- Gunicorn as the WSGI server
-- Nginx as a reverse proxy
-- Docker for containerization
-- Environment-based configuration
+View logs:
+```bash
+docker compose logs -f
+```
 
-## Contributing
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -m 'Add some feature'`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Create a Pull Request
+### Manual / Gunicorn
 
-## License
-[Add your license information here]
+```bash
+pip install -r requirements.txt
+gunicorn --bind 0.0.0.0:5050 --timeout 120 --workers 4 main:app
+```
+
+---
+
+## Caching & Rate Limiting
+
+- **Response cache:** 30-minute TTL, LRU eviction, max 1,000 items per service. Repeated lookups for the same indicator return instantly.
+- **Rate limiting:** Per-service sliding window limits (e.g., 2 req/sec for WHOIS, 4 req/sec for AlienVault). Prevents API key bans under load.
+
+---
 
 ## Acknowledgments
 
-- VPN API (vpnapi.io)
-- IPinfo
-- Shodan
-- AlienVault OTX
-- IP2WHOIS
-- Intezer
-- CyberChef (GCHQ)
-- Flask
-- Bootstrap
+| Service | Purpose |
+|---------|---------|
+| [VPNapi](https://vpnapi.io/) | VPN / proxy / Tor detection |
+| [IPinfo](https://ipinfo.io/) | IP geolocation + ASN |
+| [IP2Location](https://www.ip2location.io/) | IP geolocation |
+| [Shodan](https://shodan.io/) | Port scanning + CVEs |
+| [AbuseIPDB](https://www.abuseipdb.com/) | Abuse reporting |
+| [ProxyCheck](https://proxycheck.io/) | Proxy + VPN detection |
+| [AlienVault OTX](https://otx.alienvault.com/) | Threat intelligence |
+| [IP2WHOIS](https://www.ip2whois.com/) | WHOIS lookups |
+| [URLscan.io](https://urlscan.io/) | URL scanning + screenshots |
+| [Intezer](https://intezer.com/) | Malware analysis |
+| [VirusTotal](https://www.virustotal.com/) | Hash reputation |
+| [MalwareBazaar](https://bazaar.abuse.ch/) | Malware hash database |
+| [crt.sh](https://crt.sh/) | Certificate transparency logs |
+| [CyberChef](https://github.com/gchq/CyberChef) | Data transformation (GCHQ) |
 
-## Support
+---
 
-For support, please open an issue in the GitHub repository or contact the development team.
+## Contributing
 
-## Roadmap
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m 'Add feature'`
+4. Push and open a Pull Request
 
-- [ ] Additional threat intelligence sources
-- [ ] Machine learning-based analysis
-- [ ] Advanced visualization features
-- [ ] API rate limit management
-- [ ] Enhanced reporting capabilities
-- [ ] Mobile application
-- [ ] Real-time threat feeds 
+---
+
+## License
+
+[Add license here]
