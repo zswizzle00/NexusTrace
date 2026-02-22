@@ -13,14 +13,15 @@
                 </p>
             </div>
 
-            <!-- Search Form -->
+            <!-- Single IP Search Form -->
             <div class="unified-search">
+                <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Single IP Lookup</h3>
                 <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="text"
                            name="indicator"
-                           placeholder="Enter IPv4 or IPv6 address" 
-                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
+                           placeholder="Enter IPv4 or IPv6 address"
+                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg"
                            required>
                     <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto text-lg md:text-xl py-4 md:py-5 px-6 md:px-8 flex items-center justify-center">
                         <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,6 +31,64 @@
                     </button>
                 </form>
             </div>
+
+            <!-- Divider -->
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-600"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-4 bg-gray-800 text-gray-400 uppercase tracking-wider">Or</span>
+                </div>
+            </div>
+
+            <!-- Bulk IP Analysis -->
+            <div class="bulk-analysis">
+                <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Bulk IP Analysis</h3>
+                <p class="text-gray-400 text-center mb-6">Upload a CSV, XLSX, or TXT file with IP addresses (one per line or in the first column) to analyze multiple IPs and download results as CSV.</p>
+
+                <form id="bulkIpForm" enctype="multipart/form-data" class="space-y-6">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- File Upload Area -->
+                    <div class="flex flex-col items-center">
+                        <label for="ipFile" class="w-full max-w-md cursor-pointer">
+                            <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-gray-700/50 transition-all duration-200">
+                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                                <p class="text-gray-300 mb-2" id="fileLabel">Click to select or drag and drop</p>
+                                <p class="text-gray-500 text-sm">Supported formats: CSV, XLSX, TXT</p>
+                            </div>
+                        </label>
+                        <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
+                    </div>
+
+                    <!-- Progress Bar (hidden by default) -->
+                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto">
+                        <div class="flex justify-between text-sm text-gray-400 mb-2">
+                            <span>Processing IPs...</span>
+                            <span id="progressText">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-3">
+                            <div id="progressBar" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="flex justify-center">
+                        <button type="submit" id="submitBtn" class="btn btn-primary text-lg py-4 px-8 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                            </svg>
+                            <span id="btnText">Analyze & Download CSV</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Error/Success Messages -->
+                <div id="messageArea" class="hidden mt-6 p-4 rounded-lg text-center max-w-md mx-auto"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -37,6 +96,137 @@
 
 {% block scripts %}
 <script>
-    // Add any necessary JavaScript here
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('bulkIpForm');
+    const fileInput = document.getElementById('ipFile');
+    const fileLabel = document.getElementById('fileLabel');
+    const dropZone = document.getElementById('dropZone');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const messageArea = document.getElementById('messageArea');
+
+    // File selection handler
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            fileLabel.textContent = this.files[0].name;
+            dropZone.classList.add('border-blue-500', 'bg-gray-700/50');
+            submitBtn.disabled = false;
+        } else {
+            fileLabel.textContent = 'Click to select or drag and drop';
+            dropZone.classList.remove('border-blue-500', 'bg-gray-700/50');
+            submitBtn.disabled = true;
+        }
+    });
+
+    // Drag and drop handlers
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('border-blue-500', 'bg-gray-700/50');
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        if (!fileInput.files.length) {
+            this.classList.remove('border-blue-500', 'bg-gray-700/50');
+        }
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            fileLabel.textContent = files[0].name;
+            this.classList.add('border-blue-500', 'bg-gray-700/50');
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        if (!fileInput.files.length) {
+            showMessage('Please select a file first.', 'error');
+            return;
+        }
+
+        // Show progress
+        progressContainer.classList.remove('hidden');
+        submitBtn.disabled = true;
+        btnText.textContent = 'Processing...';
+        messageArea.classList.add('hidden');
+
+        // Simulate progress (since we can't track actual progress)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            updateProgress(progress);
+        }, 500);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const response = await fetch('/api/ip/check_ips', {
+                method: 'POST',
+                body: formData
+            });
+
+            clearInterval(progressInterval);
+
+            if (response.ok) {
+                updateProgress(100);
+
+                // Download the CSV
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ip_report.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+                showMessage('Analysis complete! CSV downloaded successfully.', 'success');
+            } else {
+                const error = await response.json();
+                showMessage(error.error || 'An error occurred during analysis.', 'error');
+            }
+        } catch (error) {
+            clearInterval(progressInterval);
+            showMessage('Network error. Please try again.', 'error');
+        } finally {
+            // Reset UI
+            setTimeout(() => {
+                progressContainer.classList.add('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+                submitBtn.disabled = false;
+                btnText.textContent = 'Analyze & Download CSV';
+            }, 2000);
+        }
+    });
+
+    function updateProgress(percent) {
+        progressBar.style.width = percent + '%';
+        progressText.textContent = Math.round(percent) + '%';
+    }
+
+    function showMessage(message, type) {
+        messageArea.textContent = message;
+        messageArea.classList.remove('hidden', 'bg-green-900', 'text-green-300', 'bg-red-900', 'text-red-300');
+        if (type === 'success') {
+            messageArea.classList.add('bg-green-900', 'text-green-300');
+        } else {
+            messageArea.classList.add('bg-red-900', 'text-red-300');
+        }
+    }
+});
 </script>
-{% endblock %} 
+{% endblock %}

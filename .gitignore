@@ -1,27 +1,34 @@
+# IDE
 .vs
+.vscode
+.idea
+
+# Python
 *.pyc
-/app/routes/__pycache__/azure_error_routes.cpython-313.pyc
-/app/routes/__pycache__/cyberchef_api.cpython-313.pyc
-/app/routes/__pycache__/cyberchef_routes.cpython-313.pyc
-/app/routes/__pycache__/domain_routes.cpython-313.pyc
-/app/routes/__pycache__/event_routes.cpython-313.pyc
-/app/routes/__pycache__/file_routes.cpython-313.pyc
-/app/routes/__pycache__/hash_routes.cpython-313.pyc
-/app/routes/__pycache__/health_routes.cpython-313.pyc
-/app/routes/__pycache__/home_routes.cpython-313.pyc
-/app/routes/__pycache__/ip_routes.cpython-313.pyc
-/app/routes/__pycache__/user_agent_routes.cpython-313.pyc
-/app/routes/__pycache__/__init__.cpython-313.pyc
-/app/services/__pycache__/azure_error_service.cpython-313.pyc
-/app/services/__pycache__/cyberchef.cpython-313.pyc
-/app/services/__pycache__/domain_service.cpython-313.pyc
-/app/services/__pycache__/event_service.cpython-313.pyc
-/app/services/__pycache__/file_service.cpython-313.pyc
-/app/services/__pycache__/hash_service.cpython-313.pyc
-/app/services/__pycache__/health_service.cpython-313.pyc
-/app/services/__pycache__/ip_service.cpython-313.pyc
-/app/services/__pycache__/url_service.cpython-313.pyc
-/app/services/__pycache__/user_agent_service.cpython-313.pyc
-/app/services/__pycache__/__init__.cpython-313.pyc
-/app/utils/__pycache__/rate_limiter.cpython-313.pyc
-/app/utils/__pycache__/__init__.cpython-313.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# Environment variables (IMPORTANT: never commit .env)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files
+*.mmdb
+data/*.mmdb

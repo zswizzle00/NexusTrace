@@ -250,55 +250,63 @@ def get_proxycheck_data(ip_address):
         logger.error(f"ProxyCheck.io API request failed: {str(e)}")
         return None
 
+@timed_lru_cache(seconds=1800)
 def get_alienvault_data(indicator):
     """Get data from AlienVault OTX API"""
-    api_key = os.getenv('ALIENVAULT_API_KEY')
+    # Support multiple env var names for backwards compatibility
+    api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('ALIENVAULT_API_KEY')
     if not api_key:
+        logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
 
     # Determine if the indicator is an IP or domain
     ip_pattern = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
     is_ip = bool(ip_pattern.match(indicator))
-    
+
     # Use the appropriate endpoint type
     endpoint_type = 'IPv4' if is_ip else 'domain'
-    
+
     base_url = f'https://otx.alienvault.com/api/v1/indicators/{endpoint_type}/{indicator}'
     headers = {'X-OTX-API-KEY': api_key}
-    
+
     try:
+        alienvault_limiter.acquire()
+
         # Get general information
         response = requests.get(f'{base_url}/general', headers=headers, timeout=10)
         response.raise_for_status()
         general_data = response.json()
-        
+
         # Get geo information
         geo_data = {}
         try:
+            alienvault_limiter.acquire()
             response = requests.get(f'{base_url}/geo', headers=headers, timeout=10)
             response.raise_for_status()
             geo_data = response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"AlienVault OTX error for section geo: {e}")
-        
+            logger.debug(f"AlienVault OTX error for section geo: {e}")
+
         # Get malware information
         malware_data = {}
         try:
+            alienvault_limiter.acquire()
             response = requests.get(f'{base_url}/malware', headers=headers, timeout=10)
             response.raise_for_status()
             malware_data = response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"AlienVault OTX error for section malware: {e}")
-        
+            logger.debug(f"AlienVault OTX error for section malware: {e}")
+
         # Get passive DNS information
         passive_dns_data = {}
         try:
+            alienvault_limiter.acquire()
             response = requests.get(f'{base_url}/passive_dns', headers=headers, timeout=10)
             response.raise_for_status()
             passive_dns_data = response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"AlienVault OTX error for section passive_dns: {e}")
-        
+            logger.debug(f"AlienVault OTX error for section passive_dns: {e}")
+
         # Combine all data
         return {
             'general': general_data,

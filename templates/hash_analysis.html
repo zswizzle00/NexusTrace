@@ -1,225 +1,298 @@
 {% extends "base.html" %}
 
+{% block main_content_class %}full-width{% endblock %}
+
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
-    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
-        <div class="card p-8 md:p-14 space-y-12">
-            <div class="text-center mb-4 md:mb-8">
-                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                    Hash Analysis
-                </h1>
-                <p class="text-lg md:text-2xl text-gray-300">
-                    Analyze file hashes and malware for security insights.
-                </p>
-            </div>
+<div class="w-full py-10">
+    <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Hash Analysis</h2>
 
-            <!-- Unified Search Form -->
-            <div class="unified-search">
-                <form action="/analyze" method="POST" class="search-form w-full flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="text"
-                           name="indicator"
-                           placeholder="Enter MD5, SHA1, or SHA256 hash" 
-                           class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg md:text-xl py-4 md:py-5 px-4 md:px-6 rounded-lg" 
-                           required>
-                    <button type="submit" class="btn btn-primary whitespace-nowrap w-full sm:w-auto text-lg md:text-xl py-4 md:py-5 px-6 md:px-8 flex items-center justify-center">
-                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        Analyze
-                    </button>
-                </form>
-            </div>
+    <!-- Search Form at Top -->
+    <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
+        <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="indicator" placeholder="Enter MD5, SHA1, or SHA256 hash..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg py-3 px-4 rounded-lg" required>
+            <button type="submit" class="btn btn-primary whitespace-nowrap px-6 py-3 text-lg rounded-lg flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Analyze
+            </button>
+        </form>
+    </div>
 
-            <!-- Results Grid -->
-            {% set card_count = (1 if intezer_result else 0) + (1 if alienvault else 0) + (1 if result else 0) %}
-            <div class="w-full grid gap-8 {% if card_count == 1 %}grid-cols-1 justify-center{% else %}grid-cols-1 lg:grid-cols-2 xl:grid-cols-3{% endif %} mt-8">
-              {% if intezer_result %}
-                <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-                  <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-                  </h3>
-                  <table class="mb-4 w-full text-sm">
-                    <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all">{{ intezer_result.sha256 }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Family</th><td class="break-all">{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ intezer_result.file_type or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Analysis Time</th><td class="break-all">{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400 break-all">Analysis URL</th><td class="break-all">
-                      {% if intezer_result.analysis_url %}
-                        <a href="{{ intezer_result.analysis_url }}" class="text-blue-400 underline mr-4" target="_blank">View Intezer Report</a>
-                      {% endif %}
-                      {% if intezer_result.sha256 %}
-                        <a href="https://otx.alienvault.com/indicator/file/{{ intezer_result.sha256 }}" class="text-green-400 underline" target="_blank">View AlienVault Report</a>
-                      {% endif %}
-                      {% if not intezer_result.analysis_url and not intezer_result.sha256 %}N/A{% endif %}
-                    </td></tr>
-                  </table>
-                  {% if intezer_result.code_reuse %}
-                    <div class="mb-4">
-                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Code Reuse</h4>
-                      <table class="data-table mb-2 w-full text-xs">
-                        <thead>
-                          <tr class="bg-gray-700 text-blue-200">
-                            <th class="break-all">Family Name</th><th class="break-all">Type</th><th class="break-all">Reused Gene Count</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {% for fam in intezer_result.code_reuse.families %}
-                            <tr>
-                              <td class="break-all">{{ fam.family_name }}</td>
-                              <td class="break-all">{{ fam.family_type }}</td>
-                              <td class="break-all">{{ fam.reused_gene_count }}</td>
-                            </tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
-                    </div>
-                  {% endif %}
-                  {% if intezer_result.indicators %}
-                    <div class="mb-4">
-                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Indicators</h4>
-                      <table class="data-table mb-2 w-full text-xs">
-                        <thead>
-                          <tr class="bg-gray-700 text-blue-200">
-                            <th class="break-all">Name</th><th class="break-all">Classification</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {% for ind in intezer_result.indicators %}
-                            <tr>
-                              <td class="break-all">{{ ind.name }}</td>
-                              <td class="break-all">{{ ind.classification }}</td>
-                            </tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
-                    </div>
-                  {% endif %}
-                  {% if intezer_result.metadata %}
-                    <div class="mb-4">
-                      <h4 class="text-lg font-semibold text-blue-400 mb-2">Metadata</h4>
-                      <table class="data-table mb-2 w-full text-xs">
-                        <tbody>
-                          {% for k, v in intezer_result.metadata.items() %}
-                            <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
-                    </div>
-                  {% endif %}
-                  <details class="mt-2"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
-                    <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ intezer_result | tojson(indent=2) }}</pre>
-                  </details>
-                </div>
-              {% endif %}
-              {% if alienvault %}
-                <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col [grid-column:1/-1] overflow-x-auto">
-                  <div class="flex items-center mb-4">
-                    <div class="w-2 h-8 bg-blue-500 rounded-r mr-3"></div>
-                    <h3 class="text-xl font-bold text-blue-300">AlienVault OTX</h3>
-                  </div>
-                  <table class="mb-4 w-full text-sm">
-                    {% for k, v in alienvault.summary.items() %}
-                      <tr><th class="break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
-                    {% endfor %}
-                  </table>
-                  {% if alienvault and alienvault.raw %}
-                    {% set general = alienvault.raw.get('general', {}) %}
-                    {% set geo = alienvault.raw.get('geo', {}) %}
-                    <div class="mb-4">
-                      {% if general.false_positives or general.whitelist %}
-                        <h4 class="text-lg font-semibold text-blue-400 mb-2">False Positives & Whitelist</h4>
-                        <ul class="text-xs text-gray-200 space-y-1">
-                          {% for item in (general.false_positives or []) %}
-                            <li>
-                              <span class="font-semibold text-gray-400 break-all">{{ item.name }}:</span>
-                              <span class="break-all">{{ item.message }} (Source: {{ item.source }})</span>
-                            </li>
-                          {% endfor %}
-                          {% for item in (general.whitelist or []) %}
-                            <li>
-                              <span class="font-semibold text-gray-400 break-all">{{ item.name }}:</span>
-                              <span class="break-all">{{ item.message }} (Source: {{ item.source }})</span>
-                            </li>
-                          {% endfor %}
-                        </ul>
-                      {% endif %}
-                      {% if general.whois %}
-                        <div class="mt-2">
-                          <span class="font-semibold text-gray-400 break-all">WHOIS:</span>
-                          <a href="{{ general.whois }}" target="_blank" class="text-blue-400 hover:underline break-all">{{ general.whois }}</a>
-                        </div>
-                      {% endif %}
-                      {% if geo %}
-                        <div class="mt-4">
-                          <h4 class="text-lg font-semibold text-blue-400 mb-2">Geo Data</h4>
-                          <table class="w-full text-xs">
-                            <tbody>
-                              {% for k, v in geo.items() %}
-                                <tr>
-                                  <th class="pr-4 text-gray-400 break-all">{{ k|replace('_', ' ')|title }}</th>
-                                  <td class="break-all">{{ v }}</td>
-                                </tr>
-                              {% endfor %}
-                            </tbody>
-                          </table>
-                        </div>
-                      {% endif %}
-                    </div>
-                  {% endif %}
-                  {% for table_name, rows in alienvault.tables.items() %}
-                    <div class="mb-4 overflow-y-auto" style="max-height: 350px;">
-                      <h5 class="font-semibold text-blue-300 mb-2 break-all">{{ table_name|replace('_', ' ')|title }}</h5>
-                      <table class="data-table w-full text-xs">
-                        <thead>
-                          <tr class="bg-gray-800 text-blue-200">
-                            {% for col in rows[0].keys() %}
-                              <th class="px-3 py-2 break-all">{{ col|replace('_', ' ')|title }}</th>
-                            {% endfor %}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {% for row in rows %}
-                            <tr class="even:bg-gray-900 odd:bg-gray-800">
-                              {% for col in row.keys() %}
-                                <td class="px-3 py-2 break-all">{{ row[col] }}</td>
-                              {% endfor %}
-                            </tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
-                    </div>
-                  {% endfor %}
-                  <details class="mt-2">
-                    <summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                    {% if alienvault and alienvault.raw %}
-                      <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ alienvault.raw | tojson(indent=2) }}</pre>
-                    {% else %}
-                      <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto">{}</pre>
-                    {% endif %}
-                  </details>
-                </div>
-              {% endif %}
-              {% if result %}
-                <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-                  <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
-                  <div class="space-y-2">
-                    <p class="text-gray-300"><span class="text-gray-400 break-all">Type:</span> <span class="break-all">{{ result.type }}</span></p>
-                    <p class="text-gray-300"><span class="text-gray-400 break-all">Value:</span> <span class="break-all">{{ result.hash }}</span></p>
-                  </div>
-                  <div class="mt-4">
-                    <h4 class="text-lg font-medium text-blue-400 mb-2">Sources</h4>
-                    <ul>
-                      {% for source, info in result.sources.items() %}
-                        <li class="text-gray-300">
-                          <span class="text-gray-400 break-all">{{ source|capitalize }}:</span> <span class="break-all">{{ info.message }}</span>
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </div>
-                </div>
-              {% endif %}
+    <!-- Results Grid -->
+    {% set card_count = (1 if intezer_result else 0) + (1 if alienvault else 0) + (1 if hash_info else 0) + (1 if result else 0) %}
+
+    {% if card_count > 0 %}
+    <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+
+        {# --- Hash Info Summary Card (from new hash_service) --- #}
+        {% if hash_info and hash_info.summary %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <span class="{% if hash_info.summary.is_malicious %}text-red-400{% else %}text-green-400{% endif %}">
+                    {% if hash_info.summary.is_malicious %}Malicious{% else %}Clean/Unknown{% endif %}
+                </span>
+            </h3>
+            <table class="mb-4 w-full text-sm">
+                <tr><th class="pr-4 text-gray-400 break-all">Hash</th><td class="font-mono break-all text-xs">{{ hash_info.hash }}</td></tr>
+                <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ hash_info.type }}</td></tr>
+                {% if hash_info.summary.detection_ratio %}
+                <tr><th class="pr-4 text-gray-400 break-all">Detection Ratio</th>
+                    <td class="break-all">
+                        <span class="{% if hash_info.summary.is_malicious %}text-red-400{% else %}text-green-400{% endif %} font-semibold">
+                            {{ hash_info.summary.detection_ratio }}
+                        </span>
+                    </td>
+                </tr>
+                {% endif %}
+                {% if hash_info.summary.threat_names %}
+                <tr><th class="pr-4 text-gray-400 break-all">Threat Names</th>
+                    <td class="break-all text-red-300">{{ hash_info.summary.threat_names | join(', ') }}</td>
+                </tr>
+                {% endif %}
+                {% if hash_info.summary.malware_family %}
+                <tr><th class="pr-4 text-gray-400 break-all">Malware Family</th>
+                    <td class="break-all text-red-300">{{ hash_info.summary.malware_family }}</td>
+                </tr>
+                {% endif %}
+                {% if hash_info.summary.file_type %}
+                <tr><th class="pr-4 text-gray-400 break-all">File Type</th>
+                    <td class="break-all">{{ hash_info.summary.file_type }}</td>
+                </tr>
+                {% endif %}
+            </table>
+
+            <!-- Source links -->
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% if hash_info.sources.virustotal and hash_info.sources.virustotal.status == 'found' %}
+                <a href="https://www.virustotal.com/gui/file/{{ hash_info.hash }}" target="_blank" class="btn btn-sm bg-blue-900 text-blue-300 px-3 py-1 rounded text-xs hover:bg-blue-800">
+                    View on VirusTotal
+                </a>
+                {% endif %}
+                {% if hash_info.sources.malwarebazaar and hash_info.sources.malwarebazaar.status == 'found' %}
+                <a href="https://bazaar.abuse.ch/sample/{{ hash_info.hash }}/" target="_blank" class="btn btn-sm bg-purple-900 text-purple-300 px-3 py-1 rounded text-xs hover:bg-purple-800">
+                    View on MalwareBazaar
+                </a>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
+
+        {# --- VirusTotal Card --- #}
+        {% if hash_info and hash_info.sources.virustotal and hash_info.sources.virustotal.status == 'found' %}
+        {% set vt = hash_info.sources.virustotal %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-400 mb-4">VirusTotal</h3>
+            <table class="mb-4 w-full text-sm">
+                <tr><th class="pr-4 text-gray-400">Detections</th>
+                    <td class="{% if vt.malicious > 0 %}text-red-400{% else %}text-green-400{% endif %} font-semibold">
+                        {{ vt.malicious }} / {{ vt.total_scanners }}
+                    </td>
+                </tr>
+                {% if vt.file_type %}
+                <tr><th class="pr-4 text-gray-400">File Type</th><td>{{ vt.file_type }}</td></tr>
+                {% endif %}
+                {% if vt.file_size %}
+                <tr><th class="pr-4 text-gray-400">File Size</th><td>{{ (vt.file_size / 1024) | round(2) }} KB</td></tr>
+                {% endif %}
+                {% if vt.first_seen %}
+                <tr><th class="pr-4 text-gray-400">First Seen</th><td>{{ vt.first_seen }}</td></tr>
+                {% endif %}
+                {% if vt.last_seen %}
+                <tr><th class="pr-4 text-gray-400">Last Seen</th><td>{{ vt.last_seen }}</td></tr>
+                {% endif %}
+            </table>
+            {% if vt.threat_names %}
+            <div class="mb-4">
+                <span class="text-gray-400 text-sm">Threat Names:</span>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for name in vt.threat_names[:10] %}
+                    <span class="bg-red-900/50 text-red-300 px-2 py-0.5 rounded text-xs">{{ name }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ vt | tojson(indent=2) }}</pre>
+            </details>
+        </div>
+        {% endif %}
+
+        {# --- MalwareBazaar Card --- #}
+        {% if hash_info and hash_info.sources.malwarebazaar and hash_info.sources.malwarebazaar.status == 'found' %}
+        {% set mb = hash_info.sources.malwarebazaar %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-purple-400 mb-4">MalwareBazaar</h3>
+            <table class="mb-4 w-full text-sm">
+                {% if mb.signature %}
+                <tr><th class="pr-4 text-gray-400">Signature</th><td class="text-red-300 font-semibold">{{ mb.signature }}</td></tr>
+                {% endif %}
+                {% if mb.file_type %}
+                <tr><th class="pr-4 text-gray-400">File Type</th><td>{{ mb.file_type }}</td></tr>
+                {% endif %}
+                {% if mb.file_size %}
+                <tr><th class="pr-4 text-gray-400">File Size</th><td>{{ (mb.file_size / 1024) | round(2) }} KB</td></tr>
+                {% endif %}
+                {% if mb.first_seen %}
+                <tr><th class="pr-4 text-gray-400">First Seen</th><td>{{ mb.first_seen }}</td></tr>
+                {% endif %}
+                {% if mb.reporter %}
+                <tr><th class="pr-4 text-gray-400">Reporter</th><td>{{ mb.reporter }}</td></tr>
+                {% endif %}
+            </table>
+            {% if mb.tags %}
+            <div class="mb-4">
+                <span class="text-gray-400 text-sm">Tags:</span>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for tag in mb.tags %}
+                    <span class="bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded text-xs">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <details class="mt-2"><summary class="cursor-pointer text-purple-400">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ mb | tojson(indent=2) }}</pre>
+            </details>
+        </div>
+        {% endif %}
+
+        {# --- ThreatFox Card --- #}
+        {% if hash_info and hash_info.sources.threatfox and hash_info.sources.threatfox.status == 'found' %}
+        {% set tf = hash_info.sources.threatfox %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-orange-400 mb-4">ThreatFox IOCs</h3>
+            <table class="mb-4 w-full text-sm">
+                <tr><th class="pr-4 text-gray-400">IOC Count</th><td>{{ tf.ioc_count }}</td></tr>
+            </table>
+            {% if tf.iocs %}
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                {% for ioc in tf.iocs[:5] %}
+                <div class="bg-gray-800 rounded p-2 text-xs">
+                    {% if ioc.malware %}
+                    <span class="text-red-300 font-semibold">{{ ioc.malware }}</span>
+                    {% endif %}
+                    {% if ioc.threat_type %}
+                    <span class="text-gray-400 ml-2">({{ ioc.threat_type }})</span>
+                    {% endif %}
+                    {% if ioc.first_seen %}
+                    <div class="text-gray-500 mt-1">First seen: {{ ioc.first_seen }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <details class="mt-2"><summary class="cursor-pointer text-orange-400">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ tf | tojson(indent=2) }}</pre>
+            </details>
+        </div>
+        {% endif %}
+
+        {# --- Intezer Card --- #}
+        {% if intezer_result %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+                Intezer Analyze
+                {% if intezer_result.verdict %}
+                <span class="px-2 py-1 rounded text-xs
+                    {% if intezer_result.verdict == 'malicious' %}bg-red-900 text-red-300
+                    {% elif intezer_result.verdict == 'suspicious' %}bg-yellow-900 text-yellow-300
+                    {% else %}bg-green-900 text-green-300{% endif %}">
+                    {{ intezer_result.verdict | capitalize }}
+                </span>
+                {% endif %}
+            </h3>
+            <table class="mb-4 w-full text-sm">
+                <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all text-xs">{{ intezer_result.sha256 }}</td></tr>
+                <tr><th class="pr-4 text-gray-400 break-all">Family</th><td class="break-all">{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ intezer_result.file_type or 'N/A' }}</td></tr>
+                <tr><th class="pr-4 text-gray-400 break-all">Analysis Time</th><td class="break-all">{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
+            </table>
+            {% if intezer_result.analysis_url %}
+            <a href="{{ intezer_result.analysis_url }}" target="_blank" class="btn btn-sm bg-green-900 text-green-300 px-3 py-1 rounded text-xs hover:bg-green-800 w-fit">
+                View Full Intezer Report
+            </a>
+            {% endif %}
+            <details class="mt-4"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ intezer_result | tojson(indent=2) }}</pre>
+            </details>
+        </div>
+        {% endif %}
+
+        {# --- AlienVault OTX Card --- #}
+        {% if alienvault %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-400 mb-4">AlienVault OTX</h3>
+            {% if alienvault.summary %}
+            <table class="mb-4 w-full text-sm">
+                {% for k, v in alienvault.summary.items() %}
+                <tr><th class="pr-4 text-gray-400 break-all">{{ k|replace('_', ' ')|title }}</th><td class="break-all">{{ v }}</td></tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            {% if alienvault.tables and alienvault.tables.pulses %}
+            <div class="mb-4">
+                <span class="text-gray-400 text-sm">Related Pulses:</span>
+                <ul class="list-disc list-inside text-sm mt-1 max-h-40 overflow-y-auto">
+                    {% for pulse in alienvault.tables.pulses[:5] %}
+                    <li class="text-gray-300">
+                        <a href="{{ pulse.link }}" target="_blank" class="text-blue-400 hover:underline">{{ pulse.name }}</a>
+                        <span class="text-gray-500 text-xs">by {{ pulse.author }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
+            </details>
+        </div>
+        {% endif %}
+
+        {# --- Basic Hash Info (fallback) --- #}
+        {% if result and not hash_info %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
+            <div class="space-y-2">
+                <p class="text-gray-300"><span class="text-gray-400 break-all">Type:</span> <span class="break-all">{{ result.type }}</span></p>
+                <p class="text-gray-300"><span class="text-gray-400 break-all">Value:</span> <span class="font-mono break-all text-xs">{{ result.hash }}</span></p>
+            </div>
+            {% if result.sources %}
+            <div class="mt-4">
+                <h4 class="text-lg font-medium text-blue-400 mb-2">Sources</h4>
+                <ul class="space-y-1">
+                    {% for source, info in result.sources.items() %}
+                    <li class="text-gray-300 text-sm">
+                        <span class="text-gray-400">{{ source|capitalize }}:</span>
+                        <span class="{% if info.status == 'found' %}text-green-400{% else %}text-gray-500{% endif %}">{{ info.message }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+    {% else %}
+    <!-- No Results State -->
+    <div class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p class="text-gray-400 text-lg">Enter a hash above to analyze</p>
+        <p class="text-gray-500 text-sm mt-2">Supports MD5, SHA1, and SHA256 hashes</p>
+    </div>
+    {% endif %}
+
+    <!-- Return to Home -->
+    <div class="flex justify-center mt-12">
+        <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+            Return to Home
+        </a>
     </div>
 </div>
 {% endblock %}
@@ -228,4 +301,4 @@
 <script>
     // Add any necessary JavaScript here
 </script>
-{% endblock %} 
+{% endblock %}

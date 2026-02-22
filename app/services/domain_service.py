@@ -2,16 +2,15 @@ import os
 import socket
 import ssl
 import dns.resolver
-import whois
 import logging
 import requests
-from concurrent.futures import ThreadPoolExecutor
-import json
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse
 from datetime import timedelta
 from ..utils.rate_limiter import RateLimiter
+from ..utils.cache import timed_lru_cache
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -19,10 +18,37 @@ logger = logging.getLogger(__name__)
 # Initialize rate limiters
 ip2whois_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
+# Global timeout settings (in seconds)
+TIMEOUT_SHORT = 5
+TIMEOUT_MEDIUM = 10
+TIMEOUT_LONG = 15
+
+# Configure DNS resolver with timeout
+dns_resolver = dns.resolver.Resolver()
+dns_resolver.timeout = TIMEOUT_SHORT
+dns_resolver.lifetime = TIMEOUT_MEDIUM
+
+
 def setup_domain_services(app):
     """Setup domain-related services."""
-    pass  # Add any necessary setup code here
+    pass
 
+
+def safe_execute(func, *args, default=None, timeout=TIMEOUT_MEDIUM, **kwargs):
+    """Execute a function with timeout and error handling."""
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(func, *args, **kwargs)
+            return future.result(timeout=timeout)
+    except FuturesTimeoutError:
+        logger.warning(f"{func.__name__} timed out after {timeout}s")
+        return default
+    except Exception as e:
+        logger.error(f"{func.__name__} failed: {str(e)}")
+        return default
+
+
+@timed_lru_cache(seconds=1800, maxsize=500)
 def get_whois_info(domain):
     """Fetch WHOIS information for a domain using IP2Location API."""
     try:
@@ -32,43 +58,78 @@ def get_whois_info(domain):
             return None
         ip2whois_limiter.acquire()
         response = requests.get(
-            f'https://api.ip2whois.com/v2',
-            params={
-                'key': ip2whois_key,
-                'domain': domain
-            },
-            timeout=10
+            'https://api.ip2whois.com/v2',
+            params={'key': ip2whois_key, 'domain': domain},
+            timeout=TIMEOUT_MEDIUM
         )
         response.raise_for_status()
-        logging.info(f"WHOIS raw response for {domain}: {response.text}")
         return response.json()
+    except requests.Timeout:
+        logger.warning(f"WHOIS lookup timed out for {domain}")
+        return None
     except Exception as e:
-        logging.error(f"Error fetching WHOIS information: {str(e)}")
+        logger.error(f"Error fetching WHOIS information: {str(e)}")
         return None
 
+
+@timed_lru_cache(seconds=1800, maxsize=500)
+def get_whois_python(domain):
+    """Fetch WHOIS using python-whois library (fallback)."""
+    try:
+        import whois
+        # whois.whois can hang, so wrap it
+        def _fetch():
+            return whois.whois(domain)
+        return safe_execute(_fetch, timeout=TIMEOUT_MEDIUM)
+    except Exception as e:
+        logger.error(f"Python WHOIS failed for {domain}: {str(e)}")
+        return None
+
+
+@timed_lru_cache(seconds=900, maxsize=500)
 def get_dns_records(domain):
-    """Fetch various DNS records for a domain."""
+    """Fetch various DNS records for a domain with timeouts."""
     records = {}
     record_types = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA']
-    
-    for record_type in record_types:
+
+    def fetch_record(record_type):
         try:
-            answers = dns.resolver.resolve(domain, record_type)
-            records[record_type] = [str(rdata) for rdata in answers]
+            answers = dns_resolver.resolve(domain, record_type)
+            return record_type, [str(rdata) for rdata in answers]
+        except dns.resolver.NXDOMAIN:
+            return record_type, []
+        except dns.resolver.NoAnswer:
+            return record_type, []
+        except dns.resolver.Timeout:
+            logger.debug(f"DNS {record_type} lookup timed out for {domain}")
+            return record_type, []
         except Exception as e:
-            records[record_type] = []
-            logging.debug(f"Could not fetch {record_type} records: {str(e)}")
-    
+            logger.debug(f"Could not fetch {record_type} records: {str(e)}")
+            return record_type, []
+
+    # Fetch all DNS records in parallel
+    with ThreadPoolExecutor(max_workers=len(record_types)) as executor:
+        futures = {executor.submit(fetch_record, rt): rt for rt in record_types}
+        for future in as_completed(futures, timeout=TIMEOUT_MEDIUM):
+            try:
+                record_type, values = future.result()
+                records[record_type] = values
+            except Exception:
+                records[futures[future]] = []
+
     return records
 
+
+@timed_lru_cache(seconds=1800, maxsize=500)
 def get_ssl_info(domain):
-    """Fetch SSL/TLS certificate information for a domain."""
+    """Fetch SSL/TLS certificate information for a domain with timeout."""
     try:
         context = ssl.create_default_context()
-        with socket.create_connection((domain, 443)) as sock:
+        # Set socket timeout
+        with socket.create_connection((domain, 443), timeout=TIMEOUT_SHORT) as sock:
+            sock.settimeout(TIMEOUT_SHORT)
             with context.wrap_socket(sock, server_hostname=domain) as ssock:
                 cert = ssock.getpeercert()
-                
                 return {
                     'issuer': dict(x[0] for x in cert['issuer']),
                     'subject': dict(x[0] for x in cert['subject']),
@@ -78,46 +139,82 @@ def get_ssl_info(domain):
                     'not_after': cert['notAfter'],
                     'cipher': ssock.cipher()
                 }
+    except socket.timeout:
+        logger.warning(f"SSL connection timed out for {domain}")
+        return None
     except Exception as e:
-        logging.error(f"Error fetching SSL information: {str(e)}")
+        logger.debug(f"Error fetching SSL information: {str(e)}")
         return None
 
+
+@timed_lru_cache(seconds=1800, maxsize=500)
 def get_reverse_ip_domains(ip):
-    """Get domains sharing the same IP using hackertarget.com (free endpoint)."""
+    """Get domains sharing the same IP using hackertarget.com."""
+    if not ip:
+        return []
     try:
-        resp = requests.get(f'https://api.hackertarget.com/reverseiplookup/?q={ip}', timeout=10)
-        if resp.status_code == 200 and 'No records' not in resp.text:
-            return resp.text.splitlines()
+        resp = requests.get(
+            f'https://api.hackertarget.com/reverseiplookup/?q={ip}',
+            timeout=TIMEOUT_SHORT
+        )
+        if resp.status_code == 200 and 'No records' not in resp.text and 'error' not in resp.text.lower():
+            domains = [d.strip() for d in resp.text.splitlines() if d.strip()]
+            return domains[:50]  # Limit results
+    except requests.Timeout:
+        logger.warning(f"Reverse IP lookup timed out for {ip}")
     except Exception as e:
         logger.error(f"Error in reverse IP lookup: {str(e)}")
     return []
 
+
+@timed_lru_cache(seconds=3600, maxsize=500)
 def get_subdomains_crtsh(domain):
     """Get subdomains from crt.sh (certificate transparency logs)."""
     try:
-        resp = requests.get(f'https://crt.sh/?q=%25.{domain}&output=json', timeout=10)
+        # crt.sh is often slow, use short timeout
+        resp = requests.get(
+            f'https://crt.sh/?q=%25.{domain}&output=json',
+            timeout=TIMEOUT_SHORT,
+            headers={'User-Agent': 'NexusTrace/1.0'}
+        )
         if resp.status_code == 200:
             data = resp.json()
             subdomains = set()
-            for entry in data:
+            for entry in data[:500]:  # Limit processing
                 name = entry.get('name_value')
                 if name:
                     for sub in name.split('\n'):
-                        if sub.endswith(domain):
-                            subdomains.add(sub.strip())
-            return sorted(subdomains)
+                        sub = sub.strip().lower()
+                        if sub.endswith(domain.lower()) and '*' not in sub:
+                            subdomains.add(sub)
+            return sorted(subdomains)[:100]  # Limit results
+    except requests.Timeout:
+        logger.warning(f"crt.sh lookup timed out for {domain}")
     except Exception as e:
-        logger.error(f"Error in crt.sh subdomain lookup: {str(e)}")
+        logger.debug(f"Error in crt.sh subdomain lookup: {str(e)}")
     return []
 
+
 def parse_spf_dkim_dmarc(txt_records):
-    spf = [r for r in txt_records if r.startswith('v=spf1')]
+    """Parse email security records from TXT records."""
+    spf = [r for r in txt_records if 'v=spf1' in r.lower()]
     dkim = [r for r in txt_records if 'dkim' in r.lower()]
-    dmarc = [r for r in txt_records if r.startswith('v=DMARC1')]
+    dmarc = [r for r in txt_records if 'v=dmarc1' in r.lower()]
     return {'spf': spf, 'dkim': dkim, 'dmarc': dmarc}
 
+
+@timed_lru_cache(seconds=3600, maxsize=500)
+def get_dmarc_record(domain):
+    """Fetch DMARC record directly."""
+    try:
+        answers = dns_resolver.resolve(f'_dmarc.{domain}', 'TXT')
+        return [str(rdata) for rdata in answers]
+    except Exception:
+        return []
+
+
 def extract_domain_for_phishtank(indicator):
-    # If it's a URL, extract the domain; if it's an IP, return None; else, return as is
+    """Extract domain from URL or return as-is."""
     try:
         if indicator.lower().startswith(('http://', 'https://')):
             return urlparse(indicator).netloc
@@ -128,117 +225,153 @@ def extract_domain_for_phishtank(indicator):
     except Exception:
         return indicator
 
+
 def check_phishtank(indicator):
+    """Generate PhishTank search URL."""
     domain = extract_domain_for_phishtank(indicator)
     if domain:
         return f'https://phishtank.org/search.php?valid=y&active=y&Search={domain}'
     return None
 
-def get_mxtoolbox_email_security(domain):
-    """Fetch DMARC, DKIM, SPF, and other info from MXToolbox (scrape or API)."""
-    api_key = os.getenv('MXTOOLBOX_API_KEY')
-    results = {'spf': None, 'dmarc': None, 'dkim': None, 'raw': {}}
-    if api_key:
-        # Paid API usage
-        try:
-            headers = {'Authorization': f'Bearer {api_key}'}
-            for record in ['spf', 'dmarc', 'dkim']:
-                resp = requests.get(f'https://api.mxtoolbox.com/api/v1/lookup/{record}/{domain}', headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results[record] = data.get('Information', '')
-                    results['raw'][record] = data
-        except Exception as e:
-            logger.error(f"MXToolbox API error: {str(e)}")
-    else:
-        # Scrape public web interface (rate-limited, for demo only)
-        try:
-            for record in ['spf', 'dmarc', 'dkim']:
-                url = f'https://mxtoolbox.com/SuperTool.aspx?action={record}%3a{domain}'
-                resp = requests.get(url, timeout=10)
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                result_div = soup.find('div', {'id': 'ctl00_ContentPlaceHolder1_lblToolOutput'})
-                if result_div:
-                    results[record] = result_div.get_text(strip=True)
-                results['raw'][record] = result_div.get_text(strip=True) if result_div else None
-        except Exception as e:
-            logger.error(f"MXToolbox scrape error: {str(e)}")
-    return results
 
+@timed_lru_cache(seconds=1800, maxsize=500)
 def get_talos_reputation(domain):
-    """Fetch Cisco Talos reputation and web category for a domain or IP."""
-    url = f'https://talosintelligence.com/reputation_center/lookup?search={domain}'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36',
-        'Referer': 'https://talosintelligence.com/'
+    """Generate Talos lookup URL (avoid scraping which is unreliable)."""
+    return {
+        'talos_url': f'https://talosintelligence.com/reputation_center/lookup?search={domain}',
+        'verdict': None,
+        'category': None
     }
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        verdict = None
-        category = None
-        # Reputation verdict
-        rep_div = soup.find('div', class_='reputation-score')
-        if rep_div:
-            verdict = rep_div.get_text(strip=True)
-        # Web category
-        cat_div = soup.find('div', class_='category')
-        if cat_div:
-            category = cat_div.get_text(strip=True)
-        return {
-            'verdict': verdict,
-            'category': category,
-            'talos_url': url
-        }
-    except Exception as e:
-        logger.error(f"Talos reputation error: {str(e)}")
-        return None
 
+
+@timed_lru_cache(seconds=900, maxsize=500)
 def get_domain_info(domain):
-    """Get comprehensive domain information in parallel, with extra enrichment."""
+    """Get comprehensive domain information with all operations in parallel."""
+    results = {
+        'domain': domain,
+        'whois': None,
+        'dns_records': {},
+        'ssl_info': None,
+        'ip_address': None,
+        'reverse_domains': [],
+        'subdomains': [],
+        'email_security': {'spf': [], 'dkim': [], 'dmarc': []},
+        'phishtank_url': None,
+        'talos_reputation': None,
+        'errors': []
+    }
+
     try:
-        with ThreadPoolExecutor() as executor:
-            whois_future = executor.submit(whois.whois, domain)
-            dns_future = executor.submit(get_dns_records, domain)
-            ssl_future = executor.submit(get_ssl_info, domain)
+        # Phase 1: Core lookups in parallel (fast, essential)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(get_whois_info, domain): 'whois_api',
+                executor.submit(get_dns_records, domain): 'dns',
+                executor.submit(get_ssl_info, domain): 'ssl',
+                executor.submit(lambda: socket.gethostbyname(domain)): 'ip',
+            }
 
-            whois_info = whois_future.result()
-            dns_records = dns_future.result()
-            ssl_info = ssl_future.result()
+            for future in as_completed(futures, timeout=TIMEOUT_LONG):
+                key = futures[future]
+                try:
+                    result = future.result(timeout=TIMEOUT_SHORT)
+                    if key == 'whois_api':
+                        results['whois'] = result
+                    elif key == 'dns':
+                        results['dns_records'] = result or {}
+                    elif key == 'ssl':
+                        results['ssl_info'] = result
+                    elif key == 'ip':
+                        results['ip_address'] = result
+                except Exception as e:
+                    results['errors'].append(f"{key}: {str(e)}")
+                    logger.debug(f"Phase 1 {key} failed: {str(e)}")
 
-        # Get IP address
-        try:
-            ip_address = socket.gethostbyname(domain)
-        except:
-            ip_address = None
+        # Parse email security from DNS TXT records
+        txt_records = results['dns_records'].get('TXT', [])
+        results['email_security'] = parse_spf_dkim_dmarc(txt_records)
 
-        # Reverse IP lookup
-        reverse_domains = get_reverse_ip_domains(ip_address) if ip_address else []
-        # Subdomain enumeration
-        subdomains = get_subdomains_crtsh(domain)
-        # SPF/DKIM/DMARC
-        txt_records = dns_records.get('TXT', [])
-        email_security = parse_spf_dkim_dmarc(txt_records)
-        # Blacklist/PhishTank
-        phishtank_url = check_phishtank(domain)
-        # MXToolbox enrichment
-        mxtoolbox_email_security = get_mxtoolbox_email_security(domain)
-        # Talos reputation
-        talos_reputation = get_talos_reputation(domain)
+        # Get DMARC if not in TXT records
+        if not results['email_security']['dmarc']:
+            dmarc = get_dmarc_record(domain)
+            if dmarc:
+                results['email_security']['dmarc'] = dmarc
 
-        return {
-            'domain': domain,
-            'whois': whois_info,
-            'dns_records': dns_records,
-            'ssl_info': ssl_info,
-            'ip_address': ip_address,
-            'reverse_domains': reverse_domains,
-            'subdomains': subdomains,
-            'email_security': email_security,
-            'phishtank_url': phishtank_url,
-            'mxtoolbox_email_security': mxtoolbox_email_security,
-            'talos_reputation': talos_reputation
-        }
+        # Generate static URLs (no network call needed)
+        results['phishtank_url'] = check_phishtank(domain)
+        results['talos_reputation'] = get_talos_reputation(domain)
+
+        # Phase 2: Enrichment lookups in parallel (slower, optional)
+        ip_address = results['ip_address']
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {}
+
+            if ip_address:
+                futures[executor.submit(get_reverse_ip_domains, ip_address)] = 'reverse_ip'
+
+            futures[executor.submit(get_subdomains_crtsh, domain)] = 'subdomains'
+
+            for future in as_completed(futures, timeout=TIMEOUT_LONG):
+                key = futures[future]
+                try:
+                    result = future.result(timeout=TIMEOUT_MEDIUM)
+                    if key == 'reverse_ip':
+                        results['reverse_domains'] = result or []
+                    elif key == 'subdomains':
+                        results['subdomains'] = result or []
+                except Exception as e:
+                    results['errors'].append(f"{key}: timed out or failed")
+                    logger.debug(f"Phase 2 {key} failed: {str(e)}")
+
+        # Clean up errors list if empty
+        if not results['errors']:
+            del results['errors']
+
+        return results
+
     except Exception as e:
-        logger.error(f"Error getting domain information: {str(e)}")
-        return None 
+        logger.error(f"Error getting domain information for {domain}: {str(e)}")
+        results['errors'].append(f"Fatal error: {str(e)}")
+        return results
+
+
+@timed_lru_cache(seconds=600, maxsize=500)
+def get_domain_info_quick(domain):
+    """Quick domain lookup - only essential info with strict timeouts."""
+    results = {
+        'domain': domain,
+        'dns_records': {},
+        'ssl_info': None,
+        'ip_address': None,
+        'email_security': {'spf': [], 'dkim': [], 'dmarc': []},
+    }
+
+    try:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(get_dns_records, domain): 'dns',
+                executor.submit(get_ssl_info, domain): 'ssl',
+                executor.submit(lambda: socket.gethostbyname(domain)): 'ip',
+            }
+
+            for future in as_completed(futures, timeout=TIMEOUT_MEDIUM):
+                key = futures[future]
+                try:
+                    result = future.result(timeout=TIMEOUT_SHORT)
+                    if key == 'dns':
+                        results['dns_records'] = result or {}
+                    elif key == 'ssl':
+                        results['ssl_info'] = result
+                    elif key == 'ip':
+                        results['ip_address'] = result
+                except Exception:
+                    pass
+
+        txt_records = results['dns_records'].get('TXT', [])
+        results['email_security'] = parse_spf_dkim_dmarc(txt_records)
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Quick domain lookup failed for {domain}: {str(e)}")
+        return results

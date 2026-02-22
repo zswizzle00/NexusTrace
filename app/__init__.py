@@ -54,6 +54,7 @@ def create_app():
             "'self'",
             "'unsafe-inline'",  # Required for some inline scripts
             "'unsafe-eval'",  # Required for CyberChef and Tailwind
+            "blob:",  # Required for CyberChef web workers
             "https://cdn.tailwindcss.com",
             "https://cdnjs.cloudflare.com",
         ],
@@ -66,6 +67,7 @@ def create_app():
         'img-src': [
             "'self'",
             "data:",
+            "blob:",  # Required for CyberChef image processing
             "https:",
         ],
         'font-src': [
@@ -75,13 +77,16 @@ def create_app():
         ],
         'connect-src': [
             "'self'",
+            "blob:",  # Required for CyberChef
             "https://api.ipinfo.io",
             "https://api.abuseipdb.com",
             "https://api.shodan.io",
             "https://otx.alienvault.com",
             "https://vpnapi.io",
         ],
-        'frame-ancestors': "'none'",
+        'worker-src': ["'self'", "blob:"],  # Required for CyberChef web workers
+        'child-src': ["'self'", "blob:"],  # Required for CyberChef workers
+        'frame-ancestors': "'self'",  # Allow same-origin framing for embedded CyberChef
         'form-action': "'self'",
     }
 

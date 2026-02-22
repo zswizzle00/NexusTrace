@@ -1,38 +1,155 @@
 {% extends "base.html" %}
 
+{% block main_content_class %}full-width{% endblock %}
+
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
-    <div class="w-full max-w-3xl mx-auto px-2 py-8 md:py-16">
-        <div class="card p-8 md:p-14 space-y-12">
-            <div class="text-center mb-4 md:mb-8">
-                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                    User Agent Analysis
-                </h1>
-                <p class="text-lg md:text-2xl text-gray-300">
-                    Analyze and decode User Agent strings to identify browser, device, and operating system information.
-                </p>
-            </div>
-            {% if user_agent %}
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-8 flex flex-col overflow-x-auto w-full max-w-2xl mx-auto">
-                <h3 class="text-xl font-bold text-blue-400 mb-4">User Agent Details</h3>
-                <table class="mb-4 w-full text-sm">
-                    <tr><th class="pr-4 text-gray-400">Browser</th><td>{{ user_agent.browser.name }} {{ user_agent.browser.version }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400">OS</th><td>{{ user_agent.os.name }} {{ user_agent.os.version }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400">Device</th><td>{{ user_agent.device.type }}{% if user_agent.device.brand %} ({{ user_agent.device.brand }}){% endif %}{% if user_agent.device.model %} - {{ user_agent.device.model }}{% endif %}</td></tr>
-                    <tr><th class="pr-4 text-gray-400">Is Mobile</th><td>{{ 'Yes' if user_agent.is_mobile else 'No' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400">Is Tablet</th><td>{{ 'Yes' if user_agent.is_tablet else 'No' }}</td></tr>
-                    <tr><th class="pr-4 text-gray-400">Is Desktop</th><td>{{ 'Yes' if user_agent.is_desktop else 'No' }}</td></tr>
+<div class="w-full py-10 tailwind-tables">
+    <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">User Agent Analysis</h2>
+
+    <!-- Search Form at Top -->
+    <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
+        <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="indicator" placeholder="Enter a user agent string to analyze..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg py-3 px-4 rounded-lg" required>
+            <button type="submit" class="btn btn-primary whitespace-nowrap px-6 py-3 text-lg rounded-lg flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Analyze
+            </button>
+        </form>
+    </div>
+
+    {% if user_agent %}
+    <div class="w-full max-w-4xl mx-auto">
+        <div class="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <!-- Browser Info -->
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                    </svg>
+                    Browser
+                </h3>
+                <table class="w-full text-sm">
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Name</th><td class="py-2">{{ user_agent.browser.name }}</td></tr>
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Version</th><td class="py-2">{{ user_agent.browser.version or 'N/A' }}</td></tr>
+                    {% if user_agent.browser.engine %}
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Engine</th><td class="py-2">{{ user_agent.browser.engine }}</td></tr>
+                    {% endif %}
                 </table>
-                <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
-                    <pre class="bg-gray-900 text-gray-200 rounded p-2 text-xs overflow-x-auto">{{ user_agent | tojson(indent=2) }}</pre>
-                </details>
             </div>
-            {% elif user_agent_error %}
-            <div class="bg-red-900 rounded-2xl shadow-lg p-8 flex flex-col items-center justify-center text-red-300 w-full max-w-2xl mx-auto">
-                <span>{{ user_agent_error }}</span>
+
+            <!-- OS Info -->
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Operating System
+                </h3>
+                <table class="w-full text-sm">
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Name</th><td class="py-2">{{ user_agent.os.name }}</td></tr>
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Version</th><td class="py-2">{{ user_agent.os.version or 'N/A' }}</td></tr>
+                    {% if user_agent.os.architecture %}
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Architecture</th><td class="py-2">{{ user_agent.os.architecture }}</td></tr>
+                    {% endif %}
+                </table>
             </div>
-            {% endif %}
+
+            <!-- Device Info -->
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    Device
+                </h3>
+                <table class="w-full text-sm">
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Type</th><td class="py-2">{{ user_agent.device.type }}</td></tr>
+                    {% if user_agent.device.brand %}
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Brand</th><td class="py-2">{{ user_agent.device.brand }}</td></tr>
+                    {% endif %}
+                    {% if user_agent.device.model %}
+                    <tr><th class="pr-4 py-2 text-gray-400 text-left">Model</th><td class="py-2">{{ user_agent.device.model }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Device Type Flags -->
+            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Device Flags
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Mobile</span>
+                        <span class="px-3 py-1 rounded text-sm font-semibold {% if user_agent.is_mobile %}bg-green-900 text-green-300{% else %}bg-gray-700 text-gray-400{% endif %}">
+                            {{ 'Yes' if user_agent.is_mobile else 'No' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Tablet</span>
+                        <span class="px-3 py-1 rounded text-sm font-semibold {% if user_agent.is_tablet %}bg-green-900 text-green-300{% else %}bg-gray-700 text-gray-400{% endif %}">
+                            {{ 'Yes' if user_agent.is_tablet else 'No' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Desktop</span>
+                        <span class="px-3 py-1 rounded text-sm font-semibold {% if user_agent.is_desktop %}bg-green-900 text-green-300{% else %}bg-gray-700 text-gray-400{% endif %}">
+                            {{ 'Yes' if user_agent.is_desktop else 'No' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Bot/Crawler</span>
+                        <span class="px-3 py-1 rounded text-sm font-semibold {% if user_agent.is_bot %}bg-yellow-900 text-yellow-300{% else %}bg-gray-700 text-gray-400{% endif %}">
+                            {{ 'Yes' if user_agent.is_bot else 'No' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Raw Data -->
+        <div class="mt-6">
+            <details class="bg-gray-900 rounded-2xl shadow-lg p-6">
+                <summary class="cursor-pointer text-blue-400 font-semibold">Show Raw Data</summary>
+                <pre class="bg-gray-800 text-gray-200 rounded p-4 text-xs overflow-x-auto mt-4">{{ user_agent | tojson(indent=2) }}</pre>
+            </details>
         </div>
     </div>
+
+    {% elif user_agent_error %}
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="bg-red-900/50 border border-red-700 rounded-2xl shadow-lg p-8 flex flex-col items-center justify-center text-red-300">
+            <svg class="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span class="text-lg">{{ user_agent_error }}</span>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Results State -->
+    <div class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+        </svg>
+        <p class="text-gray-400 text-lg">Enter a user agent string above to analyze</p>
+        <p class="text-gray-500 text-sm mt-2">Example: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0</p>
+    </div>
+    {% endif %}
+
+    <!-- Return to Home -->
+    <div class="flex justify-center mt-12">
+        <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+            Return to Home
+        </a>
+    </div>
 </div>
-{% endblock %} 
+{% endblock %}

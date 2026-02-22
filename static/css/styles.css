@@ -1080,6 +1080,26 @@ table tr:nth-child(odd) td,
     background: var(--bg-card);
 }
 
+/* Reset generic table styles inside Tailwind-styled card grids (analyze, user-agent pages) */
+.tailwind-tables table {
+    margin: 0;
+}
+
+.tailwind-tables table th,
+.tailwind-tables table td {
+    text-align: left;
+    padding: revert;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-weight: inherit;
+}
+
+.tailwind-tables table tr:nth-child(even) td,
+.tailwind-tables table tr:nth-child(odd) td {
+    background: transparent;
+}
+
 /* Lists */
 ul, ol {
     margin: 0.5em 0 0.5em 1.2em;

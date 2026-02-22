@@ -4,10 +4,10 @@ import logging
 from app.services.file_service import get_intezer_analysis
 
 logger = logging.getLogger(__name__)
-from app.services.hash_service import get_hash_info
+from app.services.hash_service import get_hash_info_quick, get_hash_info_deep
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
-from app.services.domain_service import get_domain_info, get_whois_info
-from app.services.url_service import analyze_url
+from app.services.domain_service import get_domain_info, get_domain_info_quick
+from app.services.url_service import analyze_url_quick, analyze_url_deep
 from app.services.user_agent_service import parse_user_agent
 from app.services.azure_error_service import get_azure_error_info
 import os
@@ -214,25 +214,25 @@ def analyze():
     logger.debug(f"indicator_type: {indicator_type}")
 
     if indicator_type == 'hash':
-        intezer_result = get_intezer_analysis(file_hash=indicator)
-        result_data['intezer_result'] = intezer_result if intezer_result else None
-        hash_info = get_hash_info(indicator)
+        # Quick scan by default - fast response with VT, MalwareBazaar, ThreatFox
+        hash_info = get_hash_info_quick(indicator)
         result_data['hash_info'] = hash_info if hash_info and not hash_info.get('error') else None
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-        
+
         # Check if we got meaningful hash analysis results
         has_meaningful_data = (
-            (intezer_result and intezer_result.get('verdict')) or
-            (hash_info and not hash_info.get('error') and hash_info.get('type')) or
+            (hash_info and hash_info.get('summary', {}).get('is_malicious')) or
+            (hash_info and hash_info.get('sources', {}).get('virustotal', {}).get('status') == 'found') or
+            (hash_info and hash_info.get('sources', {}).get('malwarebazaar', {}).get('status') == 'found') or
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
-        
+
         # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='hash')
-        
-        card_count = sum(1 for k in ['intezer_result', 'alienvault', 'hash_info'] if result_data.get(k))
+
+        card_count = sum(1 for k in ['alienvault', 'hash_info'] if result_data.get(k))
         return render_template('hash_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
@@ -335,21 +335,20 @@ def analyze():
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'url':
-        # Get URL analysis
-        url_analysis = analyze_url(indicator)
+        # Get URL analysis (quick mode by default)
+        url_analysis = analyze_url_quick(indicator)
         result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
         # Extract domain from URL for additional analysis
         domain = urlparse(indicator).netloc
-        # Get domain information
+        # Get domain information (includes WHOIS)
         domain_info = get_domain_info(domain)
         result_data['domain_info'] = domain_info if domain_info else None
-        # Get WHOIS information
-        whois_info = get_whois_info(domain)
-        result_data['whois_info'] = whois_info if whois_info else None
+        # Extract WHOIS from domain_info for template compatibility
+        result_data['whois_info'] = domain_info.get('whois') if domain_info else None
         # Get AlienVault OTX information
         alienvault_raw = get_alienvault_data(domain)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-        
+
         # Check if we got meaningful URL analysis results
         has_meaningful_data = (
             (result_data['url_analysis'] and result_data['url_analysis'].get('status_code') is not None) or
@@ -357,11 +356,11 @@ def analyze():
             (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
-        
+
         # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='url')
-        
+
         card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,
@@ -369,21 +368,20 @@ def analyze():
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'domain':
-        # First try to analyze as URL
+        # First try to analyze as URL (quick mode)
         normalized_url = f'https://{indicator}'
-        url_analysis = analyze_url(normalized_url)
+        url_analysis = analyze_url_quick(normalized_url)
         result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
-        
-        # Get domain information
+
+        # Get domain information (includes WHOIS)
         domain_info = get_domain_info(indicator)
         result_data['domain_info'] = domain_info if domain_info else None
-        # Get WHOIS information
-        whois_info = get_whois_info(indicator)
-        result_data['whois_info'] = whois_info if whois_info else None
+        # Extract WHOIS from domain_info for template compatibility
+        result_data['whois_info'] = domain_info.get('whois') if domain_info else None
         # Get AlienVault OTX information
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-        
+
         # Check if we got meaningful domain analysis results
         has_meaningful_data = (
             (result_data['url_analysis'] and result_data['url_analysis'].get('status_code') is not None) or
@@ -391,11 +389,11 @@ def analyze():
             (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
-        
+
         # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='domain')
-        
+
         card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,

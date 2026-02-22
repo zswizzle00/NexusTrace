@@ -64,9 +64,10 @@ def get_intezer_analysis(file_path=None, file_hash=None):
 
 def get_alienvault_analysis(file_hash):
     """Analyze a file hash using AlienVault OTX API."""
-    otx_api_key = os.getenv('OTX_API_KEY')
+    # Support multiple env var names for backwards compatibility
+    otx_api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not otx_api_key:
-        logger.warning("AlienVault OTX API key not configured")
+        logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
     try:
         otx = OTXv2(otx_api_key)
