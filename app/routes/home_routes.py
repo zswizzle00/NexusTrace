@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
 import re
 import logging
 from app.services.file_service import get_intezer_analysis
@@ -410,5 +410,5 @@ def no_results():
 
 @home_bp.route('/favicon.ico')
 def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
+    return send_from_directory(os.path.join(current_app.root_path, 'static'),
                              'favicon.ico', mimetype='image/vnd.microsoft.icon') 

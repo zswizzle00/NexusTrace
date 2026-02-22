@@ -23,8 +23,11 @@ def create_app():
     # Secret key for session and CSRF (required)
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(32).hex())
 
+    # Only mark cookies as secure when running behind HTTPS (set SECURE_COOKIES=true in .env)
+    secure_cookies = os.getenv('SECURE_COOKIES', 'false').lower() == 'true'
+
     # Configure Flask app
-    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SECURE'] = secure_cookies
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
@@ -94,9 +97,7 @@ def create_app():
     Talisman(
         app,
         force_https=False,  # Set to True in production with HTTPS
-        strict_transport_security=True,
-        strict_transport_security_max_age=31536000,
-        strict_transport_security_include_subdomains=True,
+        strict_transport_security=False,
         content_security_policy=csp,
         content_security_policy_nonce_in=['script-src'],
         referrer_policy='strict-origin-when-cross-origin',
@@ -107,7 +108,7 @@ def create_app():
         },
         x_content_type_options=True,
         x_xss_protection=True,
-        session_cookie_secure=True,
+        session_cookie_secure=secure_cookies,
         session_cookie_http_only=True,
     )
 
