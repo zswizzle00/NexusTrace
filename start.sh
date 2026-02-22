@@ -132,10 +132,11 @@ else
         log_warn "Or they may conflict with the dev server."
     fi
 
-    # Check if virtual environment exists
+    # Check if virtual environment exists and is valid
     VENV_DIR="venv"
-    if [ ! -d "$VENV_DIR" ]; then
+    if [ ! -f "$SCRIPT_DIR/$VENV_DIR/bin/pip" ]; then
         log_step "Creating virtual environment..."
+        rm -rf "$VENV_DIR"
         python3 -m venv "$VENV_DIR"
     fi
 
