@@ -36,3 +36,4 @@ logs/
 # Data files
 *.mmdb
 data/*.mmdb
+data/api_keys.json

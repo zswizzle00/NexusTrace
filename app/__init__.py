@@ -116,6 +116,10 @@ def create_app():
     from app.routes import register_routes
     register_routes(app)
 
+    # CSRF-exempt the enrichment API (uses X-API-Key auth instead)
+    from app.routes.enrichment_routes import enrichment_bp
+    csrf.exempt(enrichment_bp)
+
     # Setup services
     from app.services import setup_services
     setup_services(app)
