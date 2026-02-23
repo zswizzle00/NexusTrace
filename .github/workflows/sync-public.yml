@@ -1,0 +1,52 @@
+name: Sync to Public Repo
+
+on:
+  push:
+    branches: [latest-version]
+  workflow_dispatch: # Allow manual trigger from the Actions tab
+
+jobs:
+  sync:
+    name: Push sanitized copy to public repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+
+      - name: Remove private/operational files
+        run: |
+          # Personal AI workflow instructions
+          rm -f CLAUDE.md
+
+          # Deployment-specific admin scripts
+          rm -f scripts/cloudflare_admin.py
+
+          # Deployment-specific docs (contain personal domain/setup details)
+          rm -rf docs/
+
+          # Runtime data directory
+          rm -rf data/
+
+          # Compiled Python files (no need in public repo)
+          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          find . -name "*.pyo" -delete 2>/dev/null || true
+
+      - name: Push to public repo
+        env:
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          PUBLIC_REPO: ${{ secrets.PUBLIC_REPO }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage all removals
+          git add -A
+
+          # Only commit if there are staged changes (idempotent)
+          git diff --staged --quiet || git commit -m "chore: strip private files for public sync"
+
+          # Push to public repo — force push is intentional, public repo is a mirror
+          git remote add public https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/${PUBLIC_REPO}.git
+          git push public HEAD:main --force
