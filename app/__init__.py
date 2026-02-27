@@ -21,7 +21,15 @@ def create_app():
     )
 
     # Secret key for session and CSRF (required)
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(32).hex())
+    secret_key = os.getenv('SECRET_KEY')
+    if not secret_key or secret_key == 'your-secret-key-here':
+        logger.warning(
+            'SECRET_KEY is not set or is the default placeholder. '
+            'Sessions will break on restart. Set SECRET_KEY in your .env file.'
+        )
+        # Fall back to a per-process random key — sessions won't survive restarts
+        secret_key = os.urandom(32).hex()
+    app.config['SECRET_KEY'] = secret_key
 
     # Only mark cookies as secure when running behind HTTPS (set SECURE_COOKIES=true in .env)
     secure_cookies = os.getenv('SECURE_COOKIES', 'false').lower() == 'true'
@@ -130,5 +138,24 @@ def create_app():
 
     # Store CSRF instance for use in templates
     app.csrf = csrf
+
+    # Prevent HTML pages from being cached so CSRF tokens are never served stale
+    @app.after_request
+    def set_cache_control(response):
+        if 'text/html' in response.content_type:
+            response.cache_control.no_store = True
+            response.cache_control.no_cache = True
+            response.cache_control.private = True
+        return response
+
+    # Graceful CSRF error handling — redirect to homepage with a user-friendly message
+    from flask_wtf.csrf import CSRFError
+    from flask import redirect, url_for, flash
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        logger.warning('CSRF validation failed: %s', e.description)
+        flash('Your session expired. Please try again.', 'warning')
+        return redirect(url_for('home.home'), 303)
 
     return app
