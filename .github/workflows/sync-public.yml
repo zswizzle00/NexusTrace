@@ -19,9 +19,6 @@ jobs:
           # Personal AI workflow instructions
           rm -f CLAUDE.md
 
-          # Deployment-specific admin scripts
-          rm -f scripts/cloudflare_admin.py
-
           # Deployment-specific docs (contain personal domain/setup details)
           rm -rf docs/
 

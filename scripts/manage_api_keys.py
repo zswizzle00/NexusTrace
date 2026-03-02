@@ -5,6 +5,12 @@ Usage:
     python scripts/manage_api_keys.py list
     python scripts/manage_api_keys.py create "My SIEM Tool"
     python scripts/manage_api_keys.py revoke <full-key>
+    python scripts/manage_api_keys.py delete <full-key>
+
+Keys are stored in data/api_keys.json (gitignored).
+Pass keys to the enrichment API via X-API-Key header:
+
+    curl -H 'X-API-Key: <key>' -d '{"ip":"1.1.1.1"}' https://your-host/api/enrich/ip
 """
 import json
 import os
@@ -66,6 +72,17 @@ def cmd_revoke(key):
     print(f"Revoked key: {key}")
 
 
+def cmd_delete(key):
+    data = _load()
+    keys = data.get('keys', {})
+    if key not in keys:
+        print(f"Key not found: {key}")
+        sys.exit(1)
+    name = keys.pop(key).get('name', '')
+    _save(data)
+    print(f"Deleted key for '{name}': {key}")
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -85,6 +102,11 @@ def main():
             print("Usage: manage_api_keys.py revoke <key>")
             sys.exit(1)
         cmd_revoke(sys.argv[2])
+    elif command == 'delete':
+        if len(sys.argv) < 3:
+            print("Usage: manage_api_keys.py delete <key>")
+            sys.exit(1)
+        cmd_delete(sys.argv[2])
     else:
         print(f"Unknown command: {command!r}")
         print(__doc__)
