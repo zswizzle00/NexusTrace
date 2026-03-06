@@ -98,6 +98,45 @@ def _enrich_ip(ip):
         'open_ports': open_ports,
     }
 
+    def _clean_shodan(s):
+        if not s:
+            return None
+        return {
+            'ip': s.get('ip'),
+            'organization': s.get('organization'),
+            'isp': s.get('isp'),
+            'operating_system': s.get('operating_system'),
+            'hostnames': s.get('hostnames'),
+            'domains': s.get('domains'),
+            'country_name': s.get('country_name'),
+            'city': s.get('city'),
+            'last_update': s.get('last_update'),
+            'tags': s.get('tags'),
+            'ports': [
+                {k: v for k, v in p.items() if k not in ('http', 'ssl', 'banner')}
+                for p in (s.get('ports') or [])
+            ],
+            'vulnerabilities': s.get('vulnerabilities'),
+        }
+
+    def _clean_alienvault(a):
+        if not a:
+            return None
+        general = a.get('general') or {}
+        pulse_info = general.get('pulse_info') or {}
+        return {
+            'pulse_count': pulse_info.get('count', 0),
+            'reputation': general.get('reputation'),
+            'asn': general.get('asn'),
+            'country_name': general.get('country_name'),
+            'geo': a.get('geo'),
+        }
+
+    def _clean_abuseipdb(a):
+        if not a:
+            return None
+        return {k: v for k, v in a.items() if k != 'reports'}
+
     return {
         'indicator': ip,
         'indicator_type': 'ip',
@@ -106,9 +145,9 @@ def _enrich_ip(ip):
         'sources': {
             'vpnapi': sources.get('vpnapi'),
             'ipinfo': sources.get('ipinfo'),
-            'abuseipdb': sources.get('abuseipdb'),
-            'shodan': sources.get('shodan'),
-            'alienvault': sources.get('alienvault'),
+            'abuseipdb': _clean_abuseipdb(sources.get('abuseipdb')),
+            'shodan': _clean_shodan(sources.get('shodan')),
+            'alienvault': _clean_alienvault(sources.get('alienvault')),
         },
     }
 
