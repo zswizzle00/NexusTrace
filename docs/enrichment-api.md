@@ -1,8 +1,8 @@
 # NexusTrace Enrichment API
 
-Base URL: `https://cloud.nexustrace.net`
-
 The enrichment API provides programmatic access to NexusTrace's threat intelligence data. It is designed for integration into SIEM/SOAR pipelines, EDR triage workflows, and automation scripts. All endpoints authenticate via an API key — no browser session or CSRF token required.
+
+Replace `<your-host>` throughout this document with your NexusTrace instance URL (e.g. `http://localhost:5050` for local dev, or your deployed host).
 
 ---
 
@@ -57,7 +57,7 @@ Enrich a single IP address.
 **Request**
 
 ```bash
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/ip \
+curl -s -X POST <your-host>/api/enrich/ip \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}'
@@ -114,7 +114,15 @@ curl -s -X POST https://cloud.nexustrace.net/api/enrich/ip \
 | `threat_pulse_count`  | AlienVault  | Number of OTX threat pulses              |
 | `open_ports`          | Shodan      | Open ports detected by Shodan            |
 
-`sources` contains the raw response from each upstream service, or `null` if that service is unconfigured or failed.
+`sources` contains trimmed data from each upstream service (large blobs like Shodan HTTP screenshots, AlienVault pulse lists, and AbuseIPDB individual reports are excluded), or `null` if that service is unconfigured or failed.
+
+| Source      | Fields included                                                                 |
+|-------------|---------------------------------------------------------------------------------|
+| `vpnapi`    | Full response (small — security flags, network, location)                       |
+| `ipinfo`    | Full response (small — geo, ASN, org)                                           |
+| `abuseipdb` | Score, report count, ISP, usage type — individual reports omitted               |
+| `shodan`    | Org, ISP, OS, hostnames, ports (number/service/product/version), vulnerabilities — banners and HTTP screenshots omitted |
+| `alienvault`| Pulse count, reputation, ASN, country, geo — full pulse/malware/passive DNS lists omitted |
 
 ---
 
@@ -126,13 +134,13 @@ Enrich a domain or URL.
 
 ```bash
 # Domain
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/domain \
+curl -s -X POST <your-host>/api/enrich/domain \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"indicator": "google.com"}'
 
 # URL
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/domain \
+curl -s -X POST <your-host>/api/enrich/domain \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"indicator": "https://phishing-example.com/login"}'
@@ -183,7 +191,7 @@ Enrich up to **20** indicators in a single request. Indicators can be a mix of I
 **Request**
 
 ```bash
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/batch \
+curl -s -X POST <your-host>/api/enrich/batch \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -253,17 +261,32 @@ Results are returned in the same order as the input `indicators` array. Entries 
 
 ---
 
-## Cloudflare Notes
+## Self-Hosting Notes
 
-NexusTrace is served through Cloudflare at `cloud.nexustrace.net`. A few things to be aware of:
+### API key storage and Docker
 
-**Pass `X-API-Key` through Cloudflare**
+API keys are stored in `data/api_keys.json` on the server. This file is gitignored and never committed. When running via Docker Compose, the `data/` directory must be bind-mounted into the container or the app will not find any keys:
 
-Cloudflare does not strip custom headers on proxied requests, so `X-API-Key` reaches the origin as-is. No Cloudflare configuration change is required.
+```yaml
+# docker-compose.yml — web service volumes section
+volumes:
+  - app_logs:/app/logs
+  - ./data:/app/data   # required for API key persistence
+```
 
-**`SECURE_COOKIES=true`**
+After adding this mount, recreate the container:
 
-Because Cloudflare terminates TLS, set this in your `.env` on the origin server:
+```bash
+docker-compose up -d --force-recreate web
+```
+
+Keys created with `manage_api_keys.py` on the host are immediately visible to the running container through the mount.
+
+### Running behind a reverse proxy
+
+If NexusTrace is deployed behind Nginx, Caddy, or a cloud load balancer, ensure the `X-API-Key` header is forwarded to the origin. Most reverse proxies pass unknown headers through by default — no special configuration is needed unless you have a header allowlist in place.
+
+If you terminate TLS at the proxy, set the following in your `.env` on the origin server:
 
 ```
 SECURE_COOKIES=true
@@ -271,21 +294,9 @@ SECURE_COOKIES=true
 
 This marks session cookies as `Secure` so they are only sent over HTTPS.
 
-**Cloudflare caching**
+### Caching
 
-Cloudflare will not cache `POST` requests by default, so enrichment API responses always hit the origin. NexusTrace's own 30-minute LRU cache handles deduplication at the application layer — repeated queries for the same indicator within 30 minutes are served from cache without hitting upstream APIs again.
-
-**Bot Fight Mode / Browser Integrity Check**
-
-If you have Cloudflare's Bot Fight Mode or Browser Integrity Check enabled, API clients (scripts, curl, Python) may be blocked with a `403 Forbidden` from Cloudflare before reaching the origin. To allow programmatic clients:
-
-1. In the Cloudflare dashboard, go to **Security → Bots**.
-2. Disable **Bot Fight Mode**, or create a **WAF Custom Rule** to skip the bot check for requests that include the `X-API-Key` header:
-   - Field: `http.request.headers["x-api-key"]` exists → **Skip** → Bot Fight Mode
-
-**Rate limiting**
-
-If you have Cloudflare rate limiting rules configured on `cloud.nexustrace.net`, make sure the enrichment API paths (`/api/enrich/*`) have a threshold appropriate for your automation workload, or are excluded from rate limiting for trusted source IPs.
+NexusTrace caches upstream API responses for 30 minutes per indicator. Repeated queries for the same IP, domain, or URL within that window are served from cache without hitting upstream APIs again. This applies to both the web UI and the enrichment API.
 
 ---
 
@@ -296,7 +307,7 @@ If you have Cloudflare rate limiting rules configured on `cloud.nexustrace.net`,
 ```python
 import requests
 
-BASE = "https://cloud.nexustrace.net"
+BASE = "http://<your-host>"  # e.g. http://localhost:5050
 HEADERS = {"X-API-Key": "<your-key>", "Content-Type": "application/json"}
 
 def enrich_ip(ip):
@@ -323,11 +334,12 @@ for item in batch["results"]:
 ### PowerShell
 
 ```powershell
+$base    = "http://<your-host>"
 $headers = @{ "X-API-Key" = "<your-key>"; "Content-Type" = "application/json" }
 
-$body = '{"ip": "8.8.8.8"}' | ConvertFrom-Json | ConvertTo-Json
+$body   = '{"ip": "8.8.8.8"}'
 $result = Invoke-RestMethod -Method POST `
-    -Uri "https://cloud.nexustrace.net/api/enrich/ip" `
+    -Uri "$base/api/enrich/ip" `
     -Headers $headers `
     -Body $body
 
@@ -338,13 +350,13 @@ $result.summary
 
 ```bash
 # Extract just the summary from an IP enrichment
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/ip \
+curl -s -X POST <your-host>/api/enrich/ip \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}' | jq '.summary'
 
 # Get all IPs from a batch that are VPNs
-curl -s -X POST https://cloud.nexustrace.net/api/enrich/batch \
+curl -s -X POST <your-host>/api/enrich/batch \
   -H "X-API-Key: <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"indicators": ["1.1.1.1", "185.220.101.1", "8.8.8.8"]}' \
