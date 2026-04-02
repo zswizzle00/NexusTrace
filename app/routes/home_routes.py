@@ -165,42 +165,28 @@ def is_valid_ip(ip):
         except socket.error:
             return False
 
-@home_bp.route('/analyze', methods=['POST'])
-def analyze():
-    indicator = request.form.get('indicator', '').strip()
-    if not indicator:
-        flash('Please enter an indicator to analyze.', 'error')
-        return redirect(url_for('home.home'))
-
-    # Initialize result_data and card_count
+def _run_analysis(indicator):
+    """Core analysis logic shared by the POST /analyze form and GET /i/<indicator> deep-link route."""
     result_data = {}
     card_count = 0
 
     # Determine indicator type
     indicator_type = None
-    
-    # Check for IP address (both IPv4 and IPv6)
+
     if is_valid_ip(indicator):
         indicator_type = 'ip'
-    # Check for domain
     elif re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$', indicator):
         indicator_type = 'domain'
-    # Check for URL
     elif re.match(r'^https?://', indicator):
         indicator_type = 'url'
-    # Check for hash
     elif re.match(r'^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$', indicator):
         indicator_type = 'hash'
-    # Check for event ID
     elif re.match(r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$', indicator):
         indicator_type = 'event'
-    # Check for Azure error code (AADSTS + numbers, or just numbers that could be Azure codes)
     elif re.match(r'^AADSTS\d+$', indicator, re.IGNORECASE) or (re.match(r'^\d+$', indicator) and len(indicator) >= 5):
         indicator_type = 'azure_error'
-    # Check for AD code (assuming it's a numeric code)
     elif re.match(r'^\d+$', indicator):
         indicator_type = 'ad_code'
-    # Default to user agent if no other type matches
     else:
         logger.debug(f"Treating as User Agent: {indicator}")
         try:
@@ -214,13 +200,11 @@ def analyze():
     logger.debug(f"indicator_type: {indicator_type}")
 
     if indicator_type == 'hash':
-        # Quick scan by default - fast response with VT, MalwareBazaar, ThreatFox
         hash_info = get_hash_info_quick(indicator)
         result_data['hash_info'] = hash_info if hash_info and not hash_info.get('error') else None
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
-        # Check if we got meaningful hash analysis results
         has_meaningful_data = (
             (hash_info and hash_info.get('summary', {}).get('is_malicious')) or
             (hash_info and hash_info.get('sources', {}).get('virustotal', {}).get('status') == 'found') or
@@ -228,7 +212,6 @@ def analyze():
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
 
-        # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='hash')
 
@@ -241,18 +224,17 @@ def analyze():
     elif indicator_type == 'user_agent':
         if not result_data.get('user_agent') and result_data.get('user_agent_error'):
             return render_template('no_results.html', indicator=indicator, error_type='user_agent')
-        
-        # Check if we got meaningful user agent information (not just "Unknown" values)
+
         user_agent = result_data.get('user_agent')
         has_meaningful_data = (
-            user_agent and 
+            user_agent and
             user_agent.get('browser', {}).get('name') != 'Unknown' and
             user_agent.get('os', {}).get('name') != 'Unknown'
         )
-        
+
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='user_agent')
-        
+
         return render_template('user_agent_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
@@ -263,42 +245,38 @@ def analyze():
                               indicator_type=indicator_type,
                               **result_data)
     elif indicator_type == 'azure_error':
-        # Get Azure error information
         azure_error_info = get_azure_error_info(indicator)
         result_data['azure_error_info'] = azure_error_info if azure_error_info else None
-        
-        # Check if we got meaningful error information (not just generic/error responses)
+
         has_meaningful_data = (
-            azure_error_info and 
-            azure_error_info.get('description') and 
+            azure_error_info and
+            azure_error_info.get('description') and
             not azure_error_info.get('description', '').startswith('No specific information found for error code') and
             not azure_error_info.get('description', '').startswith('Unable to fetch error information:') and
             not azure_error_info.get('description', '').startswith('Error processing request:')
         )
-        
+
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='azure_error')
-        
+
         return render_template('azure_error_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
                               **result_data)
     elif indicator_type == 'ad_code':
-        # Get event information for the AD code
         event_info = get_event_info(indicator)
         result_data['event_info'] = event_info if event_info else None
-        
-        # Check if we got meaningful event information (not just empty data)
+
         has_meaningful_data = (
-            event_info and 
-            event_info.get('title') and 
-            event_info.get('summary') and 
+            event_info and
+            event_info.get('title') and
+            event_info.get('summary') and
             not event_info.get('summary', '').startswith('Error fetching event information:')
         )
-        
+
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='event')
-        
+
         return render_template('event_analysis.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
@@ -314,8 +292,7 @@ def analyze():
         result_data['abuseipdb'] = parse_abuseipdb(abuseipdb_raw) if abuseipdb_raw else None
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-        
-        # Check if we got meaningful IP analysis results
+
         has_meaningful_data = (
             (result_data['ipinfo'] and result_data['ipinfo'].get('ipinfo', {}).get('city')) or
             (result_data['vpnapi'] and result_data['vpnapi'].get('location', {}).get('city')) or
@@ -323,11 +300,10 @@ def analyze():
             (result_data['abuseipdb'] and result_data['abuseipdb'].get('summary', {}).get('risk_score') is not None) or
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
-        
-        # If no meaningful data found, redirect to no results page
+
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='ip')
-        
+
         card_count = sum(1 for k in ['ipinfo', 'ip2location', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,
@@ -335,21 +311,15 @@ def analyze():
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'url':
-        # Get URL analysis (quick mode by default)
         url_analysis = analyze_url_quick(indicator)
         result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
-        # Extract domain from URL for additional analysis
         domain = urlparse(indicator).netloc
-        # Get domain information (includes WHOIS)
         domain_info = get_domain_info(domain)
         result_data['domain_info'] = domain_info if domain_info else None
-        # Extract WHOIS from domain_info for template compatibility
         result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        # Get AlienVault OTX information
         alienvault_raw = get_alienvault_data(domain)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
-        # Check if we got meaningful URL analysis results
         has_meaningful_data = (
             (result_data['url_analysis'] and result_data['url_analysis'].get('status_code') is not None) or
             (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
@@ -357,7 +327,6 @@ def analyze():
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
 
-        # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='url')
 
@@ -368,21 +337,15 @@ def analyze():
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'domain':
-        # First try to analyze as URL (quick mode)
         normalized_url = f'https://{indicator}'
         url_analysis = analyze_url_quick(normalized_url)
         result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
-
-        # Get domain information (includes WHOIS)
         domain_info = get_domain_info(indicator)
         result_data['domain_info'] = domain_info if domain_info else None
-        # Extract WHOIS from domain_info for template compatibility
         result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        # Get AlienVault OTX information
         alienvault_raw = get_alienvault_data(indicator)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
-        # Check if we got meaningful domain analysis results
         has_meaningful_data = (
             (result_data['url_analysis'] and result_data['url_analysis'].get('status_code') is not None) or
             (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
@@ -390,7 +353,6 @@ def analyze():
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
         )
 
-        # If no meaningful data found, redirect to no results page
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='domain')
 
@@ -400,6 +362,34 @@ def analyze():
                               indicator_type=indicator_type,
                               card_count=card_count,
                               **result_data)
+
+
+@home_bp.route('/analyze', methods=['POST'])
+def analyze():
+    indicator = request.form.get('indicator', '').strip()
+    if not indicator:
+        flash('Please enter an indicator to analyze.', 'error')
+        return redirect(url_for('home.home'))
+    return _run_analysis(indicator)
+
+
+@home_bp.route('/i/<path:indicator>', methods=['GET'])
+def analyze_deeplink(indicator):
+    """Deep-link route: GET /i/<indicator> runs the same analysis as the POST form.
+
+    Examples:
+        /i/8.8.8.8
+        /i/google.com
+        /i/d41d8cd98f00b204e9800998ecf8427e
+        /i/AADSTS50034
+        /i/https%3A%2F%2Fexample.com%2Fpath   (URL-encode full URLs)
+    """
+    from urllib.parse import unquote
+    indicator = unquote(indicator).strip()
+    if not indicator:
+        flash('Please enter an indicator to analyze.', 'error')
+        return redirect(url_for('home.home'))
+    return _run_analysis(indicator)
 
 @home_bp.route('/no_results')
 def no_results():
