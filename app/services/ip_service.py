@@ -254,7 +254,7 @@ def get_proxycheck_data(ip_address):
 def get_alienvault_data(indicator):
     """Get data from AlienVault OTX API"""
     # Support multiple env var names for backwards compatibility
-    api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('ALIENVAULT_API_KEY')
+    api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not api_key:
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
@@ -431,25 +431,3 @@ def get_ip2location_data(ip_address):
     except Exception as e:
         logger.error(f"IP2Location.io API request failed: {str(e)}")
         return None 
-
-def get_ip_info(ip):
-    result = {}
-    # ... existing code ...
-    # Add AlienVault OTX
-    try:
-        from .alienvault_service import get_alienvault_data, parse_alienvault_otx
-        alienvault_raw = get_alienvault_data(ip)
-        if alienvault_raw:
-            result['alienvault'] = parse_alienvault_otx(alienvault_raw)
-    except Exception as e:
-        logger.error(f"AlienVault OTX error: {str(e)}")
-    # Add Intezer (if available for IPs)
-    try:
-        from .file_service import get_intezer_analysis
-        intezer_result = get_intezer_analysis(ip=ip)
-        if intezer_result:
-            result['intezer_result'] = intezer_result
-    except Exception as e:
-        logger.error(f"Intezer enrichment error: {str(e)}")
-    # ... existing code ...
-    return result 

@@ -64,7 +64,6 @@ def clear_caches():
         try:
             # Dynamically import the modules when needed
             ip_service = importlib.import_module('app.services.ip_service')
-            file_service = importlib.import_module('app.services.file_service')
 
             # List of functions to clear
             functions = [
@@ -72,7 +71,6 @@ def clear_caches():
                 ip_service.get_ipinfo_data,
                 ip_service.get_shodan_info,
                 ip_service.get_proxycheck_data,
-                file_service.get_intezer_analysis
             ]
 
             for func in functions:

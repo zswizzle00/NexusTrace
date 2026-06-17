@@ -58,7 +58,7 @@ def cmd_create(name):
     _save(data)
     print(f"\nCreated API key for '{name}':")
     print(f"  {key}")
-    print("\nStore this key securely — it will not be shown again.")
+    print("\nStore this key securely - it will not be shown again.")
 
 
 def cmd_revoke(key):

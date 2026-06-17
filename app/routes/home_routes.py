@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
 import re
 import logging
-from app.services.file_service import get_intezer_analysis
 
 logger = logging.getLogger(__name__)
 from app.services.hash_service import get_hash_info_quick, get_hash_info_deep
@@ -137,10 +136,13 @@ def parse_abuseipdb(abuse_data):
     summary = {
         'risk_score': abuse_data.get('abuse_confidence_score'),
         'total_reports': abuse_data.get('total_reports'),
+        'distinct_users': abuse_data.get('distinct_users'),
         'last_reported': abuse_data.get('last_reported'),
         'country': abuse_data.get('country_name'),
         'isp': abuse_data.get('isp'),
         'domain': abuse_data.get('domain'),
+        'usage_type': abuse_data.get('usage_type'),
+        'is_whitelisted': abuse_data.get('is_whitelisted'),
     }
     tables = {}
     if abuse_data.get('reports'):

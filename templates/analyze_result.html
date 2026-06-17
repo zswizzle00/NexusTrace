@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_search_form.html" import search_form %}
 
 {% block main_content_class %}full-width{% endblock %}
 
@@ -7,7 +8,7 @@
   {% if value %}
     <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-900 text-red-300">Yes</span>
   {% else %}
-    <span class="px-2 py-0.5 rounded text-xs font-bold bg-green-900 text-green-300">No</span>
+    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-400">No</span>
   {% endif %}
 {% endmacro %}
 
@@ -25,21 +26,35 @@
   <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Analysis Result</h2>
 
   <!-- Search Form at Top -->
-  <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
-    <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="text" name="indicator" placeholder="Enter IP, domain, URL, hash, or email..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg py-3 px-4 rounded-lg" required>
-      <button type="submit" class="btn btn-primary whitespace-nowrap px-6 py-3 text-lg rounded-lg flex items-center justify-center gap-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
-        Analyze
-      </button>
-    </form>
+  <div class="mb-10 w-full">
+    {{ search_form('Enter IP, domain, URL, hash, or user agent...') }}
   </div>
 
   {% set has_ip_cards = ipinfo or ip2location or vpnapi or proxycheck or shodan or abuseipdb %}
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
+
+  {# --- Verdict summary strip: gives the page an anchor before the source cards (IP analyses) --- #}
+  {% if has_ip_cards %}
+    {% set abuse = abuseipdb.summary.risk_score | default(0, true) | int %}
+    {% set pulses = alienvault.summary.pulse_count | default(0, true) | int %}
+    {% set is_tor = vpnapi.security.tor | default(false, true) %}
+    {% set is_vpn = vpnapi.security.vpn | default(false, true) %}
+    {% set is_proxy = vpnapi.security.proxy | default(false, true) %}
+    {% set verdict = 'malicious' if (abuse >= 50 or pulses >= 3 or is_tor) else ('suspicious' if (abuse >= 1 or pulses >= 1 or is_vpn or is_proxy) else 'clean') %}
+    <div class="verdict-bar is-{{ verdict }} shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div class="flex items-center gap-3">
+        <span class="font-mono text-2xl font-bold text-gray-100 break-all">{{ indicator }}</span>
+        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider {{ 'bg-red-900 text-red-300' if verdict == 'malicious' else ('bg-yellow-900 text-yellow-300' if verdict == 'suspicious' else 'bg-green-900 text-green-300') }}">{{ verdict }}</span>
+      </div>
+      <div class="ml-auto flex flex-wrap items-center divide-x divide-gray-600 text-sm">
+        {% if ipinfo and ipinfo.country %}<span class="px-4 text-gray-400">Geo <span class="text-gray-100">{% if ipinfo.city %}{{ ipinfo.city }}, {% endif %}{{ ipinfo.country }}</span></span>{% endif %}
+        {% if ipinfo and ipinfo.asn %}<span class="px-4 text-gray-400">ASN <span class="text-gray-100">{{ ipinfo.asn }}</span></span>{% endif %}
+        {% if abuse %}<span class="px-4 text-gray-400">Abuse <span class="{{ 'text-red-400' if abuse >= 50 else ('text-yellow-400' if abuse >= 1 else 'text-gray-100') }}">{{ abuse }}%</span></span>{% endif %}
+        {% if pulses %}<span class="px-4 text-gray-400">OTX pulses <span class="text-gray-100">{{ pulses }}</span></span>{% endif %}
+        {% if is_tor %}<span class="px-4 text-red-400">Tor exit node</span>{% elif is_vpn %}<span class="px-4 text-yellow-400">VPN</span>{% elif is_proxy %}<span class="px-4 text-yellow-400">Proxy</span>{% endif %}
+      </div>
+    </div>
+  {% endif %}
 
   {# --- IP Analysis Cards Grid --- #}
   {% if has_ip_cards %}
@@ -99,7 +114,7 @@
             </tr>
           {% endif %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-blue-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ipinfo | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -108,7 +123,7 @@
     {# ==================== IP2Location Card ==================== #}
     {% if ip2location %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -130,7 +145,7 @@
           {{ kv_row('Net Speed', ip2location.net_speed or ip2location.speed) }}
           {{ kv_row('Usage Type', ip2location.usage_type) }}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-cyan-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ip2location | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -139,7 +154,7 @@
     {# ==================== VPNAPI Card ==================== #}
     {% if vpnapi %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
           </svg>
@@ -164,7 +179,7 @@
             <td class="py-2">{{ bool_badge(vpnapi.security and vpnapi.security.relay) }}</td>
           </tr>
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-green-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ vpnapi | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -174,7 +189,7 @@
     {% if proxycheck %}
       {% set pc = proxycheck.proxycheck if proxycheck.proxycheck is defined else proxycheck %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
           </svg>
@@ -234,7 +249,7 @@
             {{ kv_row('Attack History', pc.attack_history) }}
           {% endif %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-yellow-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ proxycheck | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -243,7 +258,7 @@
     {# ==================== Shodan Card ==================== #}
     {% if shodan %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
           </svg>
@@ -318,7 +333,7 @@
             </div>
           </div>
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-purple-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ shodan.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -327,7 +342,7 @@
     {# ==================== AbuseIPDB Card ==================== #}
     {% if abuseipdb %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
           </svg>
@@ -401,7 +416,7 @@
             {% endif %}
           </div>
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-red-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ abuseipdb.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -410,7 +425,7 @@
     {# ==================== AlienVault OTX (IP grid) ==================== #}
     {% if alienvault and has_ip_cards %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -462,7 +477,7 @@
             {% endif %}
           </div>
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-orange-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ alienvault.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -475,7 +490,7 @@
     {# AlienVault OTX - show in domain grid if no IP cards #}
     {% if alienvault and not has_ip_cards %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -526,7 +541,7 @@
             {% endif %}
           </div>
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-orange-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ alienvault.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -535,7 +550,7 @@
     {# --- SSL Info Card --- #}
     {% if domain_info and domain_info.ssl_info %}
       <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
           </svg>
@@ -573,7 +588,7 @@
             {% endfor %}
           </tbody>
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-green-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -622,7 +637,7 @@
             {% endfor %}
           </tbody>
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-blue-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -770,7 +785,7 @@
           </div>
         {% endif %}
         {# --- Raw Data --- #}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-blue-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ua | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -877,7 +892,7 @@
             </tr>
           {% endfor %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-blue-400 text-sm">Show Raw Data</summary>
+        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
           <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ es | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -890,7 +905,7 @@
     {% if domain_info and domain_info.reverse_domains %}
       {% if domain_info.reverse_domains[0] and 'API count exceeded' in domain_info.reverse_domains[0] %}
         <div class="bg-yellow-900/30 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto border border-yellow-800">
-          <h3 class="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+          <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
             </svg>

@@ -33,7 +33,7 @@ def allowed_file(filename):
 
 @file_bp.route('/analyze_file', methods=['POST'])
 def analyze_file():
-    """Endpoint for analyzing files using Intezer."""
+    """Endpoint for analyzing an uploaded file by hashing it and checking reputation (AlienVault OTX)."""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400

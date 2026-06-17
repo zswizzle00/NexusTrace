@@ -12,10 +12,10 @@ html, body, .app-container, .main-content {
 }
 .cyberchef-iframe-container {
   position: fixed;
-  top: 4.5rem; /* Adjust if your header is taller/shorter */
+  top: var(--header-height, 64px); /* match the sticky header so there's no gap */
   left: 0;
   width: 100vw;
-  height: calc(100vh - 4.5rem);
+  height: calc(100vh - var(--header-height, 64px));
   z-index: 10;
   background: transparent;
 }

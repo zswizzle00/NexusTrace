@@ -32,409 +32,28 @@
     <link rel="apple-touch-icon" sizes="57x57" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='favicon_io/site.webmanifest') }}">
     
-    <!-- Update to latest Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- Add our custom Tailwind CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <style>
-        /* CSS Reset for html and body */
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            box-sizing: border-box;
-        }
-
-        :root {
-            /* Base Colors */
-            --color-primary: #3B82F6;
-            --color-primary-dark: #2563EB;
-            --color-secondary: #60A5FA;
-            --color-success: #10B981;
-            --color-warning: #F59E0B;
-            --color-danger: #EF4444;
-            --color-info: #3B82F6;
-            
-            /* Background Colors */
-            --bg-primary: #111827;
-            --bg-secondary: #1F2937;
-            --bg-tertiary: #374151;
-            --bg-card: #232946;
-            
-            /* Text Colors */
-            --text-primary: #F3F4F6;
-            --text-secondary: #9CA3AF;
-            --text-muted: #6B7280;
-            
-            /* Border Colors */
-            --border-primary: #374151;
-            --border-secondary: #4B5563;
-            
-            /* Spacing */
-            --spacing-xs: 0.25rem;
-            --spacing-sm: 0.5rem;
-            --spacing-md: 1rem;
-            --spacing-lg: 1.5rem;
-            --spacing-xl: 2rem;
-            
-            /* Border Radius */
-            --radius-sm: 0.25rem;
-            --radius-md: 0.5rem;
-            --radius-lg: 1rem;
-            
-            /* Shadows */
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            
-            /* Transitions */
-            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Base Styles */
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(
-                to bottom,
-                rgba(17, 24, 39, 0.97),
-                rgba(17, 24, 39, 0.93)
-            );
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
-
-        /* Layout Components */
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .main-header {
-            background: rgba(17, 24, 39, 0.8);
-            backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--border-primary);
-            padding: var(--spacing-md) var(--spacing-xl);
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-
-        .main-content {
-            flex: 1;
-            padding: var(--spacing-xl);
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        /* Card Components */
-        .card {
-            background: #232946;
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            transition: var(--transition-normal);
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--color-primary);
-        }
-
-        /* Form Components */
-        .input-group {
-            display: flex;
-            gap: var(--spacing-sm);
-            width: 100%;
-        }
-
-        .input-field {
-            flex: 1;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            padding: var(--spacing-md);
-            color: var(--text-primary);
-            transition: var(--transition-fast);
-        }
-
-        .input-field:focus {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            outline: none;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-radius: var(--radius-md);
-            font-weight: 500;
-            transition: var(--transition-fast);
-            cursor: pointer;
-        }
-
-        .btn-primary {
-            background: var(--color-primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--color-primary-dark);
-        }
-
-        /* Navigation */
-        .nav-link {
-            color: var(--text-secondary);
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius-md);
-            transition: var(--transition-fast);
-        }
-
-        .nav-link:hover {
-            color: var(--text-primary);
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        .nav-link.active {
-            color: var(--color-primary);
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        /* Dropdown Menus */
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            min-width: 200px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-        }
-
-        /* Submenus open to the right */
-        .submenu {
-            left: 100%;
-            right: auto;
-            top: 0;
-            z-index: 60;
-        }
-
-        /* Main dropdown opens downward */
-        .group > .dropdown-menu:not(.submenu) {
-            left: 0;
-            right: auto;
-            top: 100%;
-            z-index: 50;
-        }
-
-        .group > .dropdown-menu,
-        .group > .dropdown-menu.submenu {
-            display: none;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s 0.15s;
-        }
-        .group:hover > .dropdown-menu.submenu,
-        .group:focus-within > .dropdown-menu.submenu,
-        .group > .dropdown-menu:not(.submenu):hover {
-            display: block;
-            pointer-events: auto;
-            opacity: 1;
-            transition-delay: 0s;
-        }
-
-        /* Ensure parent menu items have proper positioning */
-        .group {
-            position: relative;
-        }
-
-        /* Add hover effect for menu items */
-        .dropdown-menu a {
-            display: block;
-            padding: 0.5rem 1rem;
-            color: var(--text-secondary);
-            transition: var(--transition-fast);
-        }
-
-        .dropdown-menu a:hover {
-            background: var(--color-primary);
-            color: white;
-        }
-
-        /* Data Display */
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: var(--spacing-lg);
-        }
-
-        .data-item {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-xs);
-        }
-
-        .data-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .data-value {
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-
-        /* Status Indicators */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: var(--spacing-xs) var(--spacing-sm);
-            border-radius: var(--radius-sm);
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .status-success {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--color-success);
-        }
-
-        .status-warning {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--color-warning);
-        }
-
-        .status-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--color-danger);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1024px) {
-            .main-header {
-                padding: var(--spacing-sm) var(--spacing-lg);
-            }
-
-            .main-content {
-                padding: var(--spacing-lg);
-            }
-
-            .data-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .input-group {
-                flex-direction: column;
-            }
-
-            .btn {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes slideIn {
-            from { transform: translateY(-10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .fade-in {
-            animation: fadeIn var(--transition-normal);
-        }
-
-        .slide-in {
-            animation: slideIn var(--transition-normal);
-        }
-
-        /* Add arrow indicator and hover delay styles */
-        .arrow {
-            margin-left: 0.5em;
-            font-size: 0.8em;
-            transition: transform 0.2s;
-        }
-        .group:hover > .nav-link .arrow {
-            transform: translateX(3px);
-        }
-
-        .group:hover > .dropdown-menu:not(.submenu),
-        .group:focus-within > .dropdown-menu:not(.submenu),
-        .group > .dropdown-menu:not(.submenu):hover {
-            display: block;
-            pointer-events: auto;
-            opacity: 1;
-            transition-delay: 0s;
-        }
-
-        /* Submenu animation */
-        @keyframes slideRight {
-            from { opacity: 0; transform: translateX(-10px);}
-            to { opacity: 1; transform: translateX(0);}
-        }
-        .submenu {
-            animation: slideRight 0.2s;
-            min-width: 12rem;
-            width: auto;
-            overflow: visible;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-            border: 1px solid var(--border-primary);
-            background: var(--bg-secondary);
-        }
-
-        /* Main dropdown should allow overflow for submenus */
-        .dropdown-menu {
-            overflow: visible !important;
-        }
-
-        /* Menu item hover */
-        .dropdown-menu a:hover {
-            background: var(--color-primary);
-            color: #fff;
-            border-radius: 0.375rem;
-            transition: background 0.15s, color 0.15s;
-        }
-
-        .footer {
-            border-radius: 0 !important;
-            margin: 0 !important;
-        }
-        .app-container {
-            border-radius: 0 !important;
-            margin: 0 !important;
-        }
-    </style>
+    <!-- Pre-built Tailwind CSS (compiled offline; no runtime compiler). Regenerate via tailwind.config.js -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}?v={{ asset_v }}">
+    <!-- Preload the primary font weight so first paint isn't blocked on a late font fetch -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='fonts/inter-latin-400-normal.woff2') }}">
+    <!-- App-specific component styles (self-hosted @font-face for Inter lives here) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ asset_v }}">
+    <!-- App shell & component styles (moved out of an inline style block; loaded last so it wins the cascade) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ asset_v }}">
 </head>
 <body class="flex flex-col min-h-screen">
     <a href="#main-content" class="sr-only focus:not-sr-only bg-blue-700 text-white px-4 py-2 rounded absolute top-2 left-2 z-50">Skip to main content</a>
     <div class="app-container flex-1 flex flex-col">
         {% if request.endpoint != 'index' %}
-        <header class="main-header">
-            <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-0 divide-x divide-gray-700">
-                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity px-4">
-                        <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
-                        </svg>
-                        <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
-                    </a>
+        <header class="main-header" role="banner">
+            <div class="flex items-center w-full">
+                <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity pr-6">
+                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
+                    </svg>
+                    <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
+                </a>
+                <nav aria-label="Primary" class="desktop-nav items-center gap-0 divide-x divide-gray-700">
                     <a href="/cyberchef" class="nav-link flex items-center gap-1 focus:outline-none px-4">CyberChef</a>
                     <a href="/user_agent_search" class="nav-link flex items-center gap-1 focus:outline-none px-4">User Agent Search</a>
                     <a href="/hash_analysis" class="nav-link flex items-center gap-1 focus:outline-none px-4">Hash Search</a>
@@ -491,8 +110,39 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </nav>
+
+                <!-- Hamburger toggle (shown below the desktop-nav breakpoint) -->
+                <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
             </div>
+
+            <!-- Mobile navigation panel (toggled by the hamburger) -->
+            <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+                <a href="/cyberchef" class="mobile-nav-link">CyberChef</a>
+                <a href="/user_agent_search" class="mobile-nav-link">User Agent Search</a>
+                <a href="/hash_analysis" class="mobile-nav-link">Hash Search</a>
+                <a href="/domain_search" class="mobile-nav-link">Domain Search</a>
+                <a href="/ip_search" class="mobile-nav-link">IP Search</a>
+                <a href="/ad_event_search" class="mobile-nav-link">Windows Event Search</a>
+                <a href="/azure_error_search" class="mobile-nav-link">Azure Error Search</a>
+                <div class="mobile-nav-heading">Tools</div>
+                <a href="https://www.virustotal.com/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">VirusTotal</a>
+                <a href="https://www.shodan.io/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Shodan</a>
+                <a href="https://ipinfo.io/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">IPInfo</a>
+                <a href="https://otx.alienvault.com/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">AlienVault</a>
+                <a href="https://proxycheck.io/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">ProxyCheck</a>
+                <a href="https://app.any.run/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">ANY.RUN</a>
+                <a href="https://www.hybrid-analysis.com/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Hybrid Analysis</a>
+                <div class="mobile-nav-heading">Threat Intel</div>
+                <a href="https://detection.fyi/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Detection.FYI</a>
+                <a href="https://social.cyware.com/cyber-security-news-articles" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Cyware News</a>
+                <div class="mobile-nav-heading">Learning</div>
+                <a href="https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Security Log Encyclopedia</a>
+            </nav>
         </header>
         {% endif %}
         
@@ -515,20 +165,82 @@
         }
     </script>
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.dropdown-menu a').forEach(link => {
-            link.addEventListener('click', function() {
+    // Accessible nav dropdowns (disclosure pattern).
+    // The menus open/close visually via CSS :hover / :focus-within; this script keeps the
+    // ARIA state in sync, marks decorative icons hidden, and adds Escape-to-close so the
+    // menus are usable by keyboard and screen-reader users.
+    document.addEventListener('DOMContentLoaded', function () {
+        const groups = document.querySelectorAll('.main-header .group');
+
+        groups.forEach(function (group) {
+            const trigger = group.querySelector(':scope > .nav-link, :scope > button');
+            const menu = group.querySelector(':scope > .dropdown-menu');
+            if (!trigger || !menu) return;
+
+            trigger.setAttribute('aria-haspopup', 'true');
+            trigger.setAttribute('aria-expanded', 'false');
+            // Decorative chevrons/arrows shouldn't be announced.
+            trigger.querySelectorAll('svg, .arrow').forEach(function (el) {
+                el.setAttribute('aria-hidden', 'true');
+            });
+
+            const setExpanded = function (open) { trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+            group.addEventListener('mouseenter', function () { setExpanded(true); });
+            group.addEventListener('mouseleave', function () { setExpanded(false); });
+            group.addEventListener('focusin', function () { setExpanded(true); });
+            group.addEventListener('focusout', function (e) {
+                if (!group.contains(e.relatedTarget)) setExpanded(false);
+            });
+        });
+
+        // Close any open menu on a link click (so it doesn't linger over the next view).
+        document.querySelectorAll('.dropdown-menu a').forEach(function (link) {
+            link.addEventListener('click', function () {
                 const group = link.closest('.group');
                 if (group) {
                     group.classList.remove('group');
-                    setTimeout(() => group.classList.add('group'), 200);
+                    setTimeout(function () { group.classList.add('group'); }, 200);
                 }
             });
         });
+
+        // Escape closes the open menu and returns focus to its trigger.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            const active = document.activeElement;
+            const group = active && active.closest ? active.closest('.main-header .group') : null;
+            if (!group) return;
+            const trigger = group.querySelector(':scope > .nav-link, :scope > button');
+            if (trigger) trigger.focus();
+            if (active.blur) active.blur();
+        });
+
+        // Mobile hamburger menu: toggle the vertical nav panel below the desktop breakpoint.
+        const navToggle = document.getElementById('nav-toggle');
+        const mobileNav = document.getElementById('mobile-nav');
+        if (navToggle && mobileNav) {
+            const closeMobile = function () {
+                mobileNav.classList.remove('open');
+                navToggle.setAttribute('aria-expanded', 'false');
+            };
+            navToggle.addEventListener('click', function () {
+                const open = mobileNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            mobileNav.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', closeMobile);
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && mobileNav.classList.contains('open')) {
+                    closeMobile();
+                    navToggle.focus();
+                }
+            });
+        }
     });
     </script>
     <!-- Mobile-specific JavaScript -->
-    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile.js') }}?v={{ asset_v }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html> 

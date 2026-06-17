@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify
 from ..services.hash_service import get_hash_info, get_hash_info_quick, get_hash_info_deep
-from ..services.file_service import get_intezer_analysis
 from ..services.ip_service import get_alienvault_data
 from app.routes.home_routes import parse_alienvault_otx
 import logging
@@ -37,7 +36,6 @@ def check_hash():
 def analyze_hash():
     result = None
     error = None
-    intezer_result = None
     alienvault = None
 
     if request.method == 'POST':
@@ -50,10 +48,6 @@ def analyze_hash():
             # Get comprehensive hash info (includes VT, MalwareBazaar, ThreatFox)
             result = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
 
-            # Intezer enrichment (only in deep scan mode - it's slow)
-            if deep_scan:
-                intezer_result = get_intezer_analysis(file_hash=hash_value)
-
             # AlienVault enrichment
             alienvault_raw = get_alienvault_data(hash_value)
             alienvault = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
@@ -62,6 +56,5 @@ def analyze_hash():
         'hash_analysis.html',
         result=result,
         error=error,
-        intezer_result=intezer_result,
         alienvault=alienvault
-    ) 
+    )

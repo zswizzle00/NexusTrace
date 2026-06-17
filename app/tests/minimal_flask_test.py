@@ -32,4 +32,4 @@ def url():
         <html><body>{NAV}<h1>URL Analysis Page</h1></body></html>""")
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=5050)

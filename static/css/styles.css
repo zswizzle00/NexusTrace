@@ -4,6 +4,139 @@
    ========================================================================== */
 
 /* ==========================================================================
+   0. Self-hosted fonts (Inter). No external font CDN - faster, private, offline.
+   Files live in /static/fonts; paths are relative to this stylesheet.
+   ========================================================================== */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+
+/* ==========================================================================
+   0b. Submit-button loading state. mobile.js adds `.loading` + disables the
+   submit button on form submit; this gives the user feedback while a slow
+   OSINT lookup runs (the main flows are full-page POSTs, so the spinner shows
+   during server processing). Hides the label and overlays a centered spinner.
+   ========================================================================== */
+@keyframes nt-spin { to { transform: rotate(360deg); } }
+
+.btn.loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+    cursor: wait;
+}
+.btn.loading > * { visibility: hidden; }
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.1em;
+    height: 1.1em;
+    margin: -0.55em 0 0 -0.55em;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: nt-spin 0.6s linear infinite;
+}
+
+/* Landing-page quick-pick example section */
+.example-heading {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted, #6B7280);
+    text-align: center;
+    margin: 0 0 0.85rem 0;
+}
+
+.example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.example-chip {
+    /* layout: center content both axes so the text is always centered in the button */
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.1rem;
+    min-width: 7.5rem;
+    padding: 0.55rem 1.1rem;
+    background: rgba(59, 130, 246, 0.14);
+    border: 1px solid rgba(96, 165, 250, 0.4);
+    border-radius: var(--radius-lg, 0.75rem);
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.example-chip:hover {
+    background: rgba(59, 130, 246, 0.26);
+    border-color: var(--color-primary, #3B82F6);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -10px rgba(59, 130, 246, 0.9);
+}
+.example-chip:active {
+    transform: translateY(0);
+}
+.example-chip:focus-visible {
+    outline: 2px solid var(--color-secondary, #60A5FA);
+    outline-offset: 2px;
+}
+.example-chip__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary, #60A5FA);
+}
+.example-chip__value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary, #F3F4F6);
+}
+
+/* ==========================================================================
+   0c. Visible keyboard focus. The nav uses Tailwind `focus:outline-none`, which
+   strips the focus ring - bad for keyboard users. These rules out-specify it
+   (.main-header descendant + :focus-visible) so the ring returns for keyboard
+   navigation only (mouse clicks stay clean via :focus-visible).
+   ========================================================================== */
+.main-header a:focus-visible,
+.main-header button:focus-visible {
+    outline: 2px solid var(--color-secondary, #60A5FA);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+.dropdown-menu a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -2px;
+}
+
+/* ==========================================================================
    1. CSS Custom Properties (Design Tokens)
    ========================================================================== */
 :root {
@@ -151,7 +284,9 @@ img {
 }
 
 .main-content.full-width {
-    max-width: 100vw;
+    /* 100% (not 100vw): 100vw includes the scrollbar gutter and overflows the page
+       horizontally when a vertical scrollbar is present. */
+    max-width: 100%;
     margin: 0;
     padding-left: 0;
     padding-right: 0;

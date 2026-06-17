@@ -101,8 +101,8 @@ stop_docker() {
 
 clean_cache() {
     log_step "Cleaning Python cache files..."
-    find . -type d -name "__pycache__" -not -path "./venv/*" -exec rm -rf {} + 2>/dev/null || true
-    find . -type f -name "*.pyc" -not -path "./venv/*" -delete 2>/dev/null || true
+    find . -type d -name "__pycache__" -not -path "./.venv/*" -not -path "./venv/*" -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name "*.pyc" -not -path "./.venv/*" -not -path "./venv/*" -delete 2>/dev/null || true
     find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
     log_info "Cache cleaned"
 }

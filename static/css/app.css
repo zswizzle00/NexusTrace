@@ -1,0 +1,558 @@
+/* ==========================================================================
+   NexusTrace - App shell & component styles
+   --------------------------------------------------------------------------
+   Moved out of an inline <style> block in base.html. Loaded AFTER styles.css,
+   so these rules are the cascade "winners" for the shell/header/cards/nav -
+   exactly as the inline block was. Keep app-shell + component overrides here;
+   styles.css holds the larger base + result-page styles.
+   ========================================================================== */
+
+/* CSS Reset for html and body */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Base Colors */
+    --color-primary: #3B82F6;
+    --color-primary-dark: #2563EB;
+    --color-secondary: #60A5FA;
+    --color-success: #10B981;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    --color-info: #3B82F6;
+
+    /* Background Colors */
+    --bg-primary: #111827;
+    --bg-secondary: #1F2937;
+    --bg-tertiary: #374151;
+    --bg-card: #232946;
+
+    /* Text Colors */
+    --text-primary: #F3F4F6;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+
+    /* Border Colors */
+    --border-primary: #374151;
+    --border-secondary: #4B5563;
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    /* Border Radius */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+    /* Transitions */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    /* Layered radial accents over the base gradient add depth without busyness */
+    background:
+        radial-gradient(1200px 600px at 85% -10%, rgba(59, 130, 246, 0.10), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(96, 165, 250, 0.07), transparent 55%),
+        linear-gradient(to bottom, #0f1623, #111827);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Layout Components */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.main-header {
+    background: rgba(15, 22, 35, 0.72);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.18);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px -16px rgba(0, 0, 0, 0.8);
+    padding: var(--spacing-md) var(--spacing-xl);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.main-content {
+    flex: 1;
+    padding: var(--spacing-xl);
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Card Components */
+.card {
+    background: linear-gradient(180deg, #262e52, #212840);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(59, 130, 246, 0.15);
+    border-color: var(--color-secondary);
+}
+
+/* Form Components */
+.input-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    width: 100%;
+}
+
+.input-field {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    color: var(--text-primary);
+    transition: var(--transition-fast);
+}
+
+.input-field:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    outline: none;
+}
+
+.input-field::placeholder {
+    color: var(--text-muted);
+}
+
+/* Search inputs: match the primary button's text size + line-height so the input and the
+   "Search"/"Analyze" button render at the same height and sit aligned in the form row. */
+.form-input {
+    font-size: 1.375rem;
+    line-height: 1.6;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    transition: var(--transition-fast);
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+    color: white;
+    box-shadow: 0 6px 16px -8px rgba(59, 130, 246, 0.8);
+    /* Slightly larger, consistent label size across all primary action buttons
+       (overrides the per-page text-lg/text-xl utility classes). */
+    font-size: 1.375rem;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(180deg, #4f93f8, var(--color-primary));
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -8px rgba(59, 130, 246, 0.9);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6);
+}
+
+/* Keep button icons from collapsing: as flex children they can otherwise shrink to
+   zero width when the button is squeezed next to a greedy w-full input (which is why
+   the search icon vanished on the domain/IP/hash search pages). */
+.btn svg {
+    flex-shrink: 0;
+}
+
+/* Navigation */
+.nav-link {
+    position: relative;
+    white-space: nowrap; /* keep each link on one line so labels never wrap/clip in the header */
+    color: var(--text-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    transition: var(--transition-fast);
+}
+
+/* Animated underline that grows from the center on hover/active */
+.nav-link::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    right: 50%;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+    transition: left var(--transition-fast), right var(--transition-fast);
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+}
+
+.nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.nav-link.active {
+    color: var(--color-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* ==========================================================================
+   Responsive navigation. The full inline nav has many links and only fits on
+   wide screens, so below 1400px we hide it and show a hamburger that toggles a
+   vertical mobile panel. This also stops the wide nav from forcing horizontal
+   page overflow on phones/tablets (which previously broke the search-form layout).
+   ========================================================================== */
+.desktop-nav { display: none; }
+
+.nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto; /* push the hamburger to the right edge (only visible below 1400px) */
+    color: var(--text-primary);
+    background: transparent;
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    padding: 0.4rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+/* Explicit icon size so the hamburger never depends on Tailwind w-7/h-7 being present. */
+.nav-toggle svg {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+.nav-toggle:hover {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.mobile-nav {
+    display: none;
+    flex-direction: column;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-primary);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.mobile-nav.open { display: flex; }
+
+.mobile-nav-link {
+    display: block;
+    padding: 0.7rem 0.5rem;
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    transition: var(--transition-fast);
+}
+.mobile-nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+.mobile-nav-sub {
+    padding-left: 1.25rem;
+    font-size: 0.9rem;
+}
+.mobile-nav-heading {
+    margin-top: 0.6rem;
+    padding: 0.4rem 0.5rem 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+@media (min-width: 1400px) {
+    .desktop-nav { display: flex; }
+    .nav-toggle { display: none; }
+    .mobile-nav { display: none !important; }
+}
+
+/* Stack the home search form on small screens so the input + button don't force
+   horizontal page overflow (this loads after styles.css, so it wins the cascade). */
+@media (max-width: 640px) {
+    .search-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .search-form > .search-input,
+    .search-form > .btn {
+        width: 100%;
+    }
+}
+
+/* Dropdown Menus */
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Submenus open to the right; must stack above the parent menu and the sticky header (z-index 50) */
+.submenu {
+    left: 100%;
+    right: auto;
+    top: 0;
+    z-index: 110;
+}
+
+/* Main dropdown opens downward; sits above the sticky header (z-index 50) */
+.group > .dropdown-menu:not(.submenu) {
+    left: 0;
+    right: auto;
+    top: 100%;
+    z-index: 100;
+}
+
+.group > .dropdown-menu,
+.group > .dropdown-menu.submenu {
+    display: none;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s 0.15s;
+}
+.group:hover > .dropdown-menu.submenu,
+.group:focus-within > .dropdown-menu.submenu,
+.group > .dropdown-menu:not(.submenu):hover {
+    display: block;
+    pointer-events: auto;
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+/* Ensure parent menu items have proper positioning */
+.group {
+    position: relative;
+}
+
+/* Add hover effect for menu items */
+.dropdown-menu a {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+}
+
+.dropdown-menu a:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+/* Data Display */
+.data-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.data-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.data-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.data-value {
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+/* Status Indicators */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--color-success);
+}
+
+.status-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--color-warning);
+}
+
+.status-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .main-header {
+        padding: var(--spacing-sm) var(--spacing-lg);
+    }
+
+    .main-content {
+        padding: var(--spacing-lg);
+    }
+
+    .data-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .input-group {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn var(--transition-normal);
+}
+
+.slide-in {
+    animation: slideIn var(--transition-normal);
+}
+
+/* Add arrow indicator and hover delay styles */
+.arrow {
+    margin-left: 0.5em;
+    font-size: 0.8em;
+    transition: transform 0.2s;
+}
+.group:hover > .nav-link .arrow {
+    transform: translateX(3px);
+}
+
+.group:hover > .dropdown-menu:not(.submenu),
+.group:focus-within > .dropdown-menu:not(.submenu),
+.group > .dropdown-menu:not(.submenu):hover {
+    display: block;
+    pointer-events: auto;
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+/* Submenu animation */
+@keyframes slideRight {
+    from { opacity: 0; transform: translateX(-10px);}
+    to { opacity: 1; transform: translateX(0);}
+}
+.submenu {
+    animation: slideRight 0.2s;
+    min-width: 12rem;
+    width: auto;
+    overflow: visible;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    border: 1px solid var(--border-primary);
+    background: var(--bg-secondary);
+}
+
+/* Main dropdown should allow overflow for submenus */
+.dropdown-menu {
+    overflow: visible !important;
+}
+
+/* Menu item hover */
+.dropdown-menu a:hover {
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 0.375rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.footer {
+    border-radius: 0 !important;
+    margin: 0 !important;
+}
+.app-container {
+    border-radius: 0 !important;
+    margin: 0 !important;
+}
+
+/* ==========================================================================
+   Verdict summary bar (result pages). A faint left-to-right severity tint over
+   the gray band makes malicious/suspicious/clean readable at a glance, beyond
+   just the left accent border.
+   ========================================================================== */
+.verdict-bar {
+    background: #1f2937; /* gray-800 */
+    border-left: 4px solid #6b7280;
+}
+.verdict-bar.is-malicious {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.14), #1f2937 45%);
+    border-left-color: #ef4444;
+}
+.verdict-bar.is-suspicious {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.13), #1f2937 45%);
+    border-left-color: #f59e0b;
+}
+.verdict-bar.is-clean {
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.13), #1f2937 45%);
+    border-left-color: #10b981;
+}
+
+/* Consistent label column in result-card key/value tables so values line up and
+   sit close to their labels across every card. nowrap lets the rare long label
+   expand rather than wrap. */
+.tailwind-tables th.text-gray-400 { width: 9rem; }

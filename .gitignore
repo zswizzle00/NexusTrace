@@ -40,3 +40,6 @@ data/api_keys.json
 
 # Personal AI workflow instructions (never commit)
 CLAUDE.md
+
+# Tailwind standalone CLI binary (46MB; download on demand, see tailwind.config.js)
+tools/

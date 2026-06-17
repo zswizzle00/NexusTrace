@@ -5,9 +5,13 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 ENV/
 env/
 .env
+
+# Tooling (regenerated/downloaded on demand, never needed in the image)
+tools/
 
 # IDE
 .idea/

@@ -145,7 +145,7 @@ def check_ips():
                             valid_ips.append(ip)
                         except socket.error:
                             continue
-            except:
+            except (socket.error, TypeError, ValueError):
                 continue
         
         if not valid_ips:

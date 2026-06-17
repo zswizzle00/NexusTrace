@@ -132,22 +132,19 @@ else
         log_warn "Or they may conflict with the dev server."
     fi
 
-    # Check if virtual environment exists and is valid
-    VENV_DIR="venv"
-    if [ ! -f "$SCRIPT_DIR/$VENV_DIR/bin/pip" ]; then
-        log_step "Creating virtual environment..."
-        rm -rf "$VENV_DIR"
-        python3 -m venv "$VENV_DIR"
+    # Ensure uv is installed (manages the virtualenv + dependencies)
+    if ! command -v uv &> /dev/null; then
+        log_error "uv is not installed. Install it with:"
+        log_error "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+        exit 1
     fi
 
-    # Use venv's Python and pip directly (works even without activation)
-    PYTHON="$SCRIPT_DIR/$VENV_DIR/bin/python3"
-    PIP="$SCRIPT_DIR/$VENV_DIR/bin/pip"
+    # Sync dependencies into .venv from uv.lock (creates the venv if missing; fast & cached)
+    log_step "Syncing dependencies with uv..."
+    uv sync
 
-    # Update dependencies using venv pip
-    log_step "Updating dependencies..."
-    "$PIP" install -q --upgrade pip
-    "$PIP" install -q -r requirements.txt
+    # Use the uv-managed venv's Python directly (works even without activation)
+    PYTHON="$SCRIPT_DIR/.venv/bin/python3"
 
     # Kill any existing NexusTrace process on port 5050
     if lsof -ti:5050 > /dev/null 2>&1; then

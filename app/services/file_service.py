@@ -1,7 +1,6 @@
 import os
+import hashlib
 import logging
-from intezer_sdk import api
-from intezer_sdk.analysis import FileAnalysis
 from ..utils.cache import timed_lru_cache
 from OTXv2 import OTXv2, IndicatorTypes
 
@@ -10,57 +9,15 @@ logger = logging.getLogger(__name__)
 
 def setup_file_services(app):
     """Setup file-related services."""
-    # Initialize Intezer API
-    intezer_api_key = os.getenv('INTEZER_KEY')
-    if not intezer_api_key:
-        logger.warning("Intezer API key not configured")
-    else:
-        api.set_global_api(intezer_api_key)
+    pass
 
-@timed_lru_cache(seconds=1800)
-def get_intezer_analysis(file_path=None, file_hash=None):
-    """Analyze a file using Intezer's API."""
-    try:
-        if not os.getenv('INTEZER_KEY'):
-            logger.warning("Intezer API key not configured")
-            return None
-            
-        if file_path:
-            analysis = FileAnalysis(file_path=file_path)
-        elif file_hash:
-            analysis = FileAnalysis(file_hash=file_hash)
-        else:
-            return None
-            
-        # Send the analysis and wait for results
-        analysis.send(wait=True)
-        result = analysis.result()
-        
-        # Get additional information
-        root_analysis = analysis.get_root_analysis()
-        code_reuse = root_analysis.code_reuse if root_analysis else None
-        metadata = root_analysis.metadata if root_analysis else None
-        
-        # Add all possible fields
-        return {
-            'analysis_id': result.get('analysis_id'),
-            'analysis_time': result.get('analysis_time'),
-            'analysis_url': result.get('analysis_url'),
-            'family_name': result.get('family_name'),
-            'is_private': result.get('is_private'),
-            'sha256': result.get('sha256'),
-            'sub_verdict': result.get('sub_verdict'),
-            'verdict': result.get('verdict'),
-            'code_reuse': code_reuse,
-            'metadata': metadata,
-            'malware_family': result.get('malware_family'),
-            'threat_type': result.get('threat_type'),
-            'indicators': result.get('indicators'),
-            'classification': result.get('classification'),
-        }
-    except Exception as e:
-        logger.error(f"Intezer analysis failed: {str(e)}")
-        return None 
+def _sha256_of_file(file_path):
+    """Compute the SHA-256 of a file in streaming chunks."""
+    digest = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 def get_alienvault_analysis(file_hash):
     """Analyze a file hash using AlienVault OTX API."""
@@ -85,12 +42,19 @@ def get_alienvault_analysis(file_hash):
 
 @timed_lru_cache(seconds=1800)
 def get_combined_file_analysis(file_path=None, file_hash=None):
-    """Get combined analysis from Intezer and AlienVault OTX."""
-    intezer_result = get_intezer_analysis(file_path=file_path, file_hash=file_hash)
-    otx_result = None
-    if file_hash:
-        otx_result = get_alienvault_analysis(file_hash)
+    """Analyze a file or hash via AlienVault OTX hash reputation.
+
+    For an uploaded file we compute its SHA-256 and look the hash up (OTX is hash-based),
+    so the endpoint still works without any binary-analysis engine.
+    """
+    if file_path and not file_hash:
+        try:
+            file_hash = _sha256_of_file(file_path)
+        except OSError as e:
+            logger.error(f"Could not read file for hashing: {str(e)}")
+            return None
+    otx_result = get_alienvault_analysis(file_hash) if file_hash else None
     return {
-        'intezer': intezer_result,
-        'alienvault_otx': otx_result
-    } 
+        'sha256': file_hash,
+        'alienvault_otx': otx_result,
+    }

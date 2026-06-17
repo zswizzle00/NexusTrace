@@ -20,6 +20,12 @@ def create_app():
         template_folder=os.path.join(project_root, 'templates')
     )
 
+    # Honor the reverse proxy's forwarded headers (nginx sets X-Forwarded-For/Proto/Host).
+    # Without this, client IPs, HTTPS detection, and external URL generation are wrong behind
+    # the proxy. Trust one hop (nginx). Harmless in direct dev runs (no forwarded headers sent).
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # Secret key for session and CSRF (required)
     secret_key = os.getenv('SECRET_KEY')
     if not secret_key or secret_key == 'your-secret-key-here':
@@ -27,7 +33,7 @@ def create_app():
             'SECRET_KEY is not set or is the default placeholder. '
             'Sessions will break on restart. Set SECRET_KEY in your .env file.'
         )
-        # Fall back to a per-process random key — sessions won't survive restarts
+        # Fall back to a per-process random key - sessions won't survive restarts
         secret_key = os.urandom(32).hex()
     app.config['SECRET_KEY'] = secret_key
 
@@ -63,17 +69,13 @@ def create_app():
         'default-src': "'self'",
         'script-src': [
             "'self'",
-            "'unsafe-inline'",  # Required for some inline scripts
-            "'unsafe-eval'",  # Required for CyberChef and Tailwind
+            "'unsafe-inline'",  # Required: the app uses inline <script> blocks across templates
+            "'unsafe-eval'",  # Required for CyberChef
             "blob:",  # Required for CyberChef web workers
-            "https://cdn.tailwindcss.com",
-            "https://cdnjs.cloudflare.com",
         ],
         'style-src': [
             "'self'",
-            "'unsafe-inline'",  # Required for inline styles
-            "https://fonts.googleapis.com",
-            "https://cdn.tailwindcss.com",
+            "'unsafe-inline'",  # Required: inline <style> blocks + style attributes
         ],
         'img-src': [
             "'self'",
@@ -83,8 +85,7 @@ def create_app():
         ],
         'font-src': [
             "'self'",
-            "data:",
-            "https://fonts.gstatic.com",
+            "data:",  # fonts are now self-hosted under /static/fonts
         ],
         'connect-src': [
             "'self'",
@@ -107,7 +108,10 @@ def create_app():
         force_https=False,  # Set to True in production with HTTPS
         strict_transport_security=False,
         content_security_policy=csp,
-        content_security_policy_nonce_in=['script-src'],
+        # NOTE: no nonce directive. A nonce in script-src causes browsers to IGNORE
+        # 'unsafe-inline', which would block this app's many inline <script> blocks.
+        # The app relies on 'unsafe-inline'/'unsafe-eval' (the latter for CyberChef).
+        # Future hardening: move inline JS to external files + adopt per-request nonces.
         referrer_policy='strict-origin-when-cross-origin',
         permissions_policy={
             'geolocation': '()',
@@ -139,6 +143,24 @@ def create_app():
     # Store CSRF instance for use in templates
     app.csrf = csrf
 
+    # Asset cache-busting: expose `asset_v` (max mtime of CSS/JS) to templates so links can
+    # append ?v={{ asset_v }}. Static files are served with a 1-year cache, so without this a
+    # CSS/JS change would not appear until a hard-refresh. The version changes on any edit,
+    # which makes the URL change and forces a fresh fetch (browser + service worker).
+    @app.context_processor
+    def inject_asset_version():
+        bust_files = [
+            os.path.join(project_root, 'static', 'css', 'tailwind.css'),
+            os.path.join(project_root, 'static', 'css', 'styles.css'),
+            os.path.join(project_root, 'static', 'css', 'app.css'),
+            os.path.join(project_root, 'static', 'js', 'mobile.js'),
+        ]
+        try:
+            version = str(int(max(os.path.getmtime(f) for f in bust_files if os.path.exists(f))))
+        except (OSError, ValueError):
+            version = '1'
+        return {'asset_v': version}
+
     # Prevent HTML pages from being cached so CSRF tokens are never served stale
     @app.after_request
     def set_cache_control(response):
@@ -148,7 +170,7 @@ def create_app():
             response.cache_control.private = True
         return response
 
-    # Graceful CSRF error handling — redirect to homepage with a user-friendly message
+    # Graceful CSRF error handling - redirect to homepage with a user-friendly message
     from flask_wtf.csrf import CSRFError
     from flask import redirect, url_for, flash
 

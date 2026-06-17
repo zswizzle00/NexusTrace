@@ -364,8 +364,8 @@ def get_domain_info_quick(domain):
                         results['ssl_info'] = result
                     elif key == 'ip':
                         results['ip_address'] = result
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Domain sub-lookup task failed: {e}")
 
         txt_records = results['dns_records'].get('TXT', [])
         results['email_security'] = parse_spf_dkim_dmarc(txt_records)

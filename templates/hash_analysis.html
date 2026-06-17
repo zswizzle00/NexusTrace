@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_search_form.html" import search_form %}
 
 {% block main_content_class %}full-width{% endblock %}
 
@@ -7,21 +8,28 @@
     <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Hash Analysis</h2>
 
     <!-- Search Form at Top -->
-    <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
-        <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="indicator" placeholder="Enter MD5, SHA1, or SHA256 hash..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg py-3 px-4 rounded-lg" required>
-            <button type="submit" class="btn btn-primary whitespace-nowrap px-6 py-3 text-lg rounded-lg flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                Analyze
-            </button>
-        </form>
+    <div class="mb-10 w-full">
+        {{ search_form('Enter MD5, SHA1, or SHA256 hash...') }}
     </div>
 
+    {# --- Verdict summary strip (hash) --- #}
+    {% if hash_info and hash_info.summary %}
+      {% set is_mal = hash_info.summary.is_malicious | default(false, true) %}
+      <div class="verdict-bar {{ 'is-malicious' if is_mal else 'is-clean' }} shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="font-mono text-lg md:text-xl font-bold text-gray-100 break-all">{{ hash_info.hash | default(indicator) }}</span>
+          <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap {{ 'bg-red-900 text-red-300' if is_mal else 'bg-green-900 text-green-300' }}">{{ 'malicious' if is_mal else 'clean' }}</span>
+        </div>
+        <div class="ml-auto flex flex-wrap items-center divide-x divide-gray-600 text-sm">
+          {% if hash_info.type %}<span class="px-4 text-gray-400">Type <span class="text-gray-100">{{ hash_info.type }}</span></span>{% endif %}
+          {% if hash_info.summary.detection_ratio %}<span class="px-4 text-gray-400">Detections <span class="{{ 'text-red-400' if is_mal else 'text-gray-100' }}">{{ hash_info.summary.detection_ratio }}</span></span>{% endif %}
+          {% if hash_info.summary.malware_family %}<span class="px-4 text-gray-400">Family <span class="text-red-300">{{ hash_info.summary.malware_family }}</span></span>{% endif %}
+        </div>
+      </div>
+    {% endif %}
+
     <!-- Results Grid -->
-    {% set card_count = (1 if intezer_result else 0) + (1 if alienvault else 0) + (1 if hash_info else 0) + (1 if result else 0) %}
+    {% set card_count = (1 if alienvault else 0) + (1 if hash_info else 0) + (1 if result else 0) %}
 
     {% if card_count > 0 %}
     <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
@@ -113,7 +121,7 @@
                 </div>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
                 <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ vt | tojson(indent=2) }}</pre>
             </details>
         </div>
@@ -123,7 +131,7 @@
         {% if hash_info and hash_info.sources.malwarebazaar and hash_info.sources.malwarebazaar.status == 'found' %}
         {% set mb = hash_info.sources.malwarebazaar %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-            <h3 class="text-xl font-bold text-purple-400 mb-4">MalwareBazaar</h3>
+            <h3 class="text-xl font-bold text-blue-400 mb-4">MalwareBazaar</h3>
             <table class="mb-4 w-full text-sm">
                 {% if mb.signature %}
                 <tr><th class="pr-4 text-gray-400">Signature</th><td class="text-red-300 font-semibold">{{ mb.signature }}</td></tr>
@@ -161,7 +169,7 @@
         {% if hash_info and hash_info.sources.threatfox and hash_info.sources.threatfox.status == 'found' %}
         {% set tf = hash_info.sources.threatfox %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-            <h3 class="text-xl font-bold text-orange-400 mb-4">ThreatFox IOCs</h3>
+            <h3 class="text-xl font-bold text-blue-400 mb-4">ThreatFox IOCs</h3>
             <table class="mb-4 w-full text-sm">
                 <tr><th class="pr-4 text-gray-400">IOC Count</th><td>{{ tf.ioc_count }}</td></tr>
             </table>
@@ -184,37 +192,6 @@
             {% endif %}
             <details class="mt-2"><summary class="cursor-pointer text-orange-400">Show Raw Data</summary>
                 <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ tf | tojson(indent=2) }}</pre>
-            </details>
-        </div>
-        {% endif %}
-
-        {# --- Intezer Card --- #}
-        {% if intezer_result %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-            <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-                Intezer Analyze
-                {% if intezer_result.verdict %}
-                <span class="px-2 py-1 rounded text-xs
-                    {% if intezer_result.verdict == 'malicious' %}bg-red-900 text-red-300
-                    {% elif intezer_result.verdict == 'suspicious' %}bg-yellow-900 text-yellow-300
-                    {% else %}bg-green-900 text-green-300{% endif %}">
-                    {{ intezer_result.verdict | capitalize }}
-                </span>
-                {% endif %}
-            </h3>
-            <table class="mb-4 w-full text-sm">
-                <tr><th class="pr-4 text-gray-400 break-all">SHA256</th><td class="font-mono break-all text-xs">{{ intezer_result.sha256 }}</td></tr>
-                <tr><th class="pr-4 text-gray-400 break-all">Family</th><td class="break-all">{{ intezer_result.family_name or intezer_result.malware_family or 'N/A' }}</td></tr>
-                <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ intezer_result.file_type or 'N/A' }}</td></tr>
-                <tr><th class="pr-4 text-gray-400 break-all">Analysis Time</th><td class="break-all">{{ intezer_result.analysis_time or 'N/A' }}</td></tr>
-            </table>
-            {% if intezer_result.analysis_url %}
-            <a href="{{ intezer_result.analysis_url }}" target="_blank" class="btn btn-sm bg-green-900 text-green-300 px-3 py-1 rounded text-xs hover:bg-green-800 w-fit">
-                View Full Intezer Report
-            </a>
-            {% endif %}
-            <details class="mt-4"><summary class="cursor-pointer text-green-400">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ intezer_result | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -243,7 +220,7 @@
                 </ul>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-blue-400">Show Raw Data</summary>
+            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
                 <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
             </details>
         </div>
@@ -252,7 +229,7 @@
         {# --- Basic Hash Info (fallback) --- #}
         {% if result and not hash_info %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-            <h3 class="text-xl font-bold text-blue-300 mb-4">Basic Hash Information</h3>
+            <h3 class="text-xl font-bold text-blue-400 mb-4">Basic Hash Information</h3>
             <div class="space-y-2">
                 <p class="text-gray-300"><span class="text-gray-400 break-all">Type:</span> <span class="break-all">{{ result.type }}</span></p>
                 <p class="text-gray-300"><span class="text-gray-400 break-all">Value:</span> <span class="font-mono break-all text-xs">{{ result.hash }}</span></p>

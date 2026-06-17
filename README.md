@@ -1,6 +1,6 @@
 # NexusTrace
 
-**Open-source threat intelligence and OSINT analysis platform.** Submit an IP, domain, URL, file hash, or user agent string and get enriched context from across the threat intelligence ecosystem — all in one dashboard.
+**Open-source threat intelligence and OSINT analysis platform.** Submit an IP, domain, URL, file hash, or user agent string and get enriched context from across the threat intelligence ecosystem - all in one dashboard.
 
 Built for security analysts, incident responders, and researchers who need fast, cross-referenced context on indicators of compromise without jumping between a dozen tools.
 
@@ -18,7 +18,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 
 ### Domain & URL Analysis
 - WHOIS registration data (IP2WHOIS)
-- DNS records — A, AAAA, MX, NS, TXT, CNAME, SOA
+- DNS records - A, AAAA, MX, NS, TXT, CNAME, SOA
 - SSL/TLS certificate details
 - HTTP security headers analysis
 - SPF / DKIM / DMARC email security posture
@@ -29,19 +29,22 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Threat intelligence (AlienVault OTX)
 
 ### File & Hash Analysis
-- Malware classification and code reuse analysis (Intezer)
 - Multi-source reputation lookup (VirusTotal, MalwareBazaar, ThreatFox)
 - Threat intelligence cross-reference (AlienVault OTX)
 
 ### Additional Tools
-- **Azure AD Error Decoder** — Look up AADSTS error codes with descriptions and remediation steps
-- **Windows Event ID Reference** — Decode Windows Security event IDs
-- **User Agent Parser** — Break down browser, OS, device, and bot flags from any UA string
-- **CyberChef** — Embedded CyberChef v10.19.4 for in-browser data encoding, decoding, and transformation
+- **Azure AD Error Decoder** - Look up AADSTS error codes with descriptions and remediation steps
+- **Windows Event ID Reference** - Decode Windows Security event IDs
+- **User Agent Parser** - Break down browser, OS, device, and bot flags from any UA string
+- **CyberChef** - Embedded CyberChef v10.19.4 for in-browser data encoding, decoding, and transformation
 
 ---
 
 ## Quick Start
+
+> **Prerequisite:** dependencies are managed with [uv](https://docs.astral.sh/uv/).
+> Install it once with `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+> (Docker builds bundle uv automatically - no local install needed for `--docker`/`--prod`.)
 
 ### Option 1: Dev Server (Recommended for testing)
 
@@ -50,7 +53,7 @@ git clone https://github.com/your-org/NexusTrace.git
 cd NexusTrace
 cp .env.example .env
 # Edit .env with your API keys
-./start.sh
+./start.sh          # runs `uv sync`, then starts the dev server
 ```
 
 Server starts at `http://localhost:5050`
@@ -103,7 +106,6 @@ IP2WHOIS_KEY=          # https://www.ip2whois.com/
 URLSCAN_API_KEY=       # https://urlscan.io/user/profile/
 
 # File / Hash Analysis
-INTEZER_KEY=           # https://analyze.intezer.com/account-details
 VIRUSTOTAL_API_KEY=    # https://www.virustotal.com/gui/my-apikey
 
 # Threat Intelligence
@@ -119,7 +121,7 @@ PORT=5050
 # MMDB_PATH=/path/to/ipinfo_lite.mmdb
 ```
 
-> **All API keys are optional.** The tool gracefully skips any service whose key is not configured — cards for that service simply won't appear in results.
+> **All API keys are optional.** The tool gracefully skips any service whose key is not configured - cards for that service simply won't appear in results.
 
 ### IPinfo MMDB (optional, offline mode)
 
@@ -151,8 +153,8 @@ NexusTrace/
 │   │   ├── ip_service.py        # VPNapi, IPinfo, IP2Location, Shodan, AbuseIPDB, OTX
 │   │   ├── domain_service.py    # WHOIS, DNS, SSL, crt.sh, email security
 │   │   ├── url_service.py       # Security headers, redirect chains, BuiltWith
-│   │   ├── file_service.py      # Intezer file analysis
-│   │   ├── hash_service.py      # VirusTotal, MalwareBazaar, ThreatFox, Intezer
+│   │   ├── file_service.py      # File hashing + OTX reputation
+│   │   ├── hash_service.py      # VirusTotal, MalwareBazaar, ThreatFox
 │   │   ├── user_agent_service.py
 │   │   ├── azure_error_service.py
 │   │   └── event_service.py
@@ -165,7 +167,8 @@ NexusTrace/
 ├── static/              # CSS, JS, images, PWA service worker
 ├── CyberChef_v10.19.4/  # Embedded CyberChef (offline capable)
 ├── main.py              # App entry point
-├── requirements.txt
+├── pyproject.toml       # Project metadata + dependencies (uv)
+├── uv.lock              # Pinned, resolved dependency lockfile
 ├── Dockerfile
 ├── docker-compose.yml
 ├── nginx.conf
@@ -173,7 +176,7 @@ NexusTrace/
 └── stop.sh              # Stop script (dev / docker / all / status)
 ```
 
-**How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format — IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string — and routes to the appropriate analysis pipeline.
+**How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format - IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string - and routes to the appropriate analysis pipeline.
 
 ---
 
@@ -214,9 +217,17 @@ docker compose logs -f
 
 ### Manual / Gunicorn
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it once:
+
 ```bash
-pip install -r requirements.txt
-gunicorn --bind 0.0.0.0:5050 --timeout 120 --workers 4 main:app
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then sync the environment and run:
+
+```bash
+uv sync                                                          # create .venv from uv.lock
+uv run gunicorn --bind 0.0.0.0:5050 --timeout 120 --workers 4 main:app
 ```
 
 ---
@@ -241,7 +252,6 @@ gunicorn --bind 0.0.0.0:5050 --timeout 120 --workers 4 main:app
 | [AlienVault OTX](https://otx.alienvault.com/) | Threat intelligence |
 | [IP2WHOIS](https://www.ip2whois.com/) | WHOIS lookups |
 | [URLscan.io](https://urlscan.io/) | URL scanning + screenshots |
-| [Intezer](https://intezer.com/) | Malware analysis |
 | [VirusTotal](https://www.virustotal.com/) | Hash reputation |
 | [MalwareBazaar](https://bazaar.abuse.ch/) | Malware hash database |
 | [crt.sh](https://crt.sh/) | Certificate transparency logs |

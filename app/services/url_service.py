@@ -2,7 +2,6 @@ import os
 import requests
 import logging
 import time
-import tempfile
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import builtwith
@@ -105,8 +104,8 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
                     data = result_response.json()
                     data['status'] = 'completed'
                     return data
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"URLscan result polling attempt failed: {e}")
 
         # Return partial result with link if polling didn't complete
         return {
@@ -182,7 +181,7 @@ def analyze_url(url, deep_scan=False):
 
     Args:
         url: The URL to analyze
-        deep_scan: If True, wait for URLscan results and run Intezer analysis.
+        deep_scan: If True, wait for URLscan results (favicon, tech, screenshot).
                    If False, return quickly with essential info only.
     """
     try:
@@ -260,7 +259,6 @@ def analyze_url(url, deep_scan=False):
                 'technologies': {},
                 'meta_tags': meta_tags[:20],  # Limit to 20 tags
                 'title': title,
-                'intezer_analysis': None,
                 'urlscan_analysis': None,
                 'screenshot_url': None,
                 'favicon': None,
@@ -290,42 +288,18 @@ def analyze_url(url, deep_scan=False):
                             result['url_analysis']['technologies'] = data or {}
                         elif key == 'urlscan':
                             result['url_analysis']['urlscan_analysis'] = data
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"URL sub-analysis task failed: {e}")
 
             return result
 
-        # Deep scan: Run all lookups including URLscan polling and Intezer
+        # Deep scan: Run all lookups including URLscan polling
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 executor.submit(get_favicon_hash, url): 'favicon',
                 executor.submit(get_tech_stack, url): 'tech',
                 executor.submit(submit_to_urlscan, url, True, 6): 'urlscan',  # Wait up to 30s
             }
-
-            # Add Intezer analysis if configured and we have HTML content
-            intezer_future = None
-            if os.getenv('INTEZER_KEY') and 'text/html' in response.headers.get('content-type', '').lower():
-                def run_intezer():
-                    try:
-                        from .file_service import get_intezer_analysis
-                        with tempfile.NamedTemporaryFile(
-                            mode='w', suffix='.html', prefix='nexustrace_',
-                            delete=False, encoding='utf-8'
-                        ) as temp_file:
-                            temp_file.write(response.text)
-                            temp_path = temp_file.name
-                        try:
-                            return get_intezer_analysis(file_path=temp_path)
-                        finally:
-                            if os.path.exists(temp_path):
-                                os.remove(temp_path)
-                    except Exception as e:
-                        logger.error(f"Intezer analysis failed: {e}")
-                        return None
-
-                intezer_future = executor.submit(run_intezer)
-                futures[intezer_future] = 'intezer'
 
             for future in as_completed(futures, timeout=45):
                 key = futures[future]
@@ -339,8 +313,6 @@ def analyze_url(url, deep_scan=False):
                         result['url_analysis']['urlscan_analysis'] = data
                         if data and data.get('status') == 'completed':
                             result['url_analysis']['screenshot_url'] = data.get('task', {}).get('screenshotURL')
-                    elif key == 'intezer':
-                        result['url_analysis']['intezer_analysis'] = data
                 except Exception as e:
                     logger.debug(f"URL analysis {key} failed: {e}")
 
@@ -363,5 +335,5 @@ def analyze_url_quick(url):
 
 
 def analyze_url_deep(url):
-    """Deep URL analysis - full analysis with URLscan polling and Intezer."""
+    """Deep URL analysis - full analysis with URLscan polling, tech, and screenshot."""
     return analyze_url(url, deep_scan=True)
