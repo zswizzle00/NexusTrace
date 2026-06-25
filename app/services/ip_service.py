@@ -14,6 +14,7 @@ from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
 import json
 import re
+import ipaddress
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ def get_proxycheck_data(ip_address):
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        ip_data = data.get(ip_address, {})
+        ip_data = proxycheck_ip_data(data, ip_address)
         return {'proxycheck': {
             **ip_data,
             'risk': ip_data.get('risk'),
@@ -250,6 +251,41 @@ def get_proxycheck_data(ip_address):
         logger.error(f"ProxyCheck.io API request failed: {str(e)}")
         return None
 
+def otx_indicator_type(indicator):
+    """Return the OTX endpoint segment for an indicator: 'IPv4', 'IPv6', or 'domain'.
+
+    Previously an IPv4-only regex was used, so IPv6 addresses fell through to the
+    'domain' endpoint and never returned any OTX data.
+    """
+    try:
+        return 'IPv6' if ipaddress.ip_address(indicator).version == 6 else 'IPv4'
+    except ValueError:
+        return 'domain'
+
+def proxycheck_ip_data(data, ip_address):
+    """Pull the per-IP block out of a ProxyCheck.io response.
+
+    ProxyCheck keys the result by the IP, but can return an IPv6 address in a
+    normalized (compressed) form that differs from the queried string, so an exact
+    `data[ip]` lookup silently misses. Fall back to matching by address equality.
+    """
+    if not isinstance(data, dict):
+        return {}
+    block = data.get(ip_address)
+    if isinstance(block, dict):
+        return block
+    try:
+        target = ipaddress.ip_address(ip_address)
+    except ValueError:
+        return {}
+    for key, value in data.items():
+        try:
+            if isinstance(value, dict) and ipaddress.ip_address(key) == target:
+                return value
+        except ValueError:
+            continue
+    return {}
+
 @timed_lru_cache(seconds=1800)
 def get_alienvault_data(indicator):
     """Get data from AlienVault OTX API"""
@@ -259,12 +295,8 @@ def get_alienvault_data(indicator):
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
 
-    # Determine if the indicator is an IP or domain
-    ip_pattern = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
-    is_ip = bool(ip_pattern.match(indicator))
-
-    # Use the appropriate endpoint type
-    endpoint_type = 'IPv4' if is_ip else 'domain'
+    # Pick the correct OTX endpoint (IPv4 / IPv6 / domain).
+    endpoint_type = otx_indicator_type(indicator)
 
     base_url = f'https://otx.alienvault.com/api/v1/indicators/{endpoint_type}/{indicator}'
     headers = {'X-OTX-API-KEY': api_key}
@@ -314,7 +346,9 @@ def get_alienvault_data(indicator):
             'malware': malware_data,
             'passive_dns': passive_dns_data
         }
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
+        # Broad catch (not just RequestException) so a bad/non-JSON response can never
+        # propagate and 500 the analysis page; the service degrades to "no OTX data".
         logger.error(f"AlienVault OTX error: {e}")
         return None
 

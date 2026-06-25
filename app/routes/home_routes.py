@@ -296,7 +296,7 @@ def _run_analysis(indicator):
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         has_meaningful_data = (
-            (result_data['ipinfo'] and result_data['ipinfo'].get('ipinfo', {}).get('city')) or
+            (result_data['ipinfo'] and (result_data['ipinfo'].get('country') or result_data['ipinfo'].get('asn'))) or
             (result_data['vpnapi'] and result_data['vpnapi'].get('location', {}).get('city')) or
             (result_data['shodan'] and result_data['shodan'].get('summary', {}).get('organization')) or
             (result_data['abuseipdb'] and result_data['abuseipdb'].get('summary', {}).get('risk_score') is not None) or
