@@ -34,7 +34,7 @@ RUN useradd -m appuser && chown -R appuser:appuser /app
 COPY . .
 
 # Create the data directory and set permissions
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+RUN mkdir -p /app/data/cyberchef_recipes && chown -R appuser:appuser /app/data
 
 # Ensure static files and the virtualenv are accessible to the app user
 RUN chown -R appuser:appuser /app/static && chmod -R 755 /app/static && \
