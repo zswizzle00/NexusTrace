@@ -37,9 +37,16 @@ def is_safe_path(base_dir, filepath):
 def register_cyberchef_routes(app):
     cyberchef_bp = Blueprint('cyberchef_tab', __name__)
 
-    # Ensure recipes directory exists
+    # Ensure recipes directory exists with proper error handling
     recipes_dir = os.path.realpath(os.path.join(app.root_path, '..', 'data', 'cyberchef_recipes'))
-    os.makedirs(recipes_dir, exist_ok=True)
+    try:
+        os.makedirs(recipes_dir, exist_ok=True)
+    except PermissionError:
+        # If we can't create the directory, log a warning but continue
+        # The directory should be created by Docker during build
+        logger.warning(f"Could not create cyberchef recipes directory at {recipes_dir}")
+    except Exception as e:
+        logger.error(f"Unexpected error creating cyberchef recipes directory: {e}")
 
     @cyberchef_bp.route('/cyberchef', strict_slashes=False)
     def cyberchef_tab():
