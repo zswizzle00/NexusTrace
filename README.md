@@ -49,7 +49,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 ### Option 1: Dev Server (Recommended for testing)
 
 ```bash
-git clone https://github.com/your-org/NexusTrace.git
+git clone https://github.com/zswizzle00/NexusTrace.git
 cd NexusTrace
 cp .env.example .env
 # Edit .env with your API keys
@@ -61,7 +61,7 @@ Server starts at `http://localhost:5050`
 ### Option 2: Docker (Recommended for deployment)
 
 ```bash
-git clone https://github.com/your-org/NexusTrace.git
+git clone https://github.com/zswizzle00/NexusTrace.git
 cd NexusTrace
 cp .env.example .env
 # Edit .env with your API keys

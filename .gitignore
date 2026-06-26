@@ -38,6 +38,11 @@ logs/
 data/*.mmdb
 data/api_keys.json
 
+# Security files (IMPORTANT: never commit keys or secrets)
+*.key
+*.pem
+secrets/
+
 # Personal AI workflow instructions (never commit)
 CLAUDE.md
 
