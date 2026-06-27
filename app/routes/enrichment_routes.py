@@ -69,14 +69,14 @@ def _enrich_ip(ip):
                 sources[key] = None
 
     vpn = sources.get('vpnapi') or {}
-    security = vpn.get('security', {})
+    security = vpn.get('security') or {}
     ipinfo = sources.get('ipinfo') or {}
     abuse = sources.get('abuseipdb') or {}
     shodan = sources.get('shodan') or {}
     alienvault = sources.get('alienvault') or {}
 
-    general = alienvault.get('general', {})
-    threat_pulse_count = general.get('pulse_info', {}).get('count', 0) if general else 0
+    general = alienvault.get('general') or {}
+    threat_pulse_count = (general.get('pulse_info') or {}).get('count', 0)
 
     open_ports = [p.get('port') for p in shodan.get('ports', []) if p.get('port') is not None]
 
@@ -275,7 +275,11 @@ def enrich_ip():
     except ValueError:
         return jsonify({'error': f'Invalid IP address: {ip!r}'}), 400
 
-    result = _enrich_ip(ip)
+    try:
+        result = _enrich_ip(ip)
+    except Exception as exc:
+        logger.exception("Unexpected error in /api/enrich/ip for %s", ip)
+        return jsonify({'error': f'Internal error: {exc}', 'indicator': ip}), 500
     return jsonify(result)
 
 
@@ -295,7 +299,11 @@ def enrich_domain():
     if itype == 'ip':
         return jsonify({'error': 'Use /api/enrich/ip for IP addresses'}), 400
 
-    result = _enrich_domain(indicator, itype)
+    try:
+        result = _enrich_domain(indicator, itype)
+    except Exception as exc:
+        logger.exception("Unexpected error in /api/enrich/domain for %s", indicator)
+        return jsonify({'error': f'Internal error: {exc}', 'indicator': indicator}), 500
     return jsonify(result)
 
 
