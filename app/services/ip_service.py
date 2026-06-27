@@ -120,7 +120,9 @@ def check_abuseipdb(ip_address):
 def get_ipinfo_data(ip_address):
     """Get IP information from IPinfo Lite API (no MMDB support, supports flat IPinfo Lite response)."""
     token = os.getenv('IPINFO_TOKEN')
-    url = f"https://api.ipinfo.io/lite/{ip_address}?token={token}"
+    # URL encode the IP address to handle IPv6 addresses properly
+    encoded_ip = quote(ip_address)
+    url = f"https://api.ipinfo.io/lite/{encoded_ip}?token={token}"
     result = {'ip': ip_address}
     try:
         response = requests.get(url, timeout=10)
@@ -143,6 +145,7 @@ def get_shodan_info(ip_address):
         return None
     try:
         shodan_limiter.acquire()
+        # Shodan library handles IPv6 natively, no manual encoding needed
         host = shodan_api.host(ip_address)
         def flatten_dict(d):
             # Only keep primitives, serialize nested objects
@@ -228,7 +231,9 @@ def get_proxycheck_data(ip_address):
             'asn': 1,
             'key': proxycheck_key
         }
-        url = f'https://proxycheck.io/v2/{ip_address}'
+        # URL encode the IP address to handle IPv6 addresses properly
+        encoded_ip = quote(ip_address)
+        url = f'https://proxycheck.io/v2/{encoded_ip}'
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
