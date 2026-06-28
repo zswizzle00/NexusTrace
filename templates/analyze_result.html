@@ -35,11 +35,11 @@
 
   {# --- Verdict summary strip: gives the page an anchor before the source cards (IP analyses) --- #}
   {% if has_ip_cards %}
-    {% set abuse = abuseipdb.summary.risk_score | default(0, true) | int %}
-    {% set pulses = alienvault.summary.pulse_count | default(0, true) | int %}
-    {% set is_tor = vpnapi.security.tor | default(false, true) %}
-    {% set is_vpn = vpnapi.security.vpn | default(false, true) %}
-    {% set is_proxy = vpnapi.security.proxy | default(false, true) %}
+    {% set abuse = (abuseipdb.summary.risk_score if abuseipdb and abuseipdb.summary else 0) | default(0, true) | int %}
+    {% set pulses = (alienvault.summary.pulse_count if alienvault and alienvault.summary else 0) | default(0, true) | int %}
+    {% set is_tor = (vpnapi.security.tor if vpnapi and vpnapi.security else false) | default(false, true) %}
+    {% set is_vpn = (vpnapi.security.vpn if vpnapi and vpnapi.security else false) | default(false, true) %}
+    {% set is_proxy = (vpnapi.security.proxy if vpnapi and vpnapi.security else false) | default(false, true) %}
     {% set verdict = 'malicious' if (abuse >= 50 or pulses >= 3 or is_tor) else ('suspicious' if (abuse >= 1 or pulses >= 1 or is_vpn or is_proxy) else 'clean') %}
     <div class="verdict-bar is-{{ verdict }} shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
       <div class="flex items-center gap-3">
