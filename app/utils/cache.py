@@ -62,15 +62,42 @@ def clear_caches():
     """Clear all cached functions periodically."""
     with _cache_lock:
         try:
-            # Dynamically import the modules when needed
             ip_service = importlib.import_module('app.services.ip_service')
+            domain_service = importlib.import_module('app.services.domain_service')
+            hash_service = importlib.import_module('app.services.hash_service')
+            url_service = importlib.import_module('app.services.url_service')
+            file_service = importlib.import_module('app.services.file_service')
 
-            # List of functions to clear
             functions = [
+                # ip_service
                 ip_service.check_abuseipdb,
                 ip_service.get_ipinfo_data,
                 ip_service.get_shodan_info,
                 ip_service.get_proxycheck_data,
+                ip_service.get_alienvault_data,
+                ip_service.get_vpn_data,
+                ip_service.get_ip2location_data,
+                ip_service.get_ipapi_data,
+                # domain_service
+                domain_service.get_whois_info,
+                domain_service.get_dns_records,
+                domain_service.get_ssl_info,
+                domain_service.get_reverse_ip_domains,
+                domain_service.get_subdomains_crtsh,
+                domain_service.get_dmarc_record,
+                domain_service.get_talos_reputation,
+                domain_service.get_domain_info,
+                domain_service.get_domain_info_quick,
+                # hash_service
+                hash_service.get_virustotal_report,
+                hash_service.get_malwarebazaar_report,
+                hash_service.get_threatfox_iocs,
+                hash_service.get_hash_info,
+                # url_service
+                url_service.get_favicon_hash,
+                url_service.get_tech_stack,
+                # file_service
+                file_service.get_combined_file_analysis,
             ]
 
             for func in functions:

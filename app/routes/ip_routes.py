@@ -117,12 +117,14 @@ def check_ips():
         if len(ip_addresses) > MAX_BATCH_IPS:
             return jsonify({'error': f'Too many IPs. Maximum batch size is {MAX_BATCH_IPS}.'}), 400
 
-        # Validate IP addresses
+        # Validate and deduplicate IP addresses (normalization collapses variants of the same IP)
         valid_ips = []
+        seen = set()
         for ip in ip_addresses:
             if isinstance(ip, str):
                 normalized = is_valid_ip(ip.strip())
-                if normalized:
+                if normalized and normalized not in seen:
+                    seen.add(normalized)
                     valid_ips.append(normalized)
         
         if not valid_ips:

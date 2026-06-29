@@ -21,16 +21,16 @@ _DOMAIN_RE = re.compile(
 
 
 def _detect_type(indicator):
-    """Return 'ip', 'url', or 'domain'. Raises ValueError if unknown."""
+    """Return ('ip'|'url'|'domain', normalized_indicator). Raises ValueError if unknown."""
     try:
-        ipaddress.ip_address(indicator)
-        return 'ip'
+        normalized = str(ipaddress.ip_address(indicator))
+        return 'ip', normalized
     except ValueError:
         pass
     if re.match(r'^https?://', indicator, re.IGNORECASE):
-        return 'url'
+        return 'url', indicator
     if _DOMAIN_RE.match(indicator):
-        return 'domain'
+        return 'domain', indicator
     raise ValueError(f"Cannot determine indicator type for: {indicator!r}")
 
 
@@ -237,11 +237,11 @@ def _enrich_domain(indicator, indicator_type):
 def _enrich_indicator(indicator):
     """Enrich a single indicator; returns result dict (may contain 'error')."""
     try:
-        itype = _detect_type(indicator)
+        itype, normalized = _detect_type(indicator)
         if itype == 'ip':
-            return _enrich_ip(indicator)
+            return _enrich_ip(normalized)
         else:
-            return _enrich_domain(indicator, itype)
+            return _enrich_domain(normalized, itype)
     except ValueError as exc:
         return {
             'indicator': indicator,
@@ -271,7 +271,7 @@ def enrich_ip():
     if not ip:
         return jsonify({'error': 'Missing required field: ip'}), 400
     try:
-        ipaddress.ip_address(ip)
+        ip = str(ipaddress.ip_address(ip))  # normalize for consistent cache keys
     except ValueError:
         return jsonify({'error': f'Invalid IP address: {ip!r}'}), 400
 
@@ -292,7 +292,7 @@ def enrich_domain():
         return jsonify({'error': 'Missing required field: indicator'}), 400
 
     try:
-        itype = _detect_type(indicator)
+        itype, normalized = _detect_type(indicator)
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
 
@@ -300,7 +300,7 @@ def enrich_domain():
         return jsonify({'error': 'Use /api/enrich/ip for IP addresses'}), 400
 
     try:
-        result = _enrich_domain(indicator, itype)
+        result = _enrich_domain(normalized, itype)
     except Exception as exc:
         logger.exception("Unexpected error in /api/enrich/domain for %s", indicator)
         return jsonify({'error': f'Internal error: {exc}', 'indicator': indicator}), 500

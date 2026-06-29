@@ -9,10 +9,12 @@ from flask import send_from_directory
 
 app = create_app()
 
-# Serve the service worker at /sw.js
+# Serve the service worker at /sw.js (must be at root scope for full-origin coverage).
+# Use app.static_folder (absolute path) — 'static' relative resolves against app.root_path
+# which is app/, not the project root where static/ actually lives.
 @app.route('/sw.js')
 def service_worker():
-    return send_from_directory('static', 'sw.js')
+    return send_from_directory(app.static_folder, 'sw.js')
 
 if __name__ == '__main__':
     # Ensure we bind to all interfaces in Docker

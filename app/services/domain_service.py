@@ -68,19 +68,6 @@ def get_whois_info(domain):
         return None
 
 
-@timed_lru_cache(seconds=1800, maxsize=500)
-def get_whois_python(domain):
-    """Fetch WHOIS using python-whois library (fallback)."""
-    try:
-        import whois
-        # whois.whois can hang, so wrap it
-        def _fetch():
-            return whois.whois(domain)
-        return safe_execute(_fetch, timeout=TIMEOUT_MEDIUM)
-    except Exception as e:
-        logger.error(f"Python WHOIS failed for {domain}: {str(e)}")
-        return None
-
 
 @timed_lru_cache(seconds=900, maxsize=500)
 def get_dns_records(domain):

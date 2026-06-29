@@ -33,6 +33,8 @@ class RateLimiter:
 
             if sleep_time > 0:
                 time.sleep(sleep_time)
+            else:
+                time.sleep(0.01)  # yield to avoid busy-spin when clock skew gives sleep_time <= 0
 
     def __enter__(self):
         """Context manager entry."""

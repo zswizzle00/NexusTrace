@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from ..services.hash_service import get_hash_info, get_hash_info_quick, get_hash_info_deep
 from ..services.ip_service import get_alienvault_data
-from app.routes.home_routes import parse_alienvault_otx
+from app.utils.parsers import parse_alienvault_otx
 import logging
 
 # Configure logging

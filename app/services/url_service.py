@@ -1,4 +1,6 @@
 import os
+import ipaddress
+import socket
 import requests
 import logging
 import time
@@ -16,6 +18,29 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def _is_safe_host(hostname):
+    """Return True only if every resolved address for hostname is globally routable.
+
+    Prevents SSRF: a user-supplied URL whose hostname resolves to a private,
+    loopback, or link-local address (including cloud metadata endpoints like
+    169.254.169.254) would let the server fetch internal resources.
+    """
+    if not hostname:
+        return False
+    try:
+        results = socket.getaddrinfo(hostname, None)
+        if not results:
+            return False
+        for _family, _type, _proto, _canonname, sockaddr in results:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if not ip.is_global:
+                logger.warning("Blocked URL fetch: %s resolved to non-public IP %s", hostname, ip)
+                return False
+        return True
+    except (socket.gaierror, ValueError):
+        return False
 
 # Initialize rate limiters
 urlscan_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
@@ -195,6 +220,10 @@ def analyze_url(url, deep_scan=False):
 
         # Parse URL
         parsed_url = urlparse(url)
+
+        # SSRF guard: reject URLs whose hostname resolves to private/internal addresses
+        if not _is_safe_host(parsed_url.hostname or ''):
+            return {'error': 'URL host resolves to a private or reserved address', 'url': url}
 
         # Get response with headers
         response = session.get(url, timeout=TIMEOUT_MEDIUM, allow_redirects=True)

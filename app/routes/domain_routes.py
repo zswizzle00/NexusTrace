@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 from ..services.domain_service import get_domain_info, get_domain_info_quick
 from ..services.ip_service import get_alienvault_data
 from ..services.url_service import analyze_url_quick, analyze_url_deep
-from app.routes.home_routes import parse_alienvault_otx
+from app.utils.parsers import parse_alienvault_otx
 from ..utils.validators import is_valid_domain, is_valid_url
 import logging
 from urllib.parse import urlparse
@@ -53,17 +53,16 @@ def analyze_domain():
 
             # Check if it's a URL
             if indicator.lower().startswith(('http://', 'https://')):
-                # Get URL analysis
-                url_analysis = url_analyze_fn(indicator)
-                result_data['url_analysis'] = url_analysis if url_analysis else None
-                # Extract domain from URL for additional analysis
+                url_result = url_analyze_fn(indicator)
+                # Unwrap to inner dict — consistent with home_routes and analyze_result.html expectations
+                result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
                 domain = urlparse(indicator).netloc
             else:
                 # Try to normalize as URL first
                 normalized_url = f'https://{indicator}'
                 if is_valid_url(normalized_url):
-                    url_analysis = url_analyze_fn(normalized_url)
-                    result_data['url_analysis'] = url_analysis if url_analysis else None
+                    url_result = url_analyze_fn(normalized_url)
+                    result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
                     domain = urlparse(normalized_url).netloc
                 else:
                     domain = indicator
@@ -80,7 +79,7 @@ def analyze_domain():
 
             # Check if we got meaningful domain analysis results
             has_meaningful_data = (
-                (result_data['url_analysis'] and result_data['url_analysis'].get('url_analysis', {}).get('status_code') is not None) or
+                (result_data['url_analysis'] and result_data['url_analysis'].get('response', {}).get('status_code') is not None) or
                 (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
                 (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
                 (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)

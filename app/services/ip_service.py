@@ -8,7 +8,6 @@ import time
 from datetime import datetime, timedelta
 from collections import deque
 from threading import Lock
-import ipinfo
 import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
@@ -31,9 +30,6 @@ shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
 
 # Initialize API clients
-ipinfo_token = os.getenv('IPINFO_TOKEN')
-ipinfo_handler = ipinfo.getHandler(ipinfo_token) if ipinfo_token else None
-
 shodan_key = os.getenv('SHODAN_KEY')
 if not shodan_key:
     logger.warning("SHODAN_KEY not configured")
@@ -123,21 +119,21 @@ def check_abuseipdb(ip_address):
 def get_ipinfo_data(ip_address):
     """Get IP information from IPinfo Lite API (no MMDB support, supports flat IPinfo Lite response)."""
     token = os.getenv('IPINFO_TOKEN')
-    # URL encode the IP address to handle IPv6 addresses properly
     encoded_ip = quote(ip_address)
     url = f"https://api.ipinfo.io/lite/{encoded_ip}?token={token}"
-    try:
-        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
-        response.raise_for_status()
-        data = response.json()
-        result = {'ip': ip_address}
-        for k, v in data.items():
-            if v is not None:
-                result[k] = v
-        return result
-    except Exception as e:
-        logger.error(f"IPinfo Lite API request failed: {str(e)}")
-        return None
+    with ipinfo_limiter:
+        try:
+            response = requests.get(url, timeout=TIMEOUT_MEDIUM)
+            response.raise_for_status()
+            data = response.json()
+            result = {'ip': ip_address}
+            for k, v in data.items():
+                if v is not None:
+                    result[k] = v
+            return result
+        except Exception as e:
+            logger.error(f"IPinfo Lite API request failed: {str(e)}")
+            return None
 
 @timed_lru_cache(seconds=1800)
 def get_shodan_info(ip_address):
@@ -359,6 +355,7 @@ def get_alienvault_data(indicator):
         logger.error(f"AlienVault OTX error: {e}")
         return None
 
+@timed_lru_cache(seconds=1800)
 def get_vpn_data(ip_address):
     """Get IP information from VPNapi.io."""
     api_key = os.getenv('VPNAPI_KEY')
@@ -456,13 +453,15 @@ def process_single_ip(ip):
         logger.error(f"Error processing IP {ip}: {str(e)}")
         return None 
 
+@timed_lru_cache(seconds=1800)
 def get_ip2location_data(ip_address):
     """Get IP information from IP2Location.io API."""
     api_key = os.getenv('IP2LOCATION_KEY')
     if not api_key:
         logger.warning("IP2Location.io API key not configured")
         return None
-    url = f'https://api.ip2location.io/?key={api_key}&ip={ip_address}&format=json'
+    encoded_ip = quote(ip_address)
+    url = f'https://api.ip2location.io/?key={api_key}&ip={encoded_ip}&format=json'
     try:
         response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
