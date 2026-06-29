@@ -16,25 +16,23 @@ class RateLimiter:
         self.lock = Lock()
 
     def acquire(self):
-        """Acquire a rate limit token."""
-        with self.lock:
-            now = datetime.now()
-            # Remove old requests
-            while self.requests and (now - self.requests[0]) > self.time_window:
-                self.requests.popleft()
-            
-            if len(self.requests) >= self.max_requests:
-                # Calculate sleep time
-                sleep_time = (self.requests[0] + self.time_window - now).total_seconds()
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                # Clean up again after sleep
+        """Acquire a rate limit token, sleeping outside the lock to allow other threads through."""
+        while True:
+            with self.lock:
                 now = datetime.now()
                 while self.requests and (now - self.requests[0]) > self.time_window:
                     self.requests.popleft()
-            
-            self.requests.append(now)
-            return True
+
+                if len(self.requests) < self.max_requests:
+                    self.requests.append(now)
+                    return True
+
+                # Compute wait time, then release the lock before sleeping so
+                # other threads (on different limiters or the same one) aren't blocked.
+                sleep_time = (self.requests[0] + self.time_window - now).total_seconds()
+
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     def __enter__(self):
         """Context manager entry."""

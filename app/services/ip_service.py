@@ -12,6 +12,7 @@ import ipinfo
 import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
+from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
 import json
 import re
 import ipaddress
@@ -26,6 +27,8 @@ abuseipdb_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1)
 ipinfo_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 proxycheck_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
+# IP-API.com free tier: 45 req/min over HTTP
+ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
 
 # Initialize API clients
 ipinfo_token = os.getenv('IPINFO_TOKEN')
@@ -86,7 +89,7 @@ def check_abuseipdb(ip_address):
                     'verbose': ''
                 },
                 headers=headers,
-                timeout=10
+                timeout=TIMEOUT_MEDIUM
             )
             response.raise_for_status()
             data = response.json()
@@ -123,19 +126,18 @@ def get_ipinfo_data(ip_address):
     # URL encode the IP address to handle IPv6 addresses properly
     encoded_ip = quote(ip_address)
     url = f"https://api.ipinfo.io/lite/{encoded_ip}?token={token}"
-    result = {'ip': ip_address}
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         data = response.json()
-        # Map all non-None fields
+        result = {'ip': ip_address}
         for k, v in data.items():
             if v is not None:
                 result[k] = v
         return result
     except Exception as e:
         logger.error(f"IPinfo Lite API request failed: {str(e)}")
-        return result
+        return None
 
 @timed_lru_cache(seconds=1800)
 def get_shodan_info(ip_address):
@@ -234,7 +236,7 @@ def get_proxycheck_data(ip_address):
         # URL encode the IP address to handle IPv6 addresses properly
         encoded_ip = quote(ip_address)
         url = f'https://proxycheck.io/v2/{encoded_ip}'
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         data = response.json()
         ip_data = proxycheck_ip_data(data, ip_address)
@@ -310,7 +312,7 @@ def get_alienvault_data(indicator):
         alienvault_limiter.acquire()
 
         # Get general information
-        response = requests.get(f'{base_url}/general', headers=headers, timeout=10)
+        response = requests.get(f'{base_url}/general', headers=headers, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         general_data = response.json()
 
@@ -318,7 +320,7 @@ def get_alienvault_data(indicator):
         geo_data = {}
         try:
             alienvault_limiter.acquire()
-            response = requests.get(f'{base_url}/geo', headers=headers, timeout=10)
+            response = requests.get(f'{base_url}/geo', headers=headers, timeout=TIMEOUT_MEDIUM)
             response.raise_for_status()
             geo_data = response.json()
         except requests.exceptions.RequestException as e:
@@ -328,7 +330,7 @@ def get_alienvault_data(indicator):
         malware_data = {}
         try:
             alienvault_limiter.acquire()
-            response = requests.get(f'{base_url}/malware', headers=headers, timeout=10)
+            response = requests.get(f'{base_url}/malware', headers=headers, timeout=TIMEOUT_MEDIUM)
             response.raise_for_status()
             malware_data = response.json()
         except requests.exceptions.RequestException as e:
@@ -338,7 +340,7 @@ def get_alienvault_data(indicator):
         passive_dns_data = {}
         try:
             alienvault_limiter.acquire()
-            response = requests.get(f'{base_url}/passive_dns', headers=headers, timeout=10)
+            response = requests.get(f'{base_url}/passive_dns', headers=headers, timeout=TIMEOUT_MEDIUM)
             response.raise_for_status()
             passive_dns_data = response.json()
         except requests.exceptions.RequestException as e:
@@ -370,7 +372,7 @@ def get_vpn_data(ip_address):
             encoded_ip = quote(ip_address)
             response = requests.get(
                 f'https://vpnapi.io/api/{encoded_ip}?key={api_key}',
-                timeout=5
+                timeout=TIMEOUT_SHORT
             )
             response.raise_for_status()
             return response.json()
@@ -462,11 +464,33 @@ def get_ip2location_data(ip_address):
         return None
     url = f'https://api.ip2location.io/?key={api_key}&ip={ip_address}&format=json'
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
-        data = response.json()
-        # Optionally, flatten or map fields for template
-        return data
+        return response.json()
     except Exception as e:
         logger.error(f"IP2Location.io API request failed: {str(e)}")
+        return None
+
+
+@timed_lru_cache(seconds=1800)
+def get_ipapi_data(ip_address):
+    """Get geolocation and network data from IP-API.com (free, no key required).
+
+    Uses HTTP (not HTTPS) — required for the free tier.
+    Non-commercial use only per IP-API.com terms.
+    """
+    try:
+        with ipapi_limiter:
+            encoded_ip = quote(ip_address)
+            fields = 'status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query'
+            url = f'http://ip-api.com/json/{encoded_ip}?fields={fields}'
+            response = requests.get(url, timeout=TIMEOUT_MEDIUM)
+            response.raise_for_status()
+            data = response.json()
+            if data.get('status') == 'fail':
+                logger.debug(f"IP-API.com failure for {ip_address}: {data.get('message')}")
+                return None
+            return data
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.error(f"IP-API.com request failed for {ip_address}: {str(e)}")
         return None 

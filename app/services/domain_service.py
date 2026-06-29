@@ -11,17 +11,13 @@ from urllib.parse import urlparse
 from datetime import timedelta
 from ..utils.rate_limiter import RateLimiter
 from ..utils.cache import timed_lru_cache
+from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM, TIMEOUT_LONG
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Initialize rate limiters
 ip2whois_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
-
-# Global timeout settings (in seconds)
-TIMEOUT_SHORT = 5
-TIMEOUT_MEDIUM = 10
-TIMEOUT_LONG = 15
 
 # Configure DNS resolver with timeout
 dns_resolver = dns.resolver.Resolver()

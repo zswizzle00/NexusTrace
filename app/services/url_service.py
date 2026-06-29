@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
+from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
 from datetime import timedelta
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -19,10 +20,6 @@ logger = logging.getLogger(__name__)
 # Initialize rate limiters
 urlscan_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 builtwith_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
-
-# Timeout settings
-TIMEOUT_SHORT = 5
-TIMEOUT_MEDIUM = 10
 
 
 def setup_url_services(app):

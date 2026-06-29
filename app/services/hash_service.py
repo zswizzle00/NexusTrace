@@ -6,6 +6,7 @@ from typing import Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
+from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
 from datetime import timedelta
 
 # Configure logging
@@ -13,10 +14,6 @@ logger = logging.getLogger(__name__)
 
 # Rate limiters
 virustotal_limiter = RateLimiter(max_requests=4, time_window=timedelta(minutes=1))  # VT free tier: 4/min
-
-# Timeouts
-TIMEOUT_SHORT = 5
-TIMEOUT_MEDIUM = 10
 
 
 def identify_hash_type(hash_value: str) -> Tuple[Optional[str], Optional[str]]:

@@ -3,78 +3,13 @@ from ..services.domain_service import get_domain_info, get_domain_info_quick
 from ..services.ip_service import get_alienvault_data
 from ..services.url_service import analyze_url_quick, analyze_url_deep
 from app.routes.home_routes import parse_alienvault_otx
-import re
+from ..utils.validators import is_valid_domain, is_valid_url
 import logging
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 domain_bp = Blueprint('domain', __name__)
-
-# Maximum domain length per RFC 1035
-MAX_DOMAIN_LENGTH = 253
-# Maximum label length per RFC 1035
-MAX_LABEL_LENGTH = 63
-
-# Valid TLDs are dynamically maintained by IANA, so we use a basic pattern check
-# This validates the structure, not whether the TLD actually exists
-DOMAIN_PATTERN = re.compile(
-    r'^(?!-)'  # Cannot start with hyphen
-    r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*'  # Subdomains
-    r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?'  # Domain name
-    r'\.[a-zA-Z]{2,}$'  # TLD (at least 2 chars)
-)
-
-# Pattern for single-label domains (internal/local use)
-SINGLE_LABEL_PATTERN = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$')
-
-
-def is_valid_domain(domain, allow_single_label=False):
-    """
-    Check if the domain is valid.
-
-    Args:
-        domain: The domain string to validate
-        allow_single_label: If True, allows domains without TLD (e.g., 'localhost')
-
-    Returns:
-        bool: True if the domain is valid
-    """
-    if not domain or not isinstance(domain, str):
-        return False
-
-    domain = domain.strip().lower()
-
-    # Check length constraints
-    if len(domain) > MAX_DOMAIN_LENGTH:
-        return False
-
-    # Check each label's length
-    labels = domain.split('.')
-    for label in labels:
-        if len(label) > MAX_LABEL_LENGTH or len(label) == 0:
-            return False
-
-    # Check for valid domain pattern
-    if DOMAIN_PATTERN.match(domain):
-        return True
-
-    # Optionally allow single-label domains for internal use
-    if allow_single_label and SINGLE_LABEL_PATTERN.match(domain):
-        return True
-
-    return False
-
-
-def is_valid_url(url):
-    """Check if the URL is valid."""
-    if not url or not isinstance(url, str):
-        return False
-    try:
-        result = urlparse(url)
-        return all([result.scheme in ('http', 'https'), result.netloc])
-    except ValueError:
-        return False
 
 @domain_bp.route('/check_domain', methods=['POST'])
 def check_domain():

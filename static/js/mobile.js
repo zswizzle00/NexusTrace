@@ -96,23 +96,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Add loading states for better UX
+    // Show a loading spinner on the submit button for the duration of the server round-trip.
+    // These are full-page POST requests so the page navigates away when the response arrives —
+    // no need to reset the button ourselves. The only case we need to handle is the user
+    // pressing Back, which restores the page from bfcache with the button still disabled.
     const forms = document.querySelectorAll('form');
-    
+
     forms.forEach(form => {
         form.addEventListener('submit', function() {
             const submitBtn = this.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.classList.add('loading');
                 submitBtn.disabled = true;
-                
-                // Re-enable after a timeout (in case of errors)
+                // Fallback: re-enable after 90s in case the server never responds
+                // (gunicorn --timeout is 120s; this gives a visible recovery window)
                 setTimeout(() => {
                     submitBtn.classList.remove('loading');
                     submitBtn.disabled = false;
-                }, 10000);
+                }, 90000);
             }
         });
+    });
+
+    // Reset any stuck loading buttons when the browser restores this page from bfcache
+    // (fires when the user navigates back and the page was preserved in memory).
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            document.querySelectorAll('button[type="submit"].loading').forEach(function(btn) {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            });
+        }
     });
 
     // Add haptic feedback for supported devices
@@ -193,14 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Optimize for mobile performance
     if ('serviceWorker' in navigator) {
-        // Register service worker for offline functionality
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('SW registered: ', registration);
-            })
-            .catch(registrationError => {
-                console.log('SW registration failed: ', registrationError);
-            });
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
 
     // Add mobile-specific analytics or tracking

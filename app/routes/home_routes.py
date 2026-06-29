@@ -1,10 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 from app.services.hash_service import get_hash_info_quick, get_hash_info_deep
-from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data
+from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data, get_ipapi_data
 from app.services.domain_service import get_domain_info, get_domain_info_quick
 from app.services.url_service import analyze_url_quick, analyze_url_deep
 from app.services.user_agent_service import parse_user_agent
@@ -14,7 +15,7 @@ import requests
 from dotenv import load_dotenv
 from app.services.event_service import get_event_info
 from urllib.parse import urlparse
-import socket
+from app.utils.validators import is_valid_ip, is_valid_domain
 
 # Load environment variables
 load_dotenv()
@@ -153,20 +154,6 @@ def parse_abuseipdb(abuse_data):
         'raw': abuse_data
     }
 
-def is_valid_ip(ip):
-    """Check if the string is a valid IPv4 or IPv6 address."""
-    try:
-        # Try IPv4 first
-        socket.inet_pton(socket.AF_INET, ip)
-        return True
-    except socket.error:
-        try:
-            # Try IPv6 if IPv4 fails
-            socket.inet_pton(socket.AF_INET6, ip)
-            return True
-        except socket.error:
-            return False
-
 def _run_analysis(indicator):
     """Core analysis logic shared by the POST /analyze form and GET /i/<indicator> deep-link route."""
     result_data = {}
@@ -175,9 +162,11 @@ def _run_analysis(indicator):
     # Determine indicator type
     indicator_type = None
 
-    if is_valid_ip(indicator):
+    normalized_ip = is_valid_ip(indicator)
+    if normalized_ip:
+        indicator = normalized_ip  # use normalized form for all downstream calls and cache keys
         indicator_type = 'ip'
-    elif re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$', indicator):
+    elif is_valid_domain(indicator):
         indicator_type = 'domain'
     elif re.match(r'^https?://', indicator):
         indicator_type = 'url'
@@ -202,9 +191,22 @@ def _run_analysis(indicator):
     logger.debug(f"indicator_type: {indicator_type}")
 
     if indicator_type == 'hash':
-        hash_info = get_hash_info_quick(indicator)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(get_hash_info_quick, indicator): 'hash_info',
+                executor.submit(get_alienvault_data, indicator): 'alienvault_raw',
+            }
+            raw = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    raw[key] = future.result()
+                except Exception as e:
+                    logger.warning(f"Hash lookup {key} failed: {e}")
+                    raw[key] = None
+        hash_info = raw.get('hash_info')
         result_data['hash_info'] = hash_info if hash_info and not hash_info.get('error') else None
-        alienvault_raw = get_alienvault_data(indicator)
+        alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         has_meaningful_data = (
@@ -284,19 +286,40 @@ def _run_analysis(indicator):
                               indicator_type=indicator_type,
                               **result_data)
     elif indicator_type == 'ip':
-        result_data['ipinfo'] = get_ipinfo_data(indicator) or None
-        result_data['ip2location'] = get_ip2location_data(indicator) or None
-        result_data['vpnapi'] = get_vpn_data(indicator) or None
-        result_data['proxycheck'] = get_proxycheck_data(indicator) or None
-        shodan_raw = get_shodan_info(indicator)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {
+                executor.submit(get_ipinfo_data, indicator): 'ipinfo',
+                executor.submit(get_ip2location_data, indicator): 'ip2location',
+                executor.submit(get_vpn_data, indicator): 'vpnapi',
+                executor.submit(get_proxycheck_data, indicator): 'proxycheck',
+                executor.submit(get_ipapi_data, indicator): 'ipapi',
+                executor.submit(get_shodan_info, indicator): 'shodan_raw',
+                executor.submit(check_abuseipdb, indicator): 'abuseipdb_raw',
+                executor.submit(get_alienvault_data, indicator): 'alienvault_raw',
+            }
+            raw = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    raw[key] = future.result()
+                except Exception as e:
+                    logger.warning(f"IP lookup {key} failed: {e}")
+                    raw[key] = None
+        result_data['ipinfo'] = raw.get('ipinfo') or None
+        result_data['ip2location'] = raw.get('ip2location') or None
+        result_data['vpnapi'] = raw.get('vpnapi') or None
+        result_data['proxycheck'] = raw.get('proxycheck') or None
+        result_data['ipapi'] = raw.get('ipapi') or None
+        shodan_raw = raw.get('shodan_raw')
         result_data['shodan'] = parse_shodan(shodan_raw) if shodan_raw else None
-        abuseipdb_raw = check_abuseipdb(indicator)
+        abuseipdb_raw = raw.get('abuseipdb_raw')
         result_data['abuseipdb'] = parse_abuseipdb(abuseipdb_raw) if abuseipdb_raw else None
-        alienvault_raw = get_alienvault_data(indicator)
+        alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         has_meaningful_data = (
             (result_data['ipinfo'] and (result_data['ipinfo'].get('country') or result_data['ipinfo'].get('asn'))) or
+            (result_data['ipapi'] and result_data['ipapi'].get('country')) or
             (result_data['vpnapi'] and result_data['vpnapi'].get('location', {}).get('city')) or
             (result_data['shodan'] and result_data['shodan'].get('summary', {}).get('organization')) or
             (result_data['abuseipdb'] and result_data['abuseipdb'].get('summary', {}).get('risk_score') is not None) or
@@ -306,20 +329,34 @@ def _run_analysis(indicator):
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='ip')
 
-        card_count = sum(1 for k in ['ipinfo', 'ip2location', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault'] if result_data.get(k))
+        card_count = sum(1 for k in ['ipinfo', 'ip2location', 'ipapi', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,
                               indicator_type=indicator_type,
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'url':
-        url_analysis = analyze_url_quick(indicator)
-        result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
         domain = urlparse(indicator).netloc
-        domain_info = get_domain_info(domain)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(analyze_url_quick, indicator): 'url_result',
+                executor.submit(get_domain_info, domain): 'domain_info',
+                executor.submit(get_alienvault_data, domain): 'alienvault_raw',
+            }
+            raw = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    raw[key] = future.result()
+                except Exception as e:
+                    logger.warning(f"URL lookup {key} failed: {e}")
+                    raw[key] = None
+        url_result = raw.get('url_result') or {}
+        result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
+        domain_info = raw.get('domain_info')
         result_data['domain_info'] = domain_info if domain_info else None
         result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        alienvault_raw = get_alienvault_data(domain)
+        alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         has_meaningful_data = (
@@ -340,12 +377,26 @@ def _run_analysis(indicator):
                               **result_data)
     elif indicator_type == 'domain':
         normalized_url = f'https://{indicator}'
-        url_analysis = analyze_url_quick(normalized_url)
-        result_data['url_analysis'] = url_analysis['url_analysis'] if url_analysis and 'url_analysis' in url_analysis else None
-        domain_info = get_domain_info(indicator)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(analyze_url_quick, normalized_url): 'url_result',
+                executor.submit(get_domain_info, indicator): 'domain_info',
+                executor.submit(get_alienvault_data, indicator): 'alienvault_raw',
+            }
+            raw = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    raw[key] = future.result()
+                except Exception as e:
+                    logger.warning(f"Domain lookup {key} failed: {e}")
+                    raw[key] = None
+        url_result = raw.get('url_result') or {}
+        result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
+        domain_info = raw.get('domain_info')
         result_data['domain_info'] = domain_info if domain_info else None
         result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        alienvault_raw = get_alienvault_data(indicator)
+        alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         has_meaningful_data = (

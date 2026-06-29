@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify, send_file
 import pandas as pd
 import io
-import ipaddress
 import logging
 from ..services.ip_service import (
     check_abuseipdb,
@@ -11,26 +10,11 @@ from ..services.ip_service import (
     get_alienvault_data,
     get_vpn_data
 )
-import socket
+from ..utils.validators import is_valid_ip
 
 logger = logging.getLogger(__name__)
 
 ip_bp = Blueprint('ip', __name__)
-
-
-def is_valid_ip(ip_str):
-    """
-    Validate IP address format (IPv4 or IPv6).
-    Returns the normalized IP address string or None if invalid.
-    """
-    if not ip_str or not isinstance(ip_str, str):
-        return None
-    try:
-        # This handles both IPv4 and IPv6, and normalizes the format
-        ip_obj = ipaddress.ip_address(ip_str.strip())
-        return str(ip_obj)
-    except ValueError:
-        return None
 
 @ip_bp.route('/check_ip', methods=['POST'])
 def check_ip():
@@ -50,8 +34,8 @@ def check_ip():
     try:
         # Get VPN API data first (primary source)
         vpn_data = get_vpn_data(ip_address)
-        if 'error' in vpn_data:
-            return jsonify({'error': vpn_data['error']}), 500
+        if not vpn_data or 'error' in vpn_data:
+            return jsonify({'error': vpn_data['error'] if vpn_data else 'VPN API lookup failed'}), 500
         
         # Run API calls sequentially
         results = {}
@@ -128,25 +112,18 @@ def check_ips():
         # Extract IP addresses from the first column
         ip_addresses = df.iloc[:, 0].tolist()
         
+        # Cap input size to prevent quota exhaustion against paid APIs
+        MAX_BATCH_IPS = 1000
+        if len(ip_addresses) > MAX_BATCH_IPS:
+            return jsonify({'error': f'Too many IPs. Maximum batch size is {MAX_BATCH_IPS}.'}), 400
+
         # Validate IP addresses
         valid_ips = []
         for ip in ip_addresses:
-            try:
-                # Use socket.inet_pton to validate both IPv4 and IPv6 addresses
-                if isinstance(ip, str):
-                    try:
-                        # Try IPv4 first
-                        socket.inet_pton(socket.AF_INET, ip)
-                        valid_ips.append(ip)
-                    except socket.error:
-                        try:
-                            # Try IPv6 if IPv4 fails
-                            socket.inet_pton(socket.AF_INET6, ip)
-                            valid_ips.append(ip)
-                        except socket.error:
-                            continue
-            except (socket.error, TypeError, ValueError):
-                continue
+            if isinstance(ip, str):
+                normalized = is_valid_ip(ip.strip())
+                if normalized:
+                    valid_ips.append(normalized)
         
         if not valid_ips:
             return jsonify({'error': 'No valid IP addresses found in the file'}), 400
