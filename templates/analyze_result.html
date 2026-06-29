@@ -1,14 +1,16 @@
 {% extends "base.html" %}
-{% from "_search_form.html" import search_form %}
 
 {% block main_content_class %}full-width{% endblock %}
 
-{# --- Reusable macros --- #}
+{# ==========================================================================
+   Reusable macros — preserved API, restyled output.
+   ========================================================================== #}
+
 {% macro bool_badge(value) %}
   {% if value %}
-    <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-900 text-red-300">Yes</span>
+    <span class="nt-pill is-positive"><span class="nt-pill__dot"></span>Yes</span>
   {% else %}
-    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-400">No</span>
+    <span class="nt-pill is-negative"><span class="nt-pill__dot"></span>No</span>
   {% endif %}
 {% endmacro %}
 
@@ -21,60 +23,129 @@
   {% endif %}
 {% endmacro %}
 
-{% block content %}
-<div class="w-full py-10 tailwind-tables">
-  <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Analysis Result</h2>
+{# Country code → flag emoji via a lookup table of Regional Indicator Symbols.
+   Returns '' if input isn't a 2-letter string. #}
+{% macro flag(code) -%}
+  {%- if code and code is string and code|length == 2 -%}
+    {%- set up = code|upper -%}
+    {%- set table = {'A':'🇦','B':'🇧','C':'🇨','D':'🇩','E':'🇪','F':'🇫','G':'🇬','H':'🇭','I':'🇮','J':'🇯','K':'🇰','L':'🇱','M':'🇲','N':'🇳','O':'🇴','P':'🇵','Q':'🇶','R':'🇷','S':'🇸','T':'🇹','U':'🇺','V':'🇻','W':'🇼','X':'🇽','Y':'🇾','Z':'🇿'} -%}
+    {# Regional indicators only render correctly when paired — build with two chars from the table #}
+    {{- table.get(up[0], '') -}}{{- table.get(up[1], '') -}}
+  {%- endif -%}
+{%- endmacro %}
 
-  <!-- Search Form at Top -->
-  <div class="mb-10 w-full">
-    {{ search_form('Enter IP, domain, URL, hash, or user agent...') }}
+{% block content %}
+<div class="nt-results-wrap">
+
+  <p class="nt-results-title">Threat Intelligence Report</p>
+
+  {# Slim search form so users can pivot to another indicator without leaving the page. #}
+  <div class="nt-results-search">
+    <form action="/analyze" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="indicator"
+             placeholder="Pivot to another IP, domain, URL, hash, or user agent..."
+             required autocomplete="off" spellcheck="false"
+             aria-label="Pivot to another indicator">
+      <button type="submit">Analyze</button>
+    </form>
   </div>
 
   {% set has_ip_cards = ipinfo or ip2location or vpnapi or proxycheck or shodan or abuseipdb %}
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
 
-  {# --- Verdict summary strip: gives the page an anchor before the source cards (IP analyses) --- #}
+  {# ==================== VERDICT HERO ==================== #}
   {% if has_ip_cards %}
-    {% set abuse = (abuseipdb.summary.risk_score if abuseipdb and abuseipdb.summary else 0) | default(0, true) | int %}
+    {% set abuse_score = (abuseipdb.summary.risk_score if abuseipdb and abuseipdb.summary else 0) | default(0, true) | int %}
     {% set pulses = (alienvault.summary.pulse_count if alienvault and alienvault.summary else 0) | default(0, true) | int %}
     {% set is_tor = (vpnapi.security.tor if vpnapi and vpnapi.security else false) | default(false, true) %}
     {% set is_vpn = (vpnapi.security.vpn if vpnapi and vpnapi.security else false) | default(false, true) %}
     {% set is_proxy = (vpnapi.security.proxy if vpnapi and vpnapi.security else false) | default(false, true) %}
-    {% set verdict = 'malicious' if (abuse >= 50 or pulses >= 3 or is_tor) else ('suspicious' if (abuse >= 1 or pulses >= 1 or is_vpn or is_proxy) else 'clean') %}
-    <div class="verdict-bar is-{{ verdict }} shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-      <div class="flex items-center gap-3">
-        <span class="font-mono text-2xl font-bold text-gray-100 break-all">{{ indicator }}</span>
-        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider {{ 'bg-red-900 text-red-300' if verdict == 'malicious' else ('bg-yellow-900 text-yellow-300' if verdict == 'suspicious' else 'bg-green-900 text-green-300') }}">{{ verdict }}</span>
+    {% set is_relay = (vpnapi.security.relay if vpnapi and vpnapi.security else false) | default(false, true) %}
+    {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor) else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy) else 'clean') %}
+    {% set verdict_label = {'malicious': 'High Risk', 'suspicious': 'Suspicious', 'clean': 'Clean'} %}
+
+    {# Resolve country code from any source that supplied it #}
+    {% set cc = (ipinfo.country_code if ipinfo and ipinfo.country_code is defined else None)
+              or (ipinfo.country if ipinfo and ipinfo.country and ipinfo.country|length == 2 else None)
+              or (abuseipdb.summary.country_code if abuseipdb and abuseipdb.summary and abuseipdb.summary.country_code is defined else None) %}
+    {% set geo_city = ipinfo.city if ipinfo and ipinfo.city else '' %}
+    {% set geo_country = (ipinfo.country if ipinfo and ipinfo.country else '') or (abuseipdb.summary.countryName if abuseipdb and abuseipdb.summary and abuseipdb.summary.countryName else '') %}
+
+    <section class="nt-verdict is-{{ verdict }}" aria-label="Verdict summary">
+      <div class="nt-verdict__main">
+        <span class="nt-verdict__label">Indicator</span>
+        <div class="nt-verdict__indicator">{{ indicator }}</div>
+        <span class="nt-verdict__badge">
+          <span class="nt-verdict__badge-dot"></span>
+          {{ verdict_label.get(verdict, verdict|capitalize) }}
+        </span>
       </div>
-      <div class="ml-auto flex flex-wrap items-center divide-x divide-gray-600 text-sm">
-        {% if ipinfo and ipinfo.country %}<span class="px-4 text-gray-400">Geo <span class="text-gray-100">{% if ipinfo.city %}{{ ipinfo.city }}, {% endif %}{{ ipinfo.country }}</span></span>{% endif %}
-        {% if ipinfo and ipinfo.asn %}<span class="px-4 text-gray-400">ASN <span class="text-gray-100">{{ ipinfo.asn }}</span></span>{% endif %}
-        {% if abuse %}<span class="px-4 text-gray-400">Abuse <span class="{{ 'text-red-400' if abuse >= 50 else ('text-yellow-400' if abuse >= 1 else 'text-gray-100') }}">{{ abuse }}%</span></span>{% endif %}
-        {% if pulses %}<span class="px-4 text-gray-400">OTX pulses <span class="text-gray-100">{{ pulses }}</span></span>{% endif %}
-        {% if is_tor %}<span class="px-4 text-red-400">Tor exit node</span>{% elif is_vpn %}<span class="px-4 text-yellow-400">VPN</span>{% elif is_proxy %}<span class="px-4 text-yellow-400">Proxy</span>{% endif %}
+
+      <div class="nt-verdict__stats">
+        {% if geo_country or geo_city %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Geolocation</span>
+            <span class="nt-verdict__stat-value" title="{% if geo_city %}{{ geo_city }}, {% endif %}{{ geo_country }}">
+              {% if cc %}{{ flag(cc) }} {% endif %}{% if geo_city %}{{ geo_city }}, {% endif %}{{ geo_country }}
+            </span>
+          </div>
+        {% endif %}
+        {% if ipinfo and ipinfo.asn %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Network</span>
+            <span class="nt-verdict__stat-value" title="{{ ipinfo.as_name or '' }} ({{ ipinfo.asn }})">
+              {% if ipinfo.as_name %}{{ ipinfo.as_name }} · {% endif %}{{ ipinfo.asn }}
+            </span>
+          </div>
+        {% endif %}
+        {% if abuse_score is defined and abuse_score > 0 %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Abuse Score</span>
+            <span class="nt-verdict__stat-value {{ 'is-danger' if abuse_score >= 50 else ('is-warn' if abuse_score >= 25 else 'is-good') }}">{{ abuse_score }}%</span>
+          </div>
+        {% endif %}
+        {% if pulses > 0 %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">OTX Pulses</span>
+            <span class="nt-verdict__stat-value {{ 'is-danger' if pulses >= 3 else 'is-warn' }}">{{ pulses }}</span>
+          </div>
+        {% endif %}
+        {% if is_tor or is_vpn or is_proxy %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Anonymizer</span>
+            <span class="nt-verdict__stat-value {{ 'is-danger' if is_tor else 'is-warn' }}">
+              {% if is_tor %}Tor{% elif is_vpn %}VPN{% elif is_proxy %}Proxy{% endif %}
+            </span>
+          </div>
+        {% endif %}
       </div>
-    </div>
+    </section>
   {% endif %}
 
-  {# --- IP Analysis Cards Grid --- #}
+  {# ==================== IP ANALYSIS CARDS ==================== #}
   {% if has_ip_cards %}
-  <div class="w-full grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+  <div class="nt-card-grid">
 
-    {# ==================== IPInfo Card ==================== #}
+    {# ---------- IPInfo ---------- #}
     {% if ipinfo %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
-          </svg>
-          IPInfo
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">IPInfo</h3>
+          <span class="nt-card__source">Geolocation</span>
+        </div>
         <table class="w-full text-sm">
           {{ kv_row('IP', ipinfo.ip) }}
           {% if ipinfo.city or ipinfo.region or ipinfo.country %}
             <tr>
               <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Location</th>
               <td class="py-2 break-words">
+                {% if cc %}{{ flag(cc) }} {% endif %}
                 {% if ipinfo.city %}{{ ipinfo.city }}{% endif %}
                 {% if ipinfo.region %}{% if ipinfo.city %}, {% endif %}{{ ipinfo.region }}{% endif %}
                 {% if ipinfo.country %}{% if ipinfo.city or ipinfo.region %}, {% endif %}{{ ipinfo.country }}{% endif %}
@@ -102,34 +173,30 @@
           {{ kv_row('Carrier', ipinfo.carrier) }}
           {{ kv_row('Privacy', ipinfo.privacy) }}
           {% if ipinfo.anycast %}
-            <tr>
-              <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Anycast</th>
-              <td class="py-2">{{ bool_badge(ipinfo.anycast) }}</td>
-            </tr>
+            <tr><th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Anycast</th><td class="py-2">{{ bool_badge(ipinfo.anycast) }}</td></tr>
           {% endif %}
           {% if ipinfo.bogon %}
-            <tr>
-              <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Bogon</th>
-              <td class="py-2">{{ bool_badge(ipinfo.bogon) }}</td>
-            </tr>
+            <tr><th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Bogon</th><td class="py-2">{{ bool_badge(ipinfo.bogon) }}</td></tr>
           {% endif %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ipinfo | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ ipinfo | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== IP2Location Card ==================== #}
+    {# ---------- IP2Location ---------- #}
     {% if ip2location %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-          IP2Location
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 21s-7-6.5-7-12a7 7 0 1114 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">IP2Location</h3>
+          <span class="nt-card__source">Geolocation</span>
+        </div>
         <table class="w-full text-sm">
           {{ kv_row('IP', ip2location.ip) }}
           {{ kv_row('Country', ip2location.country_name) }}
@@ -145,127 +212,127 @@
           {{ kv_row('Net Speed', ip2location.net_speed or ip2location.speed) }}
           {{ kv_row('Usage Type', ip2location.usage_type) }}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ip2location | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ ip2location | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== VPNAPI Card ==================== #}
+    {# ---------- VPNapi — pill-based anonymizer detection ---------- #}
     {% if vpnapi %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-          VPNAPI
-        </h3>
-        <table class="w-full text-sm">
-          {{ kv_row('IP', vpnapi.ip) }}
-          <tr>
-            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">VPN</th>
-            <td class="py-2">{{ bool_badge(vpnapi.security and vpnapi.security.vpn) }}</td>
-          </tr>
-          <tr>
-            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Proxy</th>
-            <td class="py-2">{{ bool_badge(vpnapi.security and vpnapi.security.proxy) }}</td>
-          </tr>
-          <tr>
-            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Tor</th>
-            <td class="py-2">{{ bool_badge(vpnapi.security and vpnapi.security.tor) }}</td>
-          </tr>
-          <tr>
-            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Relay</th>
-            <td class="py-2">{{ bool_badge(vpnapi.security and vpnapi.security.relay) }}</td>
-          </tr>
-        </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ vpnapi | tojson(indent=2) }}</pre>
+      <div class="nt-card is-vpn">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/>
+              <path d="M9.5 12l2 2 3.5-4"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">Anonymizer Check</h3>
+          <span class="nt-card__source">VPNapi</span>
+        </div>
+
+        <p class="nt-card__section-title" style="margin-top:0;">Detection</p>
+        <div class="nt-pills">
+          <span class="nt-pill {{ 'is-positive' if vpnapi.security and vpnapi.security.vpn else 'is-negative' }}">
+            <span class="nt-pill__dot"></span> VPN {{ 'Detected' if vpnapi.security and vpnapi.security.vpn else 'Clear' }}
+          </span>
+          <span class="nt-pill {{ 'is-positive' if vpnapi.security and vpnapi.security.proxy else 'is-negative' }}">
+            <span class="nt-pill__dot"></span> Proxy {{ 'Detected' if vpnapi.security and vpnapi.security.proxy else 'Clear' }}
+          </span>
+          <span class="nt-pill {{ 'is-positive' if vpnapi.security and vpnapi.security.tor else 'is-negative' }}">
+            <span class="nt-pill__dot"></span> Tor {{ 'Exit Node' if vpnapi.security and vpnapi.security.tor else 'Clear' }}
+          </span>
+          <span class="nt-pill {{ 'is-warn' if vpnapi.security and vpnapi.security.relay else 'is-negative' }}">
+            <span class="nt-pill__dot"></span> Relay {{ 'Detected' if vpnapi.security and vpnapi.security.relay else 'Clear' }}
+          </span>
+        </div>
+
+        {% if vpnapi.location %}
+          <p class="nt-card__section-title">Location</p>
+          <table class="w-full text-sm">
+            {{ kv_row('Country', vpnapi.location.country) }}
+            {{ kv_row('Region', vpnapi.location.region) }}
+            {{ kv_row('City', vpnapi.location.city) }}
+            {{ kv_row('ISP', vpnapi.network.autonomous_system_organization if vpnapi.network else None) }}
+          </table>
+        {% endif %}
+
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ vpnapi | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== ProxyCheck Card ==================== #}
+    {# ---------- ProxyCheck ---------- #}
     {% if proxycheck %}
       {% set pc = proxycheck.proxycheck if proxycheck.proxycheck is defined else proxycheck %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
-          </svg>
-          ProxyCheck
-        </h3>
-        <table class="w-full text-sm">
-          <tr>
-            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Proxy</th>
-            <td class="py-2">
-              {% set proxy_val = pc.proxy if pc.proxy is defined else pc.get('proxy', 'unknown') %}
-              {% if proxy_val == 'yes' or proxy_val == true %}
-                <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-900 text-red-300">Yes</span>
-              {% elif proxy_val == 'no' or proxy_val == false %}
-                <span class="px-2 py-0.5 rounded text-xs font-bold bg-green-900 text-green-300">No</span>
-              {% else %}
-                {{ proxy_val }}
-              {% endif %}
-            </td>
-          </tr>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2L4 6v6c0 5 3.5 9.4 8 10 4.5-.6 8-5 8-10V6l-8-4z"/>
+              <path d="M9.5 12.5l2 2 4-4.5"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">ProxyCheck</h3>
+          <span class="nt-card__source">Reputation</span>
+        </div>
+
+        {% set proxy_val = pc.proxy if pc.proxy is defined else pc.get('proxy', 'unknown') %}
+        <div class="nt-pills">
+          {% if proxy_val == 'yes' or proxy_val == true %}
+            <span class="nt-pill is-positive"><span class="nt-pill__dot"></span> Proxy Detected</span>
+          {% elif proxy_val == 'no' or proxy_val == false %}
+            <span class="nt-pill is-negative"><span class="nt-pill__dot"></span> Not a Proxy</span>
+          {% endif %}
           {% if pc.type is defined and pc.type %}
-            {{ kv_row('Type', pc.type) }}
+            <span class="nt-pill"><span class="nt-pill__dot"></span> {{ pc.type }}</span>
           {% endif %}
-          {% if pc.provider is defined and pc.provider %}
-            {{ kv_row('Provider', pc.provider) }}
-          {% endif %}
-          {% if pc.country is defined and pc.country %}
-            {{ kv_row('Country', pc.country) }}
-          {% endif %}
-          {% if pc.isp is defined and pc.isp %}
-            {{ kv_row('ISP', pc.isp) }}
-          {% endif %}
-          {% if pc.asn is defined and pc.asn %}
-            {{ kv_row('ASN', pc.asn) }}
-          {% endif %}
-          {% if pc.organisation is defined and pc.organisation %}
-            {{ kv_row('Organization', pc.organisation) }}
-          {% endif %}
+        </div>
+
+        <table class="w-full text-sm">
+          {% if pc.provider is defined and pc.provider %}{{ kv_row('Provider', pc.provider) }}{% endif %}
+          {% if pc.country is defined and pc.country %}{{ kv_row('Country', pc.country) }}{% endif %}
+          {% if pc.isp is defined and pc.isp %}{{ kv_row('ISP', pc.isp) }}{% endif %}
+          {% if pc.asn is defined and pc.asn %}{{ kv_row('ASN', pc.asn) }}{% endif %}
+          {% if pc.organisation is defined and pc.organisation %}{{ kv_row('Organization', pc.organisation) }}{% endif %}
           {% if pc.risk is defined and pc.risk is not none %}
             <tr>
               <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Risk Score</th>
               <td class="py-2">
                 {% set risk = pc.risk|int %}
-                <span class="px-2 py-0.5 rounded text-xs font-bold
-                  {% if risk > 66 %}bg-red-900 text-red-300
-                  {% elif risk > 33 %}bg-yellow-900 text-yellow-300
-                  {% else %}bg-green-900 text-green-300{% endif %}">{{ pc.risk }}</span>
+                <span class="nt-pill {{ 'is-positive' if risk > 66 else ('is-warn' if risk > 33 else 'is-negative') }}">{{ pc.risk }}</span>
               </td>
             </tr>
           {% endif %}
-          {% if pc.port is defined and pc.port %}
-            {{ kv_row('Port', pc.port) }}
-          {% endif %}
-          {% if pc.seen is defined and pc.seen %}
-            {{ kv_row('Last Seen', pc.seen) }}
-          {% endif %}
-          {% if pc.attack_history is defined and pc.attack_history %}
-            {{ kv_row('Attack History', pc.attack_history) }}
-          {% endif %}
+          {% if pc.port is defined and pc.port %}{{ kv_row('Port', pc.port) }}{% endif %}
+          {% if pc.seen is defined and pc.seen %}{{ kv_row('Last Seen', pc.seen) }}{% endif %}
+          {% if pc.attack_history is defined and pc.attack_history %}{{ kv_row('Attack History', pc.attack_history) }}{% endif %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ proxycheck | tojson(indent=2) }}</pre>
+
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ proxycheck | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== Shodan Card ==================== #}
+    {# ---------- Shodan — port tag cloud + CVE chips ---------- #}
     {% if shodan %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
-          </svg>
-          Shodan Report
-        </h3>
+      <div class="nt-card is-shodan">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>
+              <circle cx="7" cy="7" r="0.8" fill="currentColor"/><circle cx="7" cy="17" r="0.8" fill="currentColor"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">Shodan</h3>
+          <span class="nt-card__source">Internet Scan</span>
+        </div>
+
         {% if shodan.summary %}
-          <table class="w-full text-sm mb-4">
+          <table class="w-full text-sm">
             {{ kv_row('IP', shodan.summary.ip or shodan.summary.get('ip_str')) }}
             {{ kv_row('Organization', shodan.summary.org or shodan.summary.organization) }}
             {{ kv_row('ISP', shodan.summary.isp) }}
@@ -274,292 +341,164 @@
             {{ kv_row('Hostnames', shodan.summary.hostnames) }}
             {{ kv_row('OS', shodan.summary.os) }}
             {{ kv_row('Last Updated', shodan.summary.last_update) }}
-            {# Fallback: show any remaining summary fields not already shown #}
             {% set shown_keys = ['ip', 'ip_str', 'org', 'organization', 'isp', 'country', 'country_name', 'city', 'hostnames', 'os', 'last_update'] %}
             {% for k, v in shodan.summary.items() %}
-              {% if k not in shown_keys and v %}
-                {{ kv_row(k|replace('_', ' ')|title, v) }}
-              {% endif %}
+              {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
             {% endfor %}
           </table>
         {% endif %}
+
         {% if shodan.tables is defined and shodan.tables.open_ports is defined and shodan.raw is defined and shodan.raw.ports %}
-          <div class="mb-4">
-            <span class="font-semibold text-gray-400 text-sm">Open Ports</span>
-            <table class="w-full text-xs mt-2">
-              <thead>
-                <tr class="bg-gray-800 text-purple-200">
-                  <th class="px-2 py-1.5 text-left">Port</th><th class="px-2 py-1.5 text-left">Service</th><th class="px-2 py-1.5 text-left">Product</th><th class="px-2 py-1.5 text-left">Version</th><th class="px-2 py-1.5 text-left">Banner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for port in shodan.raw.ports[:5] %}
-                  <tr class="border-t border-gray-800">
-                    <td class="px-2 py-1.5">{{ port.port }}</td>
-                    <td class="px-2 py-1.5">{{ port.service or 'N/A' }}</td>
-                    <td class="px-2 py-1.5">{{ port.product or 'N/A' }}</td>
-                    <td class="px-2 py-1.5">{{ port.version or 'N/A' }}</td>
-                    <td class="px-2 py-1.5 break-all max-w-xs">{{ port.banner[:60] if port.banner else 'N/A' }}{% if port.banner and port.banner|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-purple-400 underline text-xs">more</a><span class="hidden">{{ port.banner }}</span>{% endif %}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% if shodan.raw.ports|length > 5 %}
-              <details class="mt-1"><summary class="text-purple-400 cursor-pointer text-xs">Show All Ports ({{ shodan.raw.ports|length }})</summary>
-                <table class="w-full text-xs mt-1">
-                  <tbody>
-                    {% for port in shodan.raw.ports[5:] %}
-                      <tr class="border-t border-gray-800">
-                        <td class="px-2 py-1.5">{{ port.port }}</td>
-                        <td class="px-2 py-1.5">{{ port.service or 'N/A' }}</td>
-                        <td class="px-2 py-1.5">{{ port.product or 'N/A' }}</td>
-                        <td class="px-2 py-1.5">{{ port.version or 'N/A' }}</td>
-                        <td class="px-2 py-1.5 break-all max-w-xs">{{ port.banner[:60] if port.banner else 'N/A' }}{% if port.banner and port.banner|length > 60 %}...{% endif %}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </details>
-            {% endif %}
+          <p class="nt-card__section-title">Open Ports ({{ shodan.raw.ports|length }})</p>
+          <div class="nt-port-cloud">
+            {% for port in shodan.raw.ports %}
+              <span class="nt-port" title="{{ port.product or '' }} {{ port.version or '' }}{% if port.banner %} — {{ port.banner[:120] }}{% endif %}">
+                <span class="nt-port__num">{{ port.port }}</span>
+                {% if port.service %}<span class="nt-port__svc">{{ port.service }}</span>{% endif %}
+              </span>
+            {% endfor %}
           </div>
         {% endif %}
+
         {% if shodan.tables is defined and shodan.tables.vulnerabilities %}
-          <div class="mb-4">
-            <span class="font-semibold text-gray-400 text-sm">Vulnerabilities</span>
-            <div class="flex flex-wrap gap-1 mt-2">
-              {% for vuln in shodan.tables.vulnerabilities %}
-                <span class="px-2 py-0.5 rounded text-xs font-mono bg-red-900/50 text-red-300 border border-red-800">{{ vuln }}</span>
-              {% endfor %}
-            </div>
+          <p class="nt-card__section-title">Vulnerabilities</p>
+          <div class="nt-cves">
+            {% for vuln in shodan.tables.vulnerabilities %}
+              <span class="nt-cve">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M3.3 19h17.4L12 4z"/></svg>
+                {{ vuln }}
+              </span>
+            {% endfor %}
           </div>
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ shodan.raw | tojson(indent=2) }}</pre>
+
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ shodan.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== AbuseIPDB Card ==================== #}
+    {# ---------- AbuseIPDB — risk gauge as the headline ---------- #}
     {% if abuseipdb %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-          AbuseIPDB Report
-        </h3>
+      <div class="nt-card is-abuse">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2L3 6v6c0 5 4 9.5 9 10 5-.5 9-5 9-10V6l-9-4z"/>
+              <path d="M12 8v5M12 17h.01"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">AbuseIPDB</h3>
+          <span class="nt-card__source">Abuse Reports</span>
+        </div>
+
         {% if abuseipdb.summary %}
-          <table class="w-full text-sm mb-4">
-            {# Risk Score with colored badge #}
-            {% set score = abuseipdb.summary.abuseConfidenceScore or abuseipdb.summary.get('abuse_confidence_score') or abuseipdb.summary.get('confidence_score') or abuseipdb.summary.get('risk_score') %}
-            {% if score is not none %}
-              <tr>
-                <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Risk Score</th>
-                <td class="py-2">
-                  {% set score_int = score|int %}
-                  <span class="px-2 py-0.5 rounded text-xs font-bold
-                    {% if score_int > 75 %}bg-red-900 text-red-300
-                    {% elif score_int > 25 %}bg-yellow-900 text-yellow-300
-                    {% else %}bg-green-900 text-green-300{% endif %}">{{ score }}%</span>
-                </td>
-              </tr>
-            {% endif %}
-            {{ kv_row('Total Reports', abuseipdb.summary.totalReports or abuseipdb.summary.get('total_reports')) }}
+          {% set score = abuseipdb.summary.abuseConfidenceScore or abuseipdb.summary.get('abuse_confidence_score') or abuseipdb.summary.get('confidence_score') or abuseipdb.summary.get('risk_score') %}
+          {% if score is not none %}
+            {% set score_int = score|int %}
+            {% set gauge_cls = 'is-high' if score_int > 50 else ('is-medium' if score_int > 25 else 'is-low') %}
+            <div class="nt-gauge-row">
+              <div class="nt-gauge {{ gauge_cls }}" style="--val: {{ score_int }};" role="img" aria-label="Abuse confidence score {{ score_int }} percent">
+                <span class="nt-gauge__value">{{ score_int }}<span class="nt-gauge__unit">%</span></span>
+              </div>
+              <div class="nt-gauge-meta">
+                <span class="nt-gauge-meta__label">Abuse Confidence</span>
+                <span class="nt-gauge-meta__text">
+                  {% if score_int >= 75 %}<strong>High-confidence malicious</strong>{% elif score_int >= 25 %}<strong>Suspicious activity</strong>{% else %}<strong>No significant abuse history</strong>{% endif %}<br>
+                  {% if abuseipdb.summary.totalReports %}{{ abuseipdb.summary.totalReports }} reports{% elif abuseipdb.summary.get('total_reports') %}{{ abuseipdb.summary.get('total_reports') }} reports{% else %}No reports{% endif %}
+                </span>
+              </div>
+            </div>
+          {% endif %}
+
+          <table class="w-full text-sm">
             {{ kv_row('Last Reported', abuseipdb.summary.lastReportedAt or abuseipdb.summary.get('last_reported_at') or abuseipdb.summary.get('last_reported')) }}
             {{ kv_row('Country', abuseipdb.summary.countryName or abuseipdb.summary.get('country_name') or abuseipdb.summary.get('country')) }}
             {{ kv_row('ISP', abuseipdb.summary.isp) }}
             {{ kv_row('Domain', abuseipdb.summary.domain) }}
             {{ kv_row('Usage Type', abuseipdb.summary.usageType or abuseipdb.summary.get('usage_type')) }}
             {{ kv_row('IP', abuseipdb.summary.ipAddress or abuseipdb.summary.get('ip_address') or abuseipdb.summary.get('ip')) }}
-            {# Fallback: show any remaining summary fields not already shown #}
             {% set shown_keys = ['abuseConfidenceScore', 'abuse_confidence_score', 'confidence_score', 'risk_score', 'totalReports', 'total_reports', 'lastReportedAt', 'last_reported_at', 'last_reported', 'countryName', 'country_name', 'country', 'isp', 'domain', 'usageType', 'usage_type', 'ipAddress', 'ip_address', 'ip'] %}
             {% for k, v in abuseipdb.summary.items() %}
-              {% if k not in shown_keys and v %}
-                {{ kv_row(k|replace('_', ' ')|title, v) }}
-              {% endif %}
+              {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
             {% endfor %}
           </table>
         {% endif %}
+
         {% if abuseipdb.tables is defined and abuseipdb.tables.reports %}
-          <div class="mb-4">
-            <span class="font-semibold text-gray-400 text-sm">Recent Reports</span>
-            <table class="w-full text-xs mt-2">
-              <thead>
-                <tr class="bg-gray-800 text-red-200">
-                  <th class="px-2 py-1.5 text-left">Date</th><th class="px-2 py-1.5 text-left">Comment</th><th class="px-2 py-1.5 text-left">Country</th>
+          <p class="nt-card__section-title">Recent Reports</p>
+          <table class="w-full text-xs">
+            <thead>
+              <tr>
+                <th class="px-2 py-1.5 text-left">Date</th>
+                <th class="px-2 py-1.5 text-left">Comment</th>
+                <th class="px-2 py-1.5 text-left">Country</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for report in abuseipdb.tables.reports[:5] %}
+                <tr class="border-t border-gray-800">
+                  <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                  <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-red-400 underline text-xs">more</a><span class="hidden">{{ report.comment }}</span>{% endif %}</td>
+                  <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {% for report in abuseipdb.tables.reports[:5] %}
-                  <tr class="border-t border-gray-800">
-                    <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
-                    <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-red-400 underline text-xs">more</a><span class="hidden">{{ report.comment }}</span>{% endif %}</td>
-                    <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% if abuseipdb.tables.reports|length > 5 %}
-              <details class="mt-1"><summary class="text-red-400 cursor-pointer text-xs">Show All Reports ({{ abuseipdb.tables.reports|length }})</summary>
-                <table class="w-full text-xs mt-1">
-                  <tbody>
-                    {% for report in abuseipdb.tables.reports[5:] %}
-                      <tr class="border-t border-gray-800">
-                        <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
-                        <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}...{% endif %}</td>
-                        <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </details>
-            {% endif %}
-          </div>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if abuseipdb.tables.reports|length > 5 %}
+            <details class="mt-1"><summary class="text-red-400 cursor-pointer text-xs">Show All Reports ({{ abuseipdb.tables.reports|length }})</summary>
+              <table class="w-full text-xs mt-1">
+                <tbody>
+                  {% for report in abuseipdb.tables.reports[5:] %}
+                    <tr class="border-t border-gray-800">
+                      <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                      <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}...{% endif %}</td>
+                      <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+          {% endif %}
         {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ abuseipdb.raw | tojson(indent=2) }}</pre>
+
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ abuseipdb.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# ==================== AlienVault OTX (IP grid) ==================== #}
+    {# ---------- AlienVault OTX (IP grid) ---------- #}
     {% if alienvault and has_ip_cards %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
-          AlienVault OTX
-        </h3>
-        {% if alienvault.summary %}
-          <table class="w-full text-sm mb-4">
-            {{ kv_row('Indicator', alienvault.summary.indicator) }}
-            {% if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none %}
-              <tr>
-                <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Reputation</th>
-                <td class="py-2">
-                  {% set rep = alienvault.summary.reputation|int %}
-                  <span class="px-2 py-0.5 rounded text-xs font-bold
-                    {% if rep > 3 %}bg-red-900 text-red-300
-                    {% elif rep > 1 %}bg-yellow-900 text-yellow-300
-                    {% else %}bg-green-900 text-green-300{% endif %}">{{ alienvault.summary.reputation }}</span>
-                </td>
-              </tr>
-            {% endif %}
-            {{ kv_row('Pulse Count', alienvault.summary.pulse_count) }}
-            {{ kv_row('Tags', alienvault.summary.tags) }}
-            {# Fallback for remaining fields #}
-            {% set shown_keys = ['indicator', 'reputation', 'pulse_count', 'tags'] %}
-            {% for k, v in alienvault.summary.items() %}
-              {% if k not in shown_keys and v %}
-                {{ kv_row(k|replace('_', ' ')|title, v) }}
-              {% endif %}
-            {% endfor %}
-          </table>
-        {% endif %}
-        {% if alienvault.tables is defined and alienvault.tables.pulses %}
-          <div class="mb-4">
-            <span class="font-semibold text-gray-400 text-sm">Pulses</span>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-              {% for pulse in alienvault.tables.pulses[:5] %}
-                <li class="text-sm text-gray-300">{{ pulse.name }} <span class="text-gray-500">by {{ pulse.author }}</span> <span class="text-gray-600">({{ pulse.created }})</span> <a href="{{ pulse.link }}" class="text-orange-400 underline text-xs" target="_blank">View</a></li>
-              {% endfor %}
-            </ul>
-            {% if alienvault.tables.pulses|length > 5 %}
-              <details class="mt-1"><summary class="text-orange-400 cursor-pointer text-xs">Show All Pulses ({{ alienvault.tables.pulses|length }})</summary>
-                <ul class="list-disc list-inside mt-1 space-y-1">
-                  {% for pulse in alienvault.tables.pulses[5:] %}
-                    <li class="text-sm text-gray-300">{{ pulse.name }} <span class="text-gray-500">by {{ pulse.author }}</span> <span class="text-gray-600">({{ pulse.created }})</span> <a href="{{ pulse.link }}" class="text-orange-400 underline text-xs" target="_blank">View</a></li>
-                  {% endfor %}
-                </ul>
-              </details>
-            {% endif %}
-          </div>
-        {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ alienvault.raw | tojson(indent=2) }}</pre>
-        </details>
-      </div>
+      {{ render_alienvault(alienvault) }}
     {% endif %}
   </div>
   {% endif %}
 
-  {# --- Domain/URL Analysis Cards Grid --- #}
-  <div class="w-full grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-5">
-    {# AlienVault OTX - show in domain grid if no IP cards #}
+  {# ==================== DOMAIN / URL GRID ==================== #}
+  {% if (alienvault and not has_ip_cards) or domain_info or url_analysis or whois_info %}
+  <div class="nt-card-grid">
     {% if alienvault and not has_ip_cards %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
-          AlienVault OTX
-        </h3>
-        {% if alienvault.summary %}
-          <table class="w-full text-sm mb-4">
-            {{ kv_row('Indicator', alienvault.summary.indicator) }}
-            {% if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none %}
-              <tr>
-                <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Reputation</th>
-                <td class="py-2">
-                  {% set rep = alienvault.summary.reputation|int %}
-                  <span class="px-2 py-0.5 rounded text-xs font-bold
-                    {% if rep > 3 %}bg-red-900 text-red-300
-                    {% elif rep > 1 %}bg-yellow-900 text-yellow-300
-                    {% else %}bg-green-900 text-green-300{% endif %}">{{ alienvault.summary.reputation }}</span>
-                </td>
-              </tr>
-            {% endif %}
-            {{ kv_row('Pulse Count', alienvault.summary.pulse_count) }}
-            {{ kv_row('Tags', alienvault.summary.tags) }}
-            {% set shown_keys = ['indicator', 'reputation', 'pulse_count', 'tags'] %}
-            {% for k, v in alienvault.summary.items() %}
-              {% if k not in shown_keys and v %}
-                {{ kv_row(k|replace('_', ' ')|title, v) }}
-              {% endif %}
-            {% endfor %}
-          </table>
-        {% endif %}
-        {% if alienvault.tables is defined and alienvault.tables.pulses %}
-          <div class="mb-4">
-            <span class="font-semibold text-gray-400 text-sm">Pulses</span>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-              {% for pulse in alienvault.tables.pulses[:5] %}
-                <li class="text-sm text-gray-300">{{ pulse.name }} <span class="text-gray-500">by {{ pulse.author }}</span> <span class="text-gray-600">({{ pulse.created }})</span> <a href="{{ pulse.link }}" class="text-orange-400 underline text-xs" target="_blank">View</a></li>
-              {% endfor %}
-            </ul>
-            {% if alienvault.tables.pulses|length > 5 %}
-              <details class="mt-1"><summary class="text-orange-400 cursor-pointer text-xs">Show All Pulses ({{ alienvault.tables.pulses|length }})</summary>
-                <ul class="list-disc list-inside mt-1 space-y-1">
-                  {% for pulse in alienvault.tables.pulses[5:] %}
-                    <li class="text-sm text-gray-300">{{ pulse.name }} <span class="text-gray-500">by {{ pulse.author }}</span> <span class="text-gray-600">({{ pulse.created }})</span> <a href="{{ pulse.link }}" class="text-orange-400 underline text-xs" target="_blank">View</a></li>
-                  {% endfor %}
-                </ul>
-              </details>
-            {% endif %}
-          </div>
-        {% endif %}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ alienvault.raw | tojson(indent=2) }}</pre>
-        </details>
-      </div>
+      {{ render_alienvault(alienvault) }}
     {% endif %}
 
-    {# --- SSL Info Card --- #}
+    {# ---------- SSL Certificate ---------- #}
     {% if domain_info and domain_info.ssl_info %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-          </svg>
-          SSL Certificate
-        </h3>
+      <div class="nt-card is-ssl">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">SSL Certificate</h3>
+          <span class="nt-card__source">TLS</span>
+        </div>
         <table class="w-full text-xs">
           <thead>
-            <tr class="bg-gray-800 text-green-200">
-              <th class="px-2 py-1.5 text-left">Field</th><th class="px-2 py-1.5 text-left">Value</th>
+            <tr>
+              <th class="px-2 py-1.5 text-left">Field</th>
+              <th class="px-2 py-1.5 text-left">Value</th>
             </tr>
           </thead>
           <tbody>
@@ -574,9 +513,7 @@
                     {% if v|length > 3 %}
                       <details><summary class="text-green-400 cursor-pointer text-xs">Show All ({{ v|length }})</summary>
                         <ul class="list-disc list-inside text-xs">
-                          {% for item in v[3:] %}
-                            <li>{{ item }}</li>
-                          {% endfor %}
+                          {% for item in v[3:] %}<li>{{ item }}</li>{% endfor %}
                         </ul>
                       </details>
                     {% endif %}
@@ -588,249 +525,245 @@
             {% endfor %}
           </tbody>
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# --- DNS Records Card --- #}
+    {# ---------- DNS Records — with type tag chips ---------- #}
     {% if domain_info and domain_info.dns_records %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-          </svg>
-          DNS Records
-        </h3>
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="bg-gray-800 text-blue-200">
-              <th class="px-2 py-1.5 text-left">Type</th><th class="px-2 py-1.5 text-left">Value</th>
-            </tr>
-          </thead>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <ellipse cx="12" cy="6" rx="8" ry="3"/>
+              <path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/>
+              <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">DNS Records</h3>
+          <span class="nt-card__source">Resolution</span>
+        </div>
+        <table class="w-full text-sm">
           <tbody>
             {% for k, v in domain_info.dns_records.items() %}
               <tr class="border-t border-gray-800">
-                <td class="px-2 py-1.5">
-                  <span class="px-2 py-0.5 rounded bg-blue-900 text-blue-200 text-xs uppercase font-mono">{{ k }}</span>
+                <td class="px-2 py-1.5 align-top">
+                  <span class="nt-dns-tag">{{ k }}</span>
                 </td>
                 <td class="px-2 py-1.5 break-all">
                   {% if v is defined and v is not none and v.__class__.__name__ in ['list', 'tuple'] %}
                     {% for rec in v[:3] %}
-                      <div>{{ rec[:80] if rec is string else rec }}{% if rec is string and rec|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ rec }}</span>{% endif %}</div>
+                      <div class="font-mono text-xs">{{ rec[:80] if rec is string else rec }}{% if rec is string and rec|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ rec }}</span>{% endif %}</div>
                     {% endfor %}
                     {% if v|length > 3 %}
                       <details><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ v|length }})</summary>
-                        <ul class="list-disc list-inside text-xs">
-                          {% for rec in v[3:] %}
-                            <li>{{ rec }}</li>
-                          {% endfor %}
+                        <ul class="font-mono text-xs space-y-1 mt-1">
+                          {% for rec in v[3:] %}<li>{{ rec }}</li>{% endfor %}
                         </ul>
                       </details>
                     {% endif %}
                   {% else %}
-                    {{ v if v else 'N/A' }}
+                    <span class="font-mono text-xs">{{ v if v else 'N/A' }}</span>
                   {% endif %}
                 </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ domain_info.dns_records | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ domain_info.dns_records | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# --- URL Analysis Card --- #}
+    {# ---------- URL Analysis — with security-header grades ---------- #}
     {% if url_analysis %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-          </svg>
-          URL Analysis
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/>
+              <path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">URL Analysis</h3>
+          <span class="nt-card__source">HTTP Probe</span>
+        </div>
         {% set ua = url_analysis %}
-        {# --- URL Details --- #}
-        <div class="mb-4">
-          <h5 class="text-sm font-semibold text-blue-300 mb-1">URL Details</h5>
-          <table class="w-full text-sm">
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Scheme</th><td class="py-1">{{ ua.get('parsed_url', {}).get('scheme', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Domain</th><td class="py-1">{{ ua.get('parsed_url', {}).get('netloc', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Path</th><td class="py-1">{{ ua.get('parsed_url', {}).get('path', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Query</th><td class="py-1">{{ ua.get('parsed_url', {}).get('query', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Fragment</th><td class="py-1">{{ ua.get('parsed_url', {}).get('fragment', 'N/A') }}</td></tr>
-          </table>
-        </div>
-        {# --- HTTP Response --- #}
-        <div class="mb-4">
-          <h5 class="text-sm font-semibold text-blue-300 mb-1">HTTP Response</h5>
-          <table class="w-full text-sm">
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Status Code</th><td class="py-1">{{ ua.get('response', {}).get('status_code', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Content Type</th><td class="py-1">{{ ua.get('response', {}).get('content_type', 'N/A') }}</td></tr>
-            <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Final URL</th><td class="py-1 break-all">{{ ua.get('response', {}).get('url', 'N/A') }}</td></tr>
-          </table>
-        </div>
-        {# --- Security Headers --- #}
-        <div class="mb-4">
-          <h5 class="text-sm font-semibold text-blue-300 mb-1">Security Headers</h5>
-          <table class="w-full text-sm">
+
+        <p class="nt-card__section-title" style="margin-top:0;">URL Components</p>
+        <table class="w-full text-sm">
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Scheme</th><td class="py-1">{{ ua.get('parsed_url', {}).get('scheme', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Domain</th><td class="py-1">{{ ua.get('parsed_url', {}).get('netloc', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Path</th><td class="py-1">{{ ua.get('parsed_url', {}).get('path', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Query</th><td class="py-1">{{ ua.get('parsed_url', {}).get('query', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Fragment</th><td class="py-1">{{ ua.get('parsed_url', {}).get('fragment', 'N/A') }}</td></tr>
+        </table>
+
+        <p class="nt-card__section-title">HTTP Response</p>
+        <table class="w-full text-sm">
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Status Code</th><td class="py-1">{{ ua.get('response', {}).get('status_code', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Content Type</th><td class="py-1">{{ ua.get('response', {}).get('content_type', 'N/A') }}</td></tr>
+          <tr><th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">Final URL</th><td class="py-1 break-all">{{ ua.get('response', {}).get('url', 'N/A') }}</td></tr>
+        </table>
+
+        {% if ua.get('security_headers') %}
+          {% set total = ua.get('security_headers', {})|length %}
+          {% set passed = 0 %}
+          {% for k, v in ua.get('security_headers', {}).items() %}{% if v != 'Not Set' %}{% set passed = passed + 1 %}{% endif %}{% endfor %}
+          {# Recompute (Jinja for-loop scoping doesn't bleed) by counting in markup #}
+          {% set passed_list = [] %}
+          {% for k, v in ua.get('security_headers', {}).items() %}{% if v != 'Not Set' %}{% set _ = passed_list.append(1) %}{% endif %}{% endfor %}
+          {% set passed_n = passed_list|length %}
+          {% set ratio = (passed_n / total) if total > 0 else 0 %}
+          {% set grade = 'A' if ratio >= 0.9 else ('B' if ratio >= 0.75 else ('C' if ratio >= 0.5 else ('D' if ratio >= 0.25 else 'F'))) %}
+
+          <div style="display:flex; align-items:baseline; gap:0.75rem; margin: 1.2rem 0 0.55rem;">
+            <p class="nt-card__section-title" style="margin:0;">Security Headers</p>
+            <span class="nt-pill {{ 'is-negative' if ratio >= 0.75 else ('is-warn' if ratio >= 0.5 else 'is-positive') }}" style="margin-left:auto;">
+              Grade {{ grade }} &nbsp;·&nbsp; {{ passed_n }}/{{ total }}
+            </span>
+          </div>
+          <div class="nt-headers-grid">
             {% for k, v in ua.get('security_headers', {}).items() %}
-              <tr>
-                <th class="pr-4 py-1 text-gray-400 text-left whitespace-nowrap">{{ k }}</th>
-                <td class="py-1">{% if v != 'Not Set' %}<span class="px-2 py-0.5 rounded bg-green-900 text-green-300 text-xs font-bold">Set</span>{% else %}<span class="px-2 py-0.5 rounded bg-red-900 text-red-300 text-xs font-bold">Not Set</span>{% endif %}</td>
-              </tr>
+              <div class="nt-header-row">
+                <span class="nt-header-row__name" title="{{ k }}">{{ k }}</span>
+                <span class="nt-grade {{ 'is-pass' if v != 'Not Set' else 'is-fail' }}">{{ '✓' if v != 'Not Set' else '✕' }}</span>
+              </div>
             {% endfor %}
-          </table>
-        </div>
-        {# --- Technologies --- #}
+          </div>
+        {% endif %}
+
         {% if ua.get('technologies') %}
-          <div class="mb-4">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">Detected Technologies</h5>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {% for cat, techs in ua.get('technologies', {}).items() %}
-                <div>
-                  <span class="font-semibold text-gray-400 text-xs">{{ cat }}:</span>
-                  <ul class="list-disc list-inside text-sm">
-                    {% for t in techs %}
-                      <li>{{ t }}</li>
-                    {% endfor %}
-                  </ul>
-                </div>
-              {% endfor %}
-            </div>
+          <p class="nt-card__section-title">Detected Technologies</p>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem;">
+            {% for cat, techs in ua.get('technologies', {}).items() %}
+              <div>
+                <span class="font-semibold text-gray-400 text-xs">{{ cat }}</span>
+                <ul class="list-disc list-inside text-sm">
+                  {% for t in techs %}<li>{{ t }}</li>{% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
           </div>
         {% endif %}
-        {# --- Meta Tags --- #}
+
         {% if ua.get('meta_tags') %}
-          <div class="mb-4">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">Meta Tags</h5>
-            <table class="w-full text-xs">
-              <thead><tr class="bg-gray-800"><th class="px-2 py-1.5 text-gray-400 text-left">Name</th><th class="px-2 py-1.5 text-gray-400 text-left">Content</th></tr></thead>
-              <tbody>
-                {% for tag in ua.get('meta_tags', [])[:5] %}
-                  <tr class="border-t border-gray-800"><td class="px-2 py-1.5">{{ tag.get('name', 'N/A') }}</td><td class="px-2 py-1.5 break-all">{{ tag.get('content', '')[:60] }}{% if tag.get('content', '')|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ tag.get('content', '') }}</span>{% endif %}</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% if ua.get('meta_tags', [])|length > 5 %}
-              <details><summary class="text-blue-400 cursor-pointer text-xs">Show All</summary>
-                <table class="w-full text-xs">
-                  <tbody>
-                    {% for tag in ua.get('meta_tags', [])[5:] %}
-                      <tr class="border-t border-gray-800"><td class="px-2 py-1.5">{{ tag.get('name', 'N/A') }}</td><td class="px-2 py-1.5">{{ tag.get('content', '') }}</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </details>
-            {% endif %}
-          </div>
-        {% endif %}
-        {# --- Redirect Chain --- #}
-        {% if ua.get('response', {}).get('redirect_chain') %}
-          <div class="mb-4">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">Redirect Chain</h5>
-            <ul class="list-disc list-inside text-sm">
-              {% for r in ua.get('response', {}).get('redirect_chain', []) %}
-                <li><span class="text-gray-400">[{{ r.get('status_code', 'N/A') }}]</span> <span class="break-all">{{ r.get('url', 'N/A') }}</span></li>
+          <p class="nt-card__section-title">Meta Tags</p>
+          <table class="w-full text-xs">
+            <thead><tr><th class="px-2 py-1.5 text-gray-400 text-left">Name</th><th class="px-2 py-1.5 text-gray-400 text-left">Content</th></tr></thead>
+            <tbody>
+              {% for tag in ua.get('meta_tags', [])[:5] %}
+                <tr class="border-t border-gray-800">
+                  <td class="px-2 py-1.5">{{ tag.get('name', 'N/A') }}</td>
+                  <td class="px-2 py-1.5 break-all">{{ tag.get('content', '')[:60] }}{% if tag.get('content', '')|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ tag.get('content', '') }}</span>{% endif %}</td>
+                </tr>
               {% endfor %}
-            </ul>
-          </div>
+            </tbody>
+          </table>
+          {% if ua.get('meta_tags', [])|length > 5 %}
+            <details><summary class="text-blue-400 cursor-pointer text-xs">Show All</summary>
+              <table class="w-full text-xs">
+                <tbody>
+                  {% for tag in ua.get('meta_tags', [])[5:] %}
+                    <tr class="border-t border-gray-800"><td class="px-2 py-1.5">{{ tag.get('name', 'N/A') }}</td><td class="px-2 py-1.5">{{ tag.get('content', '') }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+          {% endif %}
         {% endif %}
-        {# --- Favicon --- #}
+
+        {% if ua.get('response', {}).get('redirect_chain') %}
+          <p class="nt-card__section-title">Redirect Chain</p>
+          <ul class="list-disc list-inside text-sm">
+            {% for r in ua.get('response', {}).get('redirect_chain', []) %}
+              <li><span class="text-gray-400">[{{ r.get('status_code', 'N/A') }}]</span> <span class="break-all">{{ r.get('url', 'N/A') }}</span></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
         {% if ua.get('favicon') %}
-          <div class="mb-4 flex items-center gap-4">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">Favicon</h5>
+          <p class="nt-card__section-title">Favicon</p>
+          <div class="flex items-center gap-3">
             <img src="{{ ua.get('favicon', {}).get('url', '') }}" alt="favicon" class="w-8 h-8 rounded border border-gray-700">
-            <span class="font-mono text-xs">MD5: {{ ua.get('favicon', {}).get('md5', 'N/A') }}</span>
+            <span class="font-mono text-xs text-gray-400">MD5: {{ ua.get('favicon', {}).get('md5', 'N/A') }}</span>
           </div>
         {% endif %}
-        {# --- OpenGraph/Twitter --- #}
+
         {% if ua.get('opengraph') or ua.get('twitter') %}
-          <div class="mb-4">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">OpenGraph / Twitter Meta</h5>
-            {% if ua.get('opengraph') %}
-              <div class="mb-2"><span class="font-semibold text-gray-400 text-xs">OpenGraph:</span>
-                <ul class="list-disc list-inside text-xs">
-                  {% for k, v in ua.get('opengraph', {}).items() %}
-                    <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ v }}</span>{% endif %}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endif %}
-            {% if ua.get('twitter') %}
-              <div><span class="font-semibold text-gray-400 text-xs">Twitter:</span>
-                <ul class="list-disc list-inside text-xs">
-                  {% for k, v in ua.get('twitter', {}).items() %}
-                    <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ v }}</span>{% endif %}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endif %}
-          </div>
+          <p class="nt-card__section-title">OpenGraph / Twitter</p>
+          {% if ua.get('opengraph') %}
+            <div class="mb-2">
+              <span class="font-semibold text-gray-400 text-xs">OpenGraph</span>
+              <ul class="list-disc list-inside text-xs">
+                {% for k, v in ua.get('opengraph', {}).items() %}
+                  <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ v }}</span>{% endif %}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+          {% if ua.get('twitter') %}
+            <div>
+              <span class="font-semibold text-gray-400 text-xs">Twitter</span>
+              <ul class="list-disc list-inside text-xs">
+                {% for k, v in ua.get('twitter', {}).items() %}
+                  <li class="break-all">{{ k }}: {{ v[:60] }}{% if v|length > 60 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ v }}</span>{% endif %}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
         {% endif %}
-        {# --- Screenshot --- #}
+
         {% if ua.get('screenshot_url') %}
-          <div class="mb-4 flex flex-col items-center">
-            <h5 class="text-sm font-semibold text-blue-300 mb-1">Screenshot (urlscan.io)</h5>
-            <img src="{{ ua.get('screenshot_url', '') }}" alt="Screenshot" class="rounded shadow max-w-xs max-h-64 border border-gray-700">
-          </div>
+          <p class="nt-card__section-title">Screenshot (urlscan.io)</p>
+          <img src="{{ ua.get('screenshot_url', '') }}" alt="Screenshot" class="rounded shadow max-w-xs max-h-64 border border-gray-700">
         {% endif %}
-        {# --- PhishTank --- #}
+
         {% if ua.get('phishtank_url') %}
-          <div class="mb-4">
-            <a href="{{ ua.get('phishtank_url', '') }}" class="btn btn-primary w-fit" target="_blank">Check on PhishTank</a>
+          <div class="mt-4">
+            <a href="{{ ua.get('phishtank_url', '') }}" class="nt-back-home" target="_blank" rel="noopener">Check on PhishTank →</a>
           </div>
         {% endif %}
-        {# --- Raw Data --- #}
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ ua | tojson(indent=2) }}</pre>
+
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ ua | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# --- WHOIS Card --- #}
+    {# ---------- WHOIS ---------- #}
     {% if whois_info %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          WHOIS
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(129,140,248,.28), rgba(79,70,229,.16)); border-color: rgba(129,140,248,.40); color: #c7d2fe;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/>
+              <path d="M14 3v5h5M9 13h6M9 17h6"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">WHOIS</h3>
+          <span class="nt-card__source">Registration</span>
+        </div>
         <table class="w-full text-sm">
           {{ kv_row('Domain', whois_info.domain) }}
           {% if whois_info.registrar %}
             {{ kv_row('Registrar', whois_info.registrar.name if whois_info.registrar.name is defined else whois_info.registrar) }}
           {% endif %}
-          {% if whois_info.create_date %}
-            {{ kv_row('Created', whois_info.create_date[:10]) }}
-          {% endif %}
-          {% if whois_info.expire_date %}
-            {{ kv_row('Expires', whois_info.expire_date[:10]) }}
-          {% endif %}
-          {% if whois_info.update_date %}
-            {{ kv_row('Updated', whois_info.update_date[:10]) }}
-          {% endif %}
-          {% if whois_info.domain_age %}
-            {{ kv_row('Domain Age', whois_info.domain_age ~ ' days') }}
-          {% endif %}
-          {% if whois_info.whois_server %}
-            {{ kv_row('WHOIS Server', whois_info.whois_server) }}
-          {% endif %}
+          {% if whois_info.create_date %}{{ kv_row('Created', whois_info.create_date[:10]) }}{% endif %}
+          {% if whois_info.expire_date %}{{ kv_row('Expires', whois_info.expire_date[:10]) }}{% endif %}
+          {% if whois_info.update_date %}{{ kv_row('Updated', whois_info.update_date[:10]) }}{% endif %}
+          {% if whois_info.domain_age %}{{ kv_row('Domain Age', whois_info.domain_age ~ ' days') }}{% endif %}
+          {% if whois_info.whois_server %}{{ kv_row('WHOIS Server', whois_info.whois_server) }}{% endif %}
           {% if whois_info.status %}
             <tr>
               <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Status</th>
               <td class="py-2 break-words">
                 {% set statuses = [whois_info.status] if whois_info.status is string else whois_info.status %}
-                {% for s in statuses[:2] %}
-                  <div class="text-xs">{{ s.split(' ')[0] }}</div>
-                {% endfor %}
-                {% if statuses|length > 2 %}
-                  <span class="text-gray-500 text-xs">+{{ statuses|length - 2 }} more</span>
-                {% endif %}
+                {% for s in statuses[:2] %}<div class="text-xs font-mono">{{ s.split(' ')[0] }}</div>{% endfor %}
+                {% if statuses|length > 2 %}<span class="text-gray-500 text-xs">+{{ statuses|length - 2 }} more</span>{% endif %}
               </td>
             </tr>
           {% endif %}
@@ -839,37 +772,37 @@
               <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Nameservers</th>
               <td class="py-2 break-words">
                 {% set ns_list = [whois_info.nameservers] if whois_info.nameservers is string else whois_info.nameservers %}
-                {% for ns in ns_list[:3] %}
-                  <div class="text-xs">{{ ns }}</div>
-                {% endfor %}
+                {% for ns in ns_list[:3] %}<div class="text-xs font-mono">{{ ns }}</div>{% endfor %}
                 {% if ns_list|length > 3 %}
                   <details class="mt-1"><summary class="text-indigo-400 cursor-pointer text-xs">+{{ ns_list|length - 3 }} more</summary>
-                    {% for ns in ns_list[3:] %}
-                      <div class="text-xs">{{ ns }}</div>
-                    {% endfor %}
+                    {% for ns in ns_list[3:] %}<div class="text-xs font-mono">{{ ns }}</div>{% endfor %}
                   </details>
                 {% endif %}
               </td>
             </tr>
           {% endif %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-indigo-400 text-sm">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ whois_info | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ whois_info | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {# --- Email Security Card (SPF/DKIM/DMARC) --- #}
+    {# ---------- Email Security (SPF / DKIM / DMARC) — pass/fail row design ---------- #}
     {% if domain_info and domain_info.email_security %}
       {% set es = domain_info.email_security %}
       {% if es.spf or es.dkim or es.dmarc %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
-          Email Security
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 6l8 6 8-6"/>
+              <rect x="3" y="5" width="18" height="14" rx="2"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">Email Security</h3>
+          <span class="nt-card__source">SPF / DKIM / DMARC</span>
+        </div>
         <table class="w-full text-sm">
           {% for record in ['spf', 'dkim', 'dmarc'] %}
             <tr>
@@ -878,62 +811,60 @@
                 {% set val = es[record] %}
                 {% if val %}
                   {% set record_text = val[0] if val is not string else val %}
-                  <span class="inline-flex items-start gap-2">
-                    <span class="text-green-400 shrink-0">&#10003;</span>
-                    <span class="text-xs text-gray-300 break-all">{{ record_text[:80] }}{% if record_text|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">more</a><span class="hidden">{{ record_text }}</span>{% endif %}</span>
-                  </span>
+                  <div class="flex items-start gap-2">
+                    <span class="nt-grade is-pass">✓</span>
+                    <span class="text-xs font-mono text-gray-300 break-all">{{ record_text[:80] }}{% if record_text|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline">more</a><span class="hidden">{{ record_text }}</span>{% endif %}</span>
+                  </div>
                 {% else %}
-                  <span class="inline-flex items-center gap-2">
-                    <span class="text-red-400">&#10007;</span>
+                  <div class="flex items-center gap-2">
+                    <span class="nt-grade is-fail">✕</span>
                     <span class="text-gray-500 text-sm">Not configured</span>
-                  </span>
+                  </div>
                 {% endif %}
               </td>
             </tr>
           {% endfor %}
         </table>
-        <details class="mt-auto pt-4"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-          <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto max-h-64 overflow-auto mt-2">{{ es | tojson(indent=2) }}</pre>
+        <details class="nt-raw"><summary>Show Raw Data</summary>
+          <pre>{{ es | tojson(indent=2) }}</pre>
         </details>
       </div>
       {% endif %}
     {% endif %}
-  </div>
 
-  {# --- Enrichment Cards Section --- #}
-  <div class="w-full grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mt-5">
+    {# ---------- Reverse IP domains ---------- #}
     {% if domain_info and domain_info.reverse_domains %}
       {% if domain_info.reverse_domains[0] and 'API count exceeded' in domain_info.reverse_domains[0] %}
-        <div class="bg-yellow-900/30 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto border border-yellow-800">
-          <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            Reverse IP Domains
-          </h3>
-          <span class="text-yellow-400 text-sm">API count exceeded - Increase Quota with Membership or try again later.</span>
+        <div class="nt-card" style="border-color: rgba(245,158,11,.32);">
+          <div class="nt-card__head">
+            <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(245,158,11,.28), rgba(180,83,9,.16)); border-color: rgba(245,158,11,.40); color: #fde68a;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M3.3 19h17.4L12 4z"/></svg>
+            </span>
+            <h3 class="nt-card__title">Reverse IP Domains</h3>
+            <span class="nt-card__source">Rate Limited</span>
+          </div>
+          <span class="text-yellow-400 text-sm">API count exceeded — increase quota with a paid plan or try again later.</span>
         </div>
       {% else %}
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-          <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-            </svg>
-            Reverse IP Domains
-          </h3>
+        <div class="nt-card">
+          <div class="nt-card__head">
+            <span class="nt-card__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 7h12M16 3l4 4-4 4M16 17H4M8 21l-4-4 4-4"/>
+              </svg>
+            </span>
+            <h3 class="nt-card__title">Reverse IP Domains</h3>
+            <span class="nt-card__source">Co-hosted</span>
+          </div>
           {% set domains = domain_info.reverse_domains %}
           {% if domains|length > 0 %}
             <ul class="list-disc list-inside text-sm space-y-1">
-              {% for d in domains[:5] %}
-                <li class="break-all">{{ d }}</li>
-              {% endfor %}
+              {% for d in domains[:5] %}<li class="break-all">{{ d }}</li>{% endfor %}
             </ul>
             {% if domains|length > 5 %}
               <details class="mt-2"><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ domains|length }})</summary>
                 <ul class="list-disc list-inside text-sm mt-1 space-y-1">
-                  {% for d in domains[5:] %}
-                    <li class="break-all">{{ d }}</li>
-                  {% endfor %}
+                  {% for d in domains[5:] %}<li class="break-all">{{ d }}</li>{% endfor %}
                 </ul>
               </details>
             {% endif %}
@@ -943,27 +874,28 @@
         </div>
       {% endif %}
     {% endif %}
+
+    {# ---------- Subdomains (crt.sh) ---------- #}
     {% if domain_info and domain_info.subdomains %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
-          </svg>
-          Subdomains (crt.sh)
-        </h3>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3v18M5 9h14M5 15h14"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">Subdomains</h3>
+          <span class="nt-card__source">crt.sh</span>
+        </div>
         {% set subs = domain_info.subdomains %}
         {% if subs|length > 0 %}
           <ul class="list-disc list-inside text-sm space-y-1">
-            {% for sub in subs[:5] %}
-              <li class="break-all">{{ sub }}</li>
-            {% endfor %}
+            {% for sub in subs[:5] %}<li class="break-all font-mono text-xs">{{ sub }}</li>{% endfor %}
           </ul>
           {% if subs|length > 5 %}
             <details class="mt-2"><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ subs|length }})</summary>
               <ul class="list-disc list-inside text-sm mt-1 space-y-1">
-                {% for sub in subs[5:] %}
-                  <li class="break-all">{{ sub }}</li>
-                {% endfor %}
+                {% for sub in subs[5:] %}<li class="break-all font-mono text-xs">{{ sub }}</li>{% endfor %}
               </ul>
             </details>
           {% endif %}
@@ -972,49 +904,128 @@
         {% endif %}
       </div>
     {% endif %}
+
+    {# ---------- PhishTank ---------- #}
     {% if domain_info and domain_info.phishtank_url %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-          PhishTank Check
-          <span class="ml-2 px-2 py-0.5 rounded text-xs font-bold bg-blue-900 text-blue-300">External</span>
-        </h3>
-        <a href="{{ domain_info.phishtank_url }}" class="btn btn-primary w-fit mt-2" target="_blank">Check on PhishTank</a>
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(248,113,113,.28), rgba(185,28,28,.16)); border-color: rgba(248,113,113,.40); color: #fecaca;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.3 19h17.4L12 4z"/><path d="M12 10v4M12 17h.01"/>
+            </svg>
+          </span>
+          <h3 class="nt-card__title">PhishTank</h3>
+          <span class="nt-card__source">External</span>
+        </div>
+        <p class="text-sm text-gray-400 mb-3">Check this indicator against the PhishTank community database of known phishing URLs.</p>
+        <a href="{{ domain_info.phishtank_url }}" class="nt-back-home" target="_blank" rel="noopener">Check on PhishTank →</a>
       </div>
     {% endif %}
+
+    {# ---------- Cisco Talos ---------- #}
     {% if domain_info and domain_info.talos_reputation %}
-      <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
-        <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-          Cisco Talos Reputation
-          {% set verdict = domain_info.talos_reputation.verdict|lower %}
-          <span class="ml-2 px-2 py-0.5 rounded text-xs font-bold
-            {% if 'malicious' in verdict or 'untrusted' in verdict or 'suspicious' in verdict %}bg-red-900 text-red-300
-            {% elif 'neutral' in verdict %}bg-yellow-900 text-yellow-300
-            {% elif 'trusted' in verdict or 'benign' in verdict %}bg-green-900 text-green-300
-            {% else %}bg-gray-800 text-gray-300{% endif %}">
-            {{ domain_info.talos_reputation.verdict or 'External' }}
+      <div class="nt-card">
+        <div class="nt-card__head">
+          <span class="nt-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/>
+              <path d="M9.5 12l2 2 3.5-4"/>
+            </svg>
           </span>
-        </h3>
-        <a href="{{ domain_info.talos_reputation.talos_url }}" class="btn btn-primary w-fit mt-2" target="_blank">View on Talos</a>
+          <h3 class="nt-card__title">Cisco Talos</h3>
+          {% set tverdict = domain_info.talos_reputation.verdict|lower %}
+          <span class="nt-card__source">
+            {% if 'malicious' in tverdict or 'untrusted' in tverdict or 'suspicious' in tverdict %}
+              <span class="nt-pill is-positive" style="font-size:.65rem;">{{ domain_info.talos_reputation.verdict }}</span>
+            {% elif 'neutral' in tverdict %}
+              <span class="nt-pill is-warn" style="font-size:.65rem;">{{ domain_info.talos_reputation.verdict }}</span>
+            {% elif 'trusted' in tverdict or 'benign' in tverdict %}
+              <span class="nt-pill is-negative" style="font-size:.65rem;">{{ domain_info.talos_reputation.verdict }}</span>
+            {% else %}
+              External
+            {% endif %}
+          </span>
+        </div>
+        <p class="text-sm text-gray-400 mb-3">View Cisco Talos's reputation analysis for this indicator.</p>
+        <a href="{{ domain_info.talos_reputation.talos_url }}" class="nt-back-home" target="_blank" rel="noopener">View on Talos →</a>
       </div>
     {% endif %}
   </div>
+  {% endif %}
 
   <!-- Return to Home -->
-  <div class="flex justify-center mt-12">
-    <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+  <div class="flex justify-center mt-12 mb-6">
+    <a href="/" class="nt-back-home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
       </svg>
-      Return to Home
+      Back to Home
     </a>
   </div>
 </div>
 {% endblock %}
+
+{# AlienVault OTX card — shared between IP and domain grids. #}
+{% macro render_alienvault(alienvault) %}
+  <div class="nt-card is-otx">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <ellipse cx="12" cy="12" rx="9" ry="4"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">AlienVault OTX</h3>
+      <span class="nt-card__source">Open Threat Exchange</span>
+    </div>
+    {% if alienvault.summary %}
+      {% set pulses = alienvault.summary.pulse_count|default(0)|int %}
+      {% set rep = alienvault.summary.reputation|default(0)|int if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none else 0 %}
+      <div class="nt-pills">
+        <span class="nt-pill {{ 'is-positive' if pulses >= 3 else ('is-warn' if pulses >= 1 else 'is-negative') }}">
+          <span class="nt-pill__dot"></span> {{ pulses }} {{ 'pulse' if pulses == 1 else 'pulses' }}
+        </span>
+        {% if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none %}
+          <span class="nt-pill {{ 'is-positive' if rep > 3 else ('is-warn' if rep > 1 else 'is-negative') }}">
+            <span class="nt-pill__dot"></span> Reputation {{ alienvault.summary.reputation }}
+          </span>
+        {% endif %}
+      </div>
+      <table class="w-full text-sm">
+        {{ kv_row('Indicator', alienvault.summary.indicator) }}
+        {{ kv_row('Tags', alienvault.summary.tags) }}
+        {% set shown_keys = ['indicator', 'reputation', 'pulse_count', 'tags'] %}
+        {% for k, v in alienvault.summary.items() %}
+          {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
+        {% endfor %}
+      </table>
+    {% endif %}
+    {% if alienvault.tables is defined and alienvault.tables.pulses %}
+      <p class="nt-card__section-title">Recent Pulses</p>
+      <ul class="space-y-2">
+        {% for pulse in alienvault.tables.pulses[:5] %}
+          <li class="text-sm">
+            <a href="{{ pulse.link }}" target="_blank" rel="noopener" class="text-gray-200 hover:text-blue-300 underline">{{ pulse.name }}</a>
+            <div class="text-xs text-gray-500">by {{ pulse.author }} · {{ pulse.created }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if alienvault.tables.pulses|length > 5 %}
+        <details class="mt-1"><summary class="text-orange-400 cursor-pointer text-xs">Show All Pulses ({{ alienvault.tables.pulses|length }})</summary>
+          <ul class="space-y-2 mt-2">
+            {% for pulse in alienvault.tables.pulses[5:] %}
+              <li class="text-sm">
+                <a href="{{ pulse.link }}" target="_blank" rel="noopener" class="text-gray-200 hover:text-blue-300 underline">{{ pulse.name }}</a>
+                <div class="text-xs text-gray-500">by {{ pulse.author }} · {{ pulse.created }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+    {% endif %}
+    <details class="nt-raw"><summary>Show Raw Data</summary>
+      <pre>{{ alienvault.raw | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+{% endmacro %}
 
 {% block scripts %}{{ super() }}{% endblock %}
