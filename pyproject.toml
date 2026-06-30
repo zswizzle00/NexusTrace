@@ -3,7 +3,7 @@ name = "nexustrace"
 version = "1.0.0"
 description = "Flask-based OSINT analysis tool aggregating multiple threat intelligence APIs into a unified web interface."
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11"
 dependencies = [
     "Flask==3.0.2",
     "requests==2.31.0",
