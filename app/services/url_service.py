@@ -76,7 +76,7 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
 
     data = {
         'url': url,
-        'visibility': 'public'
+        'visibility': 'unlisted'
     }
 
     try:
@@ -150,6 +150,8 @@ def get_favicon_hash(url):
     """Get favicon and compute its MD5 hash."""
     try:
         parsed = urlparse(url)
+        if not _is_safe_host(parsed.netloc or ''):
+            return None
         favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
         resp = requests.get(favicon_url, timeout=TIMEOUT_SHORT)
         if resp.status_code == 200 and len(resp.content) > 0:

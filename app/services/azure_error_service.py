@@ -1,7 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+from ..utils.cache import timed_lru_cache
+from ..utils.constants import TIMEOUT_MEDIUM
 
+@timed_lru_cache(seconds=3600)
 def get_azure_error_info(error_code):
     """
     Fetch information about an Azure error code from the Microsoft error lookup website.
@@ -18,7 +21,7 @@ def get_azure_error_info(error_code):
         
         # Construct the URL for the error lookup
         url = f"https://login.microsoftonline.com/error?code={clean_code}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 

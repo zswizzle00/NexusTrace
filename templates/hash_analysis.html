@@ -22,8 +22,8 @@
         </div>
         <div class="ml-auto flex flex-wrap items-center divide-x divide-gray-600 text-sm">
           {% if hash_info.type %}<span class="px-4 text-gray-400">Type <span class="text-gray-100">{{ hash_info.type }}</span></span>{% endif %}
-          {% if hash_info.summary.detection_ratio %}<span class="px-4 text-gray-400">Detections <span class="{{ 'text-red-400' if is_mal else 'text-gray-100' }}">{{ hash_info.summary.detection_ratio }}</span></span>{% endif %}
-          {% if hash_info.summary.malware_family %}<span class="px-4 text-gray-400">Family <span class="text-red-300">{{ hash_info.summary.malware_family }}</span></span>{% endif %}
+          {% if hash_info.summary.detection_count %}<span class="px-4 text-gray-400">Detections <span class="{{ 'text-red-400' if is_mal else 'text-gray-100' }}">{{ hash_info.summary.detection_count }}/{{ hash_info.summary.total_engines }}</span></span>{% endif %}
+          {% if hash_info.summary.malware_names %}<span class="px-4 text-gray-400">Family <span class="text-red-300">{{ hash_info.summary.malware_names[0] }}</span></span>{% endif %}
         </div>
       </div>
     {% endif %}
@@ -45,23 +45,18 @@
             <table class="mb-4 w-full text-sm">
                 <tr><th class="pr-4 text-gray-400 break-all">Hash</th><td class="font-mono break-all text-xs">{{ hash_info.hash }}</td></tr>
                 <tr><th class="pr-4 text-gray-400 break-all">Type</th><td class="break-all">{{ hash_info.type }}</td></tr>
-                {% if hash_info.summary.detection_ratio %}
+                {% if hash_info.summary.detection_count %}
                 <tr><th class="pr-4 text-gray-400 break-all">Detection Ratio</th>
                     <td class="break-all">
                         <span class="{% if hash_info.summary.is_malicious %}text-red-400{% else %}text-green-400{% endif %} font-semibold">
-                            {{ hash_info.summary.detection_ratio }}
+                            {{ hash_info.summary.detection_count }}/{{ hash_info.summary.total_engines }}
                         </span>
                     </td>
                 </tr>
                 {% endif %}
-                {% if hash_info.summary.threat_names %}
-                <tr><th class="pr-4 text-gray-400 break-all">Threat Names</th>
-                    <td class="break-all text-red-300">{{ hash_info.summary.threat_names | join(', ') }}</td>
-                </tr>
-                {% endif %}
-                {% if hash_info.summary.malware_family %}
-                <tr><th class="pr-4 text-gray-400 break-all">Malware Family</th>
-                    <td class="break-all text-red-300">{{ hash_info.summary.malware_family }}</td>
+                {% if hash_info.summary.malware_names %}
+                <tr><th class="pr-4 text-gray-400 break-all">Malware Names</th>
+                    <td class="break-all text-red-300">{{ hash_info.summary.malware_names | join(', ') }}</td>
                 </tr>
                 {% endif %}
                 {% if hash_info.summary.file_type %}
@@ -94,8 +89,8 @@
             <h3 class="text-xl font-bold text-blue-400 mb-4">VirusTotal</h3>
             <table class="mb-4 w-full text-sm">
                 <tr><th class="pr-4 text-gray-400">Detections</th>
-                    <td class="{% if vt.malicious > 0 %}text-red-400{% else %}text-green-400{% endif %} font-semibold">
-                        {{ vt.malicious }} / {{ vt.total_scanners }}
+                    <td class="{% if vt.detection_stats.malicious > 0 %}text-red-400{% else %}text-green-400{% endif %} font-semibold">
+                        {{ vt.detection_stats.malicious }}/{{ vt.detection_stats.total }}
                     </td>
                 </tr>
                 {% if vt.file_type %}
@@ -111,12 +106,12 @@
                 <tr><th class="pr-4 text-gray-400">Last Seen</th><td>{{ vt.last_seen }}</td></tr>
                 {% endif %}
             </table>
-            {% if vt.threat_names %}
+            {% if vt.detections %}
             <div class="mb-4">
-                <span class="text-gray-400 text-sm">Threat Names:</span>
+                <span class="text-gray-400 text-sm">Detections:</span>
                 <div class="flex flex-wrap gap-1 mt-1">
-                    {% for name in vt.threat_names[:10] %}
-                    <span class="bg-red-900/50 text-red-300 px-2 py-0.5 rounded text-xs">{{ name }}</span>
+                    {% for det in vt.detections[:10] %}
+                    <span class="bg-red-900/50 text-red-300 px-2 py-0.5 rounded text-xs">{{ det.engine }}: {{ det.result }}</span>
                     {% endfor %}
                 </div>
             </div>

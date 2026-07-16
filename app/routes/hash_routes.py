@@ -54,7 +54,7 @@ def analyze_hash():
 
     return render_template(
         'hash_analysis.html',
-        result=result,
+        hash_info=result,
         error=error,
         alienvault=alienvault
     )

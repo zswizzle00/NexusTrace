@@ -123,6 +123,62 @@
     </section>
   {% endif %}
 
+  {# ==================== DOMAIN / URL VERDICT HERO ==================== #}
+  {% if has_domain_cards and not has_ip_cards %}
+    {% set registrar_name = '' %}
+    {% if whois_info and whois_info.registrar %}
+      {% set registrar_name = whois_info.registrar.name if whois_info.registrar.name is defined else whois_info.registrar %}
+    {% endif %}
+    {% set created_date = whois_info.create_date[:10] if whois_info and whois_info.create_date else '' %}
+    {% set ssl_status = '' %}
+    {% if domain_info and domain_info.ssl_info %}
+      {% if domain_info.ssl_info.is_expired is defined %}
+        {% set ssl_status = 'Expired' if domain_info.ssl_info.is_expired else 'Valid' %}
+      {% else %}
+        {% set ssl_status = 'Present' %}
+      {% endif %}
+    {% endif %}
+    {% set http_status = url_analysis.get('response', {}).get('status_code', '') if url_analysis else '' %}
+
+    <section class="nt-verdict is-info" aria-label="Analysis summary">
+      <div class="nt-verdict__main">
+        <span class="nt-verdict__label">Indicator</span>
+        <div class="nt-verdict__indicator">{{ indicator }}</div>
+        <span class="nt-verdict__badge">
+          <span class="nt-verdict__badge-dot"></span>
+          Intel Report
+        </span>
+      </div>
+
+      <div class="nt-verdict__stats">
+        {% if registrar_name %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Registrar</span>
+            <span class="nt-verdict__stat-value" title="{{ registrar_name }}">{{ registrar_name }}</span>
+          </div>
+        {% endif %}
+        {% if ssl_status %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">SSL/TLS</span>
+            <span class="nt-verdict__stat-value {{ 'is-danger' if ssl_status == 'Expired' else 'is-good' }}">{{ ssl_status }}</span>
+          </div>
+        {% endif %}
+        {% if created_date %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">Created</span>
+            <span class="nt-verdict__stat-value">{{ created_date }}</span>
+          </div>
+        {% endif %}
+        {% if http_status %}
+          <div class="nt-verdict__stat">
+            <span class="nt-verdict__stat-label">HTTP</span>
+            <span class="nt-verdict__stat-value {{ 'is-good' if http_status|string|first == '2' else ('is-warn' if http_status|string|first == '3' else 'is-danger') }}">{{ http_status }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
   {# ==================== IP ANALYSIS CARDS ==================== #}
   {% if has_ip_cards %}
   <div class="nt-card-grid">
@@ -340,7 +396,9 @@
             {{ kv_row('City', shodan.summary.city) }}
             {{ kv_row('Hostnames', shodan.summary.hostnames) }}
             {{ kv_row('OS', shodan.summary.os) }}
-            {{ kv_row('Last Updated', shodan.summary.last_update) }}
+            {% if shodan.summary.last_update %}
+              {{ kv_row('Last Updated', (shodan.summary.last_update | string | replace('T', ' '))[:16]) }}
+            {% endif %}
             {% set shown_keys = ['ip', 'ip_str', 'org', 'organization', 'isp', 'country', 'country_name', 'city', 'hostnames', 'os', 'last_update'] %}
             {% for k, v in shodan.summary.items() %}
               {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
@@ -427,7 +485,7 @@
 
         {% if abuseipdb.tables is defined and abuseipdb.tables.reports %}
           <p class="nt-card__section-title">Recent Reports</p>
-          <table class="w-full text-xs">
+          <table class="w-full text-xs nt-reports-table">
             <thead>
               <tr>
                 <th class="px-2 py-1.5 text-left">Date</th>
@@ -439,21 +497,21 @@
               {% for report in abuseipdb.tables.reports[:5] %}
                 <tr class="border-t border-gray-800">
                   <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
-                  <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-red-400 underline text-xs">more</a><span class="hidden">{{ report.comment }}</span>{% endif %}</td>
-                  <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
+                  <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
+                  <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
           {% if abuseipdb.tables.reports|length > 5 %}
             <details class="mt-1"><summary class="text-red-400 cursor-pointer text-xs">Show All Reports ({{ abuseipdb.tables.reports|length }})</summary>
-              <table class="w-full text-xs mt-1">
+              <table class="w-full text-xs mt-1 nt-reports-table">
                 <tbody>
                   {% for report in abuseipdb.tables.reports[5:] %}
                     <tr class="border-t border-gray-800">
                       <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
-                      <td class="px-2 py-1.5 break-all">{{ report.comment[:80] if report.comment else 'N/A' }}{% if report.comment and report.comment|length > 80 %}...{% endif %}</td>
-                      <td class="px-2 py-1.5">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
+                      <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
+                      <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -506,7 +564,11 @@
               <tr class="border-t border-gray-800">
                 <td class="px-2 py-1.5 font-semibold text-gray-400 whitespace-nowrap">{{ k|replace('_', ' ')|title }}</td>
                 <td class="px-2 py-1.5 break-all">
-                  {% if v is defined and v is not none and v.__class__.__name__ in ['list', 'tuple'] %}
+                  {% if v is mapping %}
+                    {% for dk, dv in v.items() %}
+                      <div><span class="text-gray-400">{{ dk|replace('Name', '')|replace('_', ' ')|title }}:</span> {{ dv }}</div>
+                    {% endfor %}
+                  {% elif v is defined and v is not none and v.__class__.__name__ in ['list', 'tuple'] %}
                     {% for item in v[:3] %}
                       <div>{{ item[:80] if item is string else item }}{% if item is string and item|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-green-400 underline text-xs">more</a><span class="hidden">{{ item }}</span>{% endif %}</div>
                     {% endfor %}
@@ -738,7 +800,7 @@
     {% if whois_info %}
       <div class="nt-card">
         <div class="nt-card__head">
-          <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(129,140,248,.28), rgba(79,70,229,.16)); border-color: rgba(129,140,248,.40); color: #c7d2fe;">
+          <span class="nt-card__icon" style="background: rgba(129,140,248,.18); border-color: rgba(129,140,248,.40); color: #c7d2fe;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/>
               <path d="M14 3v5h5M9 13h6M9 17h6"/>
@@ -837,7 +899,7 @@
       {% if domain_info.reverse_domains[0] and 'API count exceeded' in domain_info.reverse_domains[0] %}
         <div class="nt-card" style="border-color: rgba(245,158,11,.32);">
           <div class="nt-card__head">
-            <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(245,158,11,.28), rgba(180,83,9,.16)); border-color: rgba(245,158,11,.40); color: #fde68a;">
+            <span class="nt-card__icon" style="background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.40); color: #fde68a;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M3.3 19h17.4L12 4z"/></svg>
             </span>
             <h3 class="nt-card__title">Reverse IP Domains</h3>
@@ -907,9 +969,9 @@
 
     {# ---------- PhishTank ---------- #}
     {% if domain_info and domain_info.phishtank_url %}
-      <div class="nt-card">
+      <div class="nt-card is-phishtank">
         <div class="nt-card__head">
-          <span class="nt-card__icon" style="background:linear-gradient(180deg, rgba(248,113,113,.28), rgba(185,28,28,.16)); border-color: rgba(248,113,113,.40); color: #fecaca;">
+          <span class="nt-card__icon" style="background: rgba(248,113,113,.18); border-color: rgba(248,113,113,.40); color: #fecaca;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3.3 19h17.4L12 4z"/><path d="M12 10v4M12 17h.01"/>
             </svg>
@@ -917,14 +979,21 @@
           <h3 class="nt-card__title">PhishTank</h3>
           <span class="nt-card__source">External</span>
         </div>
+        <div class="nt-stub-status">
+          <span class="nt-pill is-neutral"><span class="nt-pill__dot"></span> No active phishing entries</span>
+        </div>
         <p class="text-sm text-gray-400 mb-3">Check this indicator against the PhishTank community database of known phishing URLs.</p>
-        <a href="{{ domain_info.phishtank_url }}" class="nt-back-home" target="_blank" rel="noopener">Check on PhishTank →</a>
+        <a href="{{ domain_info.phishtank_url }}" class="nt-cta-button" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.3 19h17.4L12 4z"/></svg>
+          Check on PhishTank
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
       </div>
     {% endif %}
 
     {# ---------- Cisco Talos ---------- #}
     {% if domain_info and domain_info.talos_reputation %}
-      <div class="nt-card">
+      <div class="nt-card is-talos">
         <div class="nt-card__head">
           <span class="nt-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -946,8 +1015,15 @@
             {% endif %}
           </span>
         </div>
+        <div class="nt-stub-status">
+          <span class="nt-pill is-neutral"><span class="nt-pill__dot"></span> Community reputation data</span>
+        </div>
         <p class="text-sm text-gray-400 mb-3">View Cisco Talos's reputation analysis for this indicator.</p>
-        <a href="{{ domain_info.talos_reputation.talos_url }}" class="nt-back-home" target="_blank" rel="noopener">View on Talos →</a>
+        <a href="{{ domain_info.talos_reputation.talos_url }}" class="nt-cta-button" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/></svg>
+          View on Talos
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
       </div>
     {% endif %}
   </div>
@@ -979,17 +1055,34 @@
     </div>
     {% if alienvault.summary %}
       {% set pulses = alienvault.summary.pulse_count|default(0)|int %}
-      {% set rep = alienvault.summary.reputation|default(0)|int if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none else 0 %}
+      {% set rep_raw = alienvault.summary.reputation if alienvault.summary.reputation is defined else none %}
+      {% set rep_is_na = (rep_raw is none) or (rep_raw == '') or (rep_raw == 'N/A') or (rep_raw == 0) or (rep_raw == '0') %}
+      {% set rep = rep_raw|int if (rep_raw is not none and rep_raw != '' and rep_raw != 'N/A') else 0 %}
       <div class="nt-pills">
-        <span class="nt-pill {{ 'is-positive' if pulses >= 3 else ('is-warn' if pulses >= 1 else 'is-negative') }}">
+        <span class="nt-pill {{ 'is-positive' if pulses >= 3 else ('is-warn' if pulses >= 1 else 'is-neutral') }}">
           <span class="nt-pill__dot"></span> {{ pulses }} {{ 'pulse' if pulses == 1 else 'pulses' }}
         </span>
-        {% if alienvault.summary.reputation is defined and alienvault.summary.reputation is not none %}
-          <span class="nt-pill {{ 'is-positive' if rep > 3 else ('is-warn' if rep > 1 else 'is-negative') }}">
-            <span class="nt-pill__dot"></span> Reputation {{ alienvault.summary.reputation }}
-          </span>
+        {% if rep_raw is defined %}
+          {% if rep_is_na %}
+            <span class="nt-pill is-neutral">
+              <span class="nt-pill__dot"></span> Reputation N/A
+            </span>
+          {% else %}
+            <span class="nt-pill {{ 'is-positive' if rep > 3 else ('is-warn' if rep > 1 else 'is-negative') }}">
+              <span class="nt-pill__dot"></span> Reputation {{ rep_raw }}
+            </span>
+          {% endif %}
         {% endif %}
       </div>
+
+      {% if pulses == 0 %}
+        <div class="nt-otx-empty">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          <span>No threat pulses found for this indicator</span>
+        </div>
+      {% endif %}
       <table class="w-full text-sm">
         {{ kv_row('Indicator', alienvault.summary.indicator) }}
         {{ kv_row('Tags', alienvault.summary.tags) }}
@@ -1021,6 +1114,14 @@
           </ul>
         </details>
       {% endif %}
+    {% endif %}
+    {% set otx_indicator = alienvault.summary.indicator if alienvault.summary and alienvault.summary.indicator else (indicator if indicator is defined else '') %}
+    {% if otx_indicator %}
+      {% set otx_url = 'https://otx.alienvault.com/indicator/ip/' ~ otx_indicator %}
+      <a href="{{ otx_url }}" target="_blank" rel="noopener" class="nt-card__external-link">
+        View on OTX
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
     {% endif %}
     <details class="nt-raw"><summary>Show Raw Data</summary>
       <pre>{{ alienvault.raw | tojson(indent=2) }}</pre>

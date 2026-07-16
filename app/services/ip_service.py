@@ -3,11 +3,8 @@ import requests
 import logging
 from urllib.parse import quote
 import concurrent.futures
-from functools import lru_cache, wraps
 import time
-from datetime import datetime, timedelta
-from collections import deque
-from threading import Lock
+from datetime import timedelta
 import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
@@ -28,6 +25,7 @@ proxycheck_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1
 shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 # IP-API.com free tier: 45 req/min over HTTP
 ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
+ip2location_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 # Initialize API clients
 shodan_key = os.getenv('SHODAN_KEY')
@@ -75,12 +73,10 @@ def check_abuseipdb(ip_address):
                 'Key': abuseipdb_api_key,
                 'Accept': 'application/json'
             }
-            # URL encode the IP address to handle IPv6 addresses properly
-            encoded_ip = quote(ip_address)
             response = requests.get(
                 f'https://api.abuseipdb.com/api/v2/check',
                 params={
-                    'ipAddress': encoded_ip,
+                    'ipAddress': ip_address,  # requests encodes params; manual quote() would double-encode IPv6
                     'maxAgeInDays': '90',
                     'verbose': ''
                 },
@@ -141,8 +137,8 @@ def get_shodan_info(ip_address):
     if not shodan_api:
         logger.warning("Shodan API not available - SHODAN_KEY not configured")
         return None
+    shodan_limiter.acquire()
     try:
-        shodan_limiter.acquire()
         # Shodan library handles IPv6 natively, no manual encoding needed
         host = shodan_api.host(ip_address)
         def flatten_dict(d):
@@ -221,8 +217,8 @@ def get_shodan_info(ip_address):
 @timed_lru_cache(seconds=1800)
 def get_proxycheck_data(ip_address):
     """Get IP information from ProxyCheck.io."""
+    proxycheck_limiter.acquire()
     try:
-        proxycheck_limiter.acquire()
         proxycheck_key = os.getenv('PROXYCHECK_KEY')
         params = {
             'vpn': 1,
@@ -462,13 +458,14 @@ def get_ip2location_data(ip_address):
         return None
     encoded_ip = quote(ip_address)
     url = f'https://api.ip2location.io/?key={api_key}&ip={encoded_ip}&format=json'
-    try:
-        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"IP2Location.io API request failed: {str(e)}")
-        return None
+    with ip2location_limiter:
+        try:
+            response = requests.get(url, timeout=TIMEOUT_MEDIUM)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"IP2Location.io API request failed: {str(e)}")
+            return None
 
 
 @timed_lru_cache(seconds=1800)

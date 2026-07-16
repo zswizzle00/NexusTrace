@@ -53,49 +53,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Add swipe gestures for navigation (if needed)
-    let startX = 0;
-    let startY = 0;
-    
-    document.addEventListener('touchstart', function(e) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    });
-    
-    document.addEventListener('touchend', function(e) {
-        if (!startX || !startY) return;
-        
-        const endX = e.changedTouches[0].clientX;
-        const endY = e.changedTouches[0].clientY;
-        
-        const diffX = startX - endX;
-        const diffY = startY - endY;
-        
-        // Only handle horizontal swipes
-        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-            // Swipe left or right detected
-            // You can add navigation logic here if needed
-        }
-        
-        startX = 0;
-        startY = 0;
-    });
-
-    // Optimize scrolling performance
-    let ticking = false;
-    
-    function updateScroll() {
-        // Add any scroll-based animations here
-        ticking = false;
-    }
-    
-    document.addEventListener('scroll', function() {
-        if (!ticking) {
-            requestAnimationFrame(updateScroll);
-            ticking = true;
-        }
-    });
-
     // Show a loading spinner on the submit button for the duration of the server round-trip.
     // These are full-page POST requests so the page navigates away when the response arrives —
     // no need to reset the button ourselves. The only case we need to handle is the user
@@ -199,29 +156,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Add mobile-specific error handling
-    window.addEventListener('error', function(e) {
-        console.error('Mobile error:', e.error);
-        // You can add error reporting here
-    });
-
-    // Optimize for mobile performance
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
-
-    // Add mobile-specific analytics or tracking
-    function trackMobileUsage() {
-        const userAgent = navigator.userAgent;
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-        
-        if (isMobile) {
-            // Track mobile usage
-            console.log('Mobile user detected');
-        }
-    }
-    
-    trackMobileUsage();
 });
 
 // Add mobile-specific utility functions

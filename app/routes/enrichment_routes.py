@@ -197,9 +197,10 @@ def _enrich_domain(indicator, indicator_type):
             from app.services.url_service import analyze_url_quick
             url_data = analyze_url_quick(indicator)
             if url_data:
-                status_code = url_data.get('status_code')
-                redirect_count = len(url_data.get('redirect_chain', [])) - 1
-                redirect_count = max(redirect_count, 0)
+                response_block = (url_data.get('url_analysis') or {}).get('response') or {}
+                status_code = response_block.get('status_code')
+                redirect_chain = response_block.get('redirect_chain') or []
+                redirect_count = max(len(redirect_chain) - 1, 0)
         except Exception as exc:
             logger.warning("URL analysis failed: %s", exc)
 

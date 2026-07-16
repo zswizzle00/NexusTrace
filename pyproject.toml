@@ -34,6 +34,7 @@ dependencies = [
     "OTXv2==1.5.12",
     "Flask-WTF==1.2.1",
     "flask-talisman==1.1.0",
+    "playwright>=1.61.0",
 ]
 
 # No [build-system] table on purpose: NexusTrace is a deployable application, not an

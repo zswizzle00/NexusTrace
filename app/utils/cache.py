@@ -67,6 +67,8 @@ def clear_caches():
             hash_service = importlib.import_module('app.services.hash_service')
             url_service = importlib.import_module('app.services.url_service')
             file_service = importlib.import_module('app.services.file_service')
+            event_service = importlib.import_module('app.services.event_service')
+            azure_error_service = importlib.import_module('app.services.azure_error_service')
 
             functions = [
                 # ip_service
@@ -98,6 +100,9 @@ def clear_caches():
                 url_service.get_tech_stack,
                 # file_service
                 file_service.get_combined_file_analysis,
+                # event/azure services
+                event_service.get_event_info,
+                azure_error_service.get_azure_error_info,
             ]
 
             for func in functions:

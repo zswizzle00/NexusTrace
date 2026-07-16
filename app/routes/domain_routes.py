@@ -15,7 +15,7 @@ domain_bp = Blueprint('domain', __name__)
 def check_domain():
     """Endpoint for checking domain information."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         domain = data.get('domain', '').strip()
         
         if not domain:
@@ -90,7 +90,8 @@ def analyze_domain():
                 return render_template('no_results.html', indicator=indicator, error_type='domain')
 
             card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
-    return render_template('analyze_result.html', error=error, card_count=card_count, **result_data)
+    return render_template('analyze_result.html', error=error, card_count=card_count,
+                           indicator=indicator, indicator_type='domain', **result_data)
 
 @domain_bp.route('/analyze_url', methods=['POST'])
 def analyze_url_endpoint():

@@ -1,7 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+from ..utils.cache import timed_lru_cache
+from ..utils.constants import TIMEOUT_MEDIUM
 
+@timed_lru_cache(seconds=3600)
 def get_event_info(event_id):
     """
     Fetch information about a Windows Event ID from the Ultimate Windows Security website.
@@ -14,7 +17,7 @@ def get_event_info(event_id):
     """
     try:
         url = f"https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid={event_id}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
