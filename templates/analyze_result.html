@@ -470,7 +470,8 @@
           {% endif %}
 
           <table class="w-full text-sm">
-            {{ kv_row('Last Reported', abuseipdb.summary.lastReportedAt or abuseipdb.summary.get('last_reported_at') or abuseipdb.summary.get('last_reported')) }}
+            {% set lr = abuseipdb.summary.lastReportedAt or abuseipdb.summary.get('last_reported_at') or abuseipdb.summary.get('last_reported') or '' %}
+            {{ kv_row('Last Reported', lr[:10] if lr else '') }}
             {{ kv_row('Country', abuseipdb.summary.countryName or abuseipdb.summary.get('country_name') or abuseipdb.summary.get('country')) }}
             {{ kv_row('ISP', abuseipdb.summary.isp) }}
             {{ kv_row('Domain', abuseipdb.summary.domain) }}
@@ -495,8 +496,9 @@
             </thead>
             <tbody>
               {% for report in abuseipdb.tables.reports[:5] %}
+                {% set ts = report.reportedAt or report.timestamp or '' %}
                 <tr class="border-t border-gray-800">
-                  <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                  <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
                   <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
                   <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                 </tr>
@@ -508,8 +510,9 @@
               <table class="w-full text-xs mt-1 nt-reports-table">
                 <tbody>
                   {% for report in abuseipdb.tables.reports[5:] %}
+                    {% set ts = report.reportedAt or report.timestamp or '' %}
                     <tr class="border-t border-gray-800">
-                      <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reportedAt or report.timestamp or 'N/A' }}</td>
+                      <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
                       <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
                       <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                     </tr>
