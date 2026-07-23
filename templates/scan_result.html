@@ -26,14 +26,15 @@
   {# ---- Meta summary card ---- #}
   {% set asn = scan.asn %}
   <div class="nt-card p-5 mb-5 flex flex-col lg:flex-row gap-5">
-    {# Screenshot #}
+    {# Screenshot thumbnail — click opens lightbox #}
     {% if scan.page.get('screenshot_url') %}
     <div class="flex-shrink-0">
-      <a href="{{ scan.page.screenshot_url }}" target="_blank" rel="noopener">
+      <button id="shot-thumb-btn" onclick="openLightbox()"
+        class="block rounded border border-gray-700 overflow-hidden focus:outline-none hover:border-blue-500 transition-colors cursor-zoom-in"
+        title="Click to view full screenshot" style="width:272px;height:172px;">
         <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
-          class="rounded border border-gray-700 object-cover object-top"
-          style="width:272px;height:172px;" />
-      </a>
+          class="object-cover object-top w-full h-full" />
+      </button>
     </div>
     {% endif %}
 
@@ -391,15 +392,18 @@
 
   {# ---- Page Panel ---- #}
   <div class="scan-panel hidden" data-panel="page">
-    {# Full screenshot #}
+    {# Full screenshot — scrollable inline #}
     {% if scan.page.get('screenshot_url') %}
     <div class="nt-card p-4 mb-4">
-      <h3 class="nt-card-title mb-3">Screenshot</h3>
-      <a href="{{ scan.page.screenshot_url }}" target="_blank" rel="noopener">
-        <img src="{{ scan.page.screenshot_url }}" alt="full page screenshot"
-          class="rounded border border-gray-700 w-full"
-          style="max-height:480px;object-fit:cover;object-position:top;" />
-      </a>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="nt-card-title">Screenshot</h3>
+        <button onclick="openLightbox()" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+          Expand
+        </button>
+      </div>
+      <div class="overflow-y-auto rounded border border-gray-700 cursor-zoom-in" style="max-height:520px;" onclick="openLightbox()">
+        <img src="{{ scan.page.screenshot_url }}" alt="full page screenshot" class="w-full block" />
+      </div>
     </div>
     {% endif %}
 
@@ -454,23 +458,50 @@
 
 </div>
 
+{% if scan.page.get('screenshot_url') %}
+{# Lightbox modal — clicking anywhere outside the image closes it #}
+<div id="shot-lightbox" class="fixed inset-0 z-50 hidden overflow-y-auto"
+  style="background:rgba(0,0,0,0.85);"
+  onclick="closeLightbox()"
+  role="dialog" aria-modal="true" aria-label="Full screenshot">
+  {# Inner wrapper — stops click propagation so clicks ON the image don't close #}
+  <div class="flex items-start justify-center min-h-full py-10 px-4">
+    <div class="relative" style="max-width:1200px;width:100%;" onclick="event.stopPropagation()">
+      {# Close button #}
+      <button onclick="closeLightbox()"
+        class="absolute right-2 top-2 z-10 flex items-center justify-center w-8 h-8 rounded-full text-gray-300 hover:text-white hover:bg-gray-700 transition-colors focus:outline-none"
+        title="Close (Esc)">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+      <img id="shot-full-img" src="{{ scan.page.screenshot_url }}" alt="Full page screenshot"
+        class="w-full rounded-lg border border-gray-700 block" />
+      <p class="text-center text-xs text-gray-600 mt-2">Click outside or press Esc to close</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 (function () {
   // Tab switching
-  document.querySelectorAll('.scan-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-      document.querySelectorAll('.scan-tab').forEach(b => {
-        b.classList.toggle('active', b === btn);
-        b.classList.toggle('border-blue-500', b === btn);
-        b.classList.toggle('text-blue-400', b === btn);
-        b.classList.toggle('border-transparent', b !== btn);
-        b.classList.toggle('text-gray-500', b !== btn);
-      });
-      document.querySelectorAll('.scan-panel').forEach(p => {
-        p.classList.toggle('hidden', p.dataset.panel !== target);
-      });
+  function activateTab(target) {
+    document.querySelectorAll('.scan-tab').forEach(b => {
+      const on = b.dataset.tab === target;
+      b.classList.toggle('active', on);
+      b.classList.toggle('border-blue-500', on);
+      b.classList.toggle('text-blue-400', on);
+      b.classList.toggle('border-transparent', !on);
+      b.classList.toggle('text-gray-500', !on);
     });
+    document.querySelectorAll('.scan-panel').forEach(p => {
+      p.classList.toggle('hidden', p.dataset.panel !== target);
+    });
+  }
+
+  document.querySelectorAll('.scan-tab').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
 
   // Transaction filter
@@ -484,5 +515,24 @@
     });
   }
 })();
+
+// Lightbox
+const lightbox = document.getElementById('shot-lightbox');
+
+function openLightbox() {
+  if (!lightbox) return;
+  lightbox.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  if (!lightbox) return;
+  lightbox.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLightbox();
+});
 </script>
 {% endblock %}
