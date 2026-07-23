@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Scan: {{ scan.page.get('title') or scan.url }} | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  {# ---- Summary bar ---- #}
+  <div class="mb-5 flex items-start gap-2 flex-wrap">
+    <a href="/url_scan" class="text-xs text-gray-500 hover:text-gray-300 transition-colors mr-2 mt-0.5">← New scan</a>
+    <span class="text-gray-600">|</span>
+    {% set status = scan.page.get('status') %}
+    <span class="font-mono text-xs px-2 py-0.5 rounded mt-0.5
+      {% if status and status < 400 %}bg-green-900/50 text-green-400
+      {% elif status and status < 500 %}bg-yellow-900/50 text-yellow-400
+      {% elif status %}bg-red-900/50 text-red-400
+      {% else %}bg-gray-700 text-gray-400{% endif %}">
+      {{ status or '?' }} {{ scan.page.get('status_text') or '' }}
+    </span>
+    <span class="text-gray-300 text-sm font-mono truncate max-w-2xl mt-0.5">{{ scan.page.get('final_url') or scan.url }}</span>
+    {% if scan.status == 'error' and scan.error %}
+      <span class="ml-auto text-xs text-red-400 bg-red-900/30 border border-red-800 px-2 py-0.5 rounded">{{ scan.error }}</span>
+    {% endif %}
+  </div>
+
+  {# ---- Meta summary card ---- #}
+  {% set asn = scan.asn %}
+  <div class="nt-card p-5 mb-5 flex flex-col lg:flex-row gap-5">
+    {# Screenshot #}
+    {% if scan.page.get('screenshot_url') %}
+    <div class="flex-shrink-0">
+      <a href="{{ scan.page.screenshot_url }}" target="_blank" rel="noopener">
+        <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
+          class="rounded border border-gray-700 object-cover object-top"
+          style="width:272px;height:172px;" />
+      </a>
+    </div>
+    {% endif %}
+
+    {# Facts grid #}
+    <div class="flex-1 min-w-0">
+      {% if scan.page.get('title') %}
+        <div class="text-lg font-semibold text-gray-100 mb-1 truncate">{{ scan.page.title }}</div>
+      {% endif %}
+      {% if scan.page.get('description') %}
+        <div class="text-sm text-gray-400 mb-3 line-clamp-2">{{ scan.page.description }}</div>
+      {% endif %}
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+        {% macro fact(k, v) %}
+        <div>
+          <div class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</div>
+          <div class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '—' }}</div>
+        </div>
+        {% endmacro %}
+
+        {{ fact('Server IP', scan.main_ip) }}
+        {{ fact('ASN', ((asn.asn ~ ' · ' ~ asn.name) if asn and asn.name else (asn.asn if asn else None)) ) }}
+        {{ fact('Country', asn.country if asn else None) }}
+        {{ fact('Requests', scan.transactions | length) }}
+        {{ fact('Domains', scan.domains | length) }}
+        {{ fact('Technologies', scan.technologies | length) }}
+        {{ fact('Security headers', (scan.security.score | string ~ '/' ~ scan.security.total | string) if scan.security else None) }}
+        {{ fact('Device', scan.device) }}
+        {% if scan.ptr %}{{ fact('PTR', scan.ptr[0]) }}{% endif %}
+      </div>
+
+      {# Verdict signals #}
+      {% if scan.verdict and scan.verdict.signals %}
+      <div class="mt-3 flex flex-wrap gap-2">
+        {% for sig in scan.verdict.signals %}
+        <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-800/60">{{ sig }}</span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="mt-3">
+        <span class="px-2 py-0.5 rounded text-xs bg-green-900/40 text-green-400 border border-green-800/60">No notable signals</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---- Tabs ---- #}
+  <div class="scan-tabs flex gap-0 border-b border-gray-700 mb-5 overflow-x-auto">
+    {% set tabs = [
+      ('http',     'HTTP',          scan.transactions | length),
+      ('dns',      'DNS · TLS',     None),
+      ('security', 'Security',      None),
+      ('tech',     'Technologies',  scan.technologies | length),
+      ('page',     'Page',          None),
+    ] %}
+    {% for tid, label, count in tabs %}
+    <button class="scan-tab {% if loop.first %}active{% endif %} px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+      {% if loop.first %}border-blue-500 text-blue-400{% else %}border-transparent text-gray-500 hover:text-gray-300{% endif %}"
+      data-tab="{{ tid }}">
+      {{ label }}{% if count is not none %} <span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-gray-700 text-gray-400">{{ count }}</span>{% endif %}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ---- HTTP Panel ---- #}
+  <div class="scan-panel" data-panel="http">
+    {# Redirect chain #}
+    {% if scan.redirects | length > 1 %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Redirect Chain ({{ scan.redirects | length }} hops)</h3>
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4 w-16">Code</th>
+            <th class="pb-1.5">URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in scan.redirects %}
+          <tr class="border-b border-gray-800/50">
+            <td class="py-1.5 pr-4
+              {% if r.status and r.status < 400 %}text-green-400
+              {% elif r.status and r.status < 500 %}text-yellow-400
+              {% else %}text-red-400{% endif %}">
+              {{ r.status or '—' }}
+            </td>
+            <td class="py-1.5 text-gray-300 truncate max-w-0 w-full" title="{{ r.url }}">{{ r.url }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {# Transactions #}
+    <div class="nt-card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="nt-card-title">HTTP Transactions ({{ scan.transactions | length }})</h3>
+        <input id="txn-filter" type="text" placeholder="filter…"
+          class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500 w-48" />
+      </div>
+      <div class="overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="w-full text-xs font-mono" id="txn-table">
+          <thead class="sticky top-0 bg-gray-900">
+            <tr class="text-gray-500 text-left border-b border-gray-700">
+              <th class="pb-1.5 pr-3 w-14">Method</th>
+              <th class="pb-1.5 pr-3 w-12">Status</th>
+              <th class="pb-1.5 pr-3 w-24">Type</th>
+              <th class="pb-1.5 pr-3 w-20">Size</th>
+              <th class="pb-1.5 pr-3 w-28">Server IP</th>
+              <th class="pb-1.5">URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in scan.transactions %}
+            <tr class="border-b border-gray-800/40 txn-row"
+              data-search="{{ (t.url ~ ' ' ~ t.resource_type ~ ' ' ~ (t.mime_type or '')) | lower }}">
+              <td class="py-1 pr-3 text-gray-400">{{ t.method }}</td>
+              <td class="py-1 pr-3
+                {% if t.status and t.status < 400 %}text-green-400
+                {% elif t.status and t.status < 500 %}text-yellow-400
+                {% elif t.status %}text-red-400
+                {% else %}text-gray-500{% endif %}">
+                {{ t.status or '—' }}
+              </td>
+              <td class="py-1 pr-3 text-gray-500">{{ t.resource_type }}</td>
+              <td class="py-1 pr-3 text-gray-400">
+                {% if t.size_bytes is not none %}
+                  {% if t.size_bytes < 1024 %}{{ t.size_bytes }} B
+                  {% elif t.size_bytes < 1048576 %}{{ '%.1f' | format(t.size_bytes / 1024) }} KB
+                  {% else %}{{ '%.2f' | format(t.size_bytes / 1048576) }} MB{% endif %}
+                {% else %}—{% endif %}
+              </td>
+              <td class="py-1 pr-3 text-gray-500">{{ t.server_ip or '—' }}</td>
+              <td class="py-1 text-gray-300 truncate max-w-0 w-full" title="{{ t.url }}">{{ t.url }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="py-4 text-center text-gray-500">No transactions recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ---- DNS / TLS Panel ---- #}
+  <div class="scan-panel hidden" data-panel="dns">
+    {# ASN / Network #}
+    {% if asn %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Network</h3>
+      <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+        {% macro kv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '—' }}</dd></div>{% endmacro %}
+        {{ kv('IP', scan.main_ip) }}
+        {{ kv('ASN', asn.asn) }}
+        {{ kv('Name', asn.name) }}
+        {{ kv('Prefix', asn.prefix) }}
+        {{ kv('Country', asn.country) }}
+        {{ kv('Registry', asn.registry) }}
+        {% if scan.ptr %}{{ kv('PTR', scan.ptr | join(', ')) }}{% endif %}
+      </dl>
+    </div>
+    {% endif %}
+
+    {# TLS #}
+    {% set tls = scan.tls %}
+    {% if tls %}
+    <div class="nt-card p-4 mb-4">
+      <div class="flex items-center gap-2 mb-3">
+        <h3 class="nt-card-title">TLS Certificate</h3>
+        {% if tls.authorized %}
+        <span class="px-2 py-0.5 rounded text-xs bg-green-900/40 text-green-400 border border-green-800/60">trusted</span>
+        {% else %}
+        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-400 border border-red-800/60">not trusted</span>
+        {% endif %}
+      </div>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        {% macro tlskv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ v or '—' }}</dd></div>{% endmacro %}
+        {{ tlskv('Subject', tls.subject) }}
+        {{ tlskv('Issuer', tls.issuer) }}
+        {{ tlskv('Valid from', tls.valid_from) }}
+        {{ tlskv('Valid to', tls.valid_to) }}
+        {{ tlskv('Protocol', tls.protocol ~ (' · ' ~ tls.cipher if tls.cipher else '')) }}
+        {{ tlskv('Serial', tls.serial_number) }}
+        {{ tlskv('SANs', tls.subject_alt_name) }}
+      </dl>
+    </div>
+    {% endif %}
+
+    {# DNS Records #}
+    <div class="nt-card p-4">
+      <h3 class="nt-card-title mb-3">DNS Records</h3>
+      {% set dns = scan.dns %}
+      {% if dns %}
+        {% for rtype in ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SOA', 'CAA'] %}
+          {% if dns.get(rtype) %}
+          <div class="flex gap-3 py-2 border-b border-gray-800/50 text-xs">
+            <span class="w-12 flex-shrink-0 font-mono font-bold text-blue-400">{{ rtype }}</span>
+            <div class="text-gray-300 font-mono space-y-0.5">
+              {% for val in dns[rtype] %}
+                {% if val is mapping %}
+                  {% if val.exchange is defined %}<div>{{ val.exchange }} (pri {{ val.priority }})</div>
+                  {% elif val.mname is defined %}<div>{{ val.mname }} / {{ val.rname }} (serial {{ val.serial }})</div>
+                  {% else %}<div>{{ val | tojson }}</div>{% endif %}
+                {% else %}
+                  <div>{{ val }}</div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <p class="text-gray-500 text-sm">No DNS records resolved (target may be an IP literal).</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---- Security Panel ---- #}
+  <div class="scan-panel hidden" data-panel="security">
+    {% set sec = scan.security %}
+    {% if sec %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Security Headers</h3>
+      <div class="flex items-center gap-3 mb-4">
+        <div class="flex-1 bg-gray-800 rounded-full h-2 max-w-xs">
+          <div class="bg-blue-600 h-2 rounded-full transition-all"
+            style="width: {{ ((sec.score / sec.total * 100) | int) if sec.total else 0 }}%"></div>
+        </div>
+        <span class="text-sm text-gray-400">{{ sec.score }}/{{ sec.total }} present</span>
+      </div>
+      <div class="space-y-2">
+        {% for check in sec.results %}
+        <div class="flex items-start gap-3 text-sm py-1.5 border-b border-gray-800/40">
+          <span class="mt-0.5 flex-shrink-0">
+            {% if check.status == 'ok' %}<span class="text-green-400">●</span>
+            {% elif check.status == 'weak' %}<span class="text-yellow-400">●</span>
+            {% else %}<span class="text-red-400">○</span>{% endif %}
+          </span>
+          <div class="flex-1 min-w-0">
+            <span class="text-gray-300">{{ check.name }}</span>
+            <span class="ml-2 text-xs text-gray-600 font-mono">{{ check.header }}</span>
+            {% if check.value %}
+            <div class="text-xs text-gray-500 font-mono mt-0.5 truncate" title="{{ check.value }}">{{ check.value }}</div>
+            {% elif check.status == 'missing' %}
+            <div class="text-xs text-red-400/70 mt-0.5">missing</div>
+            {% endif %}
+          </div>
+          <span class="text-xs flex-shrink-0
+            {% if check.status == 'ok' %}text-green-400
+            {% elif check.status == 'weak' %}text-yellow-400
+            {% else %}text-red-400{% endif %}">
+            {{ check.status }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Cookies #}
+    <div class="nt-card p-4">
+      <h3 class="nt-card-title mb-3">Cookies ({{ scan.cookies | length }})</h3>
+      {% if scan.cookies %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs font-mono">
+          <thead>
+            <tr class="text-gray-500 text-left border-b border-gray-700">
+              <th class="pb-1.5 pr-3">Name</th>
+              <th class="pb-1.5 pr-3">Domain</th>
+              <th class="pb-1.5 pr-3 w-16">Secure</th>
+              <th class="pb-1.5 pr-3 w-20">HttpOnly</th>
+              <th class="pb-1.5 pr-3">SameSite</th>
+              <th class="pb-1.5">Lifetime</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in scan.cookies %}
+            <tr class="border-b border-gray-800/40">
+              <td class="py-1.5 pr-3 text-gray-200">{{ c.name }}</td>
+              <td class="py-1.5 pr-3 text-gray-400">{{ c.domain }}</td>
+              <td class="py-1.5 pr-3">
+                {% if c.secure %}<span class="text-green-400">yes</span>{% else %}<span class="text-yellow-400">no</span>{% endif %}
+              </td>
+              <td class="py-1.5 pr-3">
+                {% if c.http_only %}<span class="text-green-400">yes</span>{% else %}<span class="text-yellow-400">no</span>{% endif %}
+              </td>
+              <td class="py-1.5 pr-3 text-gray-400">{{ c.same_site or '—' }}</td>
+              <td class="py-1.5 text-gray-400">{% if c.session %}session{% else %}persistent{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-gray-500 text-sm">No cookies set.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---- Technologies Panel ---- #}
+  <div class="scan-panel hidden" data-panel="tech">
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-4">Detected Technologies ({{ scan.technologies | length }})</h3>
+      {% if scan.technologies %}
+        {% set by_cat = {} %}
+        {% for t in scan.technologies %}
+          {% if t.category not in by_cat %}{% set _ = by_cat.update({t.category: []}) %}{% endif %}
+          {% set _ = by_cat[t.category].append(t.name) %}
+        {% endfor %}
+        <div class="space-y-4">
+          {% for cat, names in by_cat.items() %}
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">{{ cat }}</div>
+            <div class="flex flex-wrap gap-2">
+              {% for name in names %}
+              <span class="px-2.5 py-1 rounded-full text-xs bg-blue-900/30 text-blue-300 border border-blue-800/50">{{ name }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-gray-500 text-sm">No technologies fingerprinted.</p>
+      {% endif %}
+    </div>
+
+    {# Domains contacted #}
+    <div class="nt-card p-4">
+      <h3 class="nt-card-title mb-3">Domains Contacted ({{ scan.domains | length }})</h3>
+      {% if scan.domains %}
+      <div class="max-h-72 overflow-y-auto">
+        <table class="w-full text-xs font-mono">
+          <thead class="sticky top-0 bg-gray-900">
+            <tr class="text-gray-500 text-left border-b border-gray-700">
+              <th class="pb-1.5 pr-4">Domain</th>
+              <th class="pb-1.5">Resolved IPs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in scan.domains %}
+            <tr class="border-b border-gray-800/40">
+              <td class="py-1.5 pr-4 text-gray-300">{{ d.domain }}</td>
+              <td class="py-1.5 text-gray-500">{{ d.ips | join(', ') or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-gray-500 text-sm">None.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---- Page Panel ---- #}
+  <div class="scan-panel hidden" data-panel="page">
+    {# Full screenshot #}
+    {% if scan.page.get('screenshot_url') %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Screenshot</h3>
+      <a href="{{ scan.page.screenshot_url }}" target="_blank" rel="noopener">
+        <img src="{{ scan.page.screenshot_url }}" alt="full page screenshot"
+          class="rounded border border-gray-700 w-full"
+          style="max-height:480px;object-fit:cover;object-position:top;" />
+      </a>
+    </div>
+    {% endif %}
+
+    {# Metadata #}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Page Metadata</h3>
+      <dl class="space-y-2 text-sm">
+        {% macro pmeta(k,v) %}{% if v %}<div class="flex gap-4"><dt class="w-24 text-xs text-gray-500 uppercase tracking-wide flex-shrink-0 mt-0.5">{{ k }}</dt><dd class="text-gray-300 text-xs font-mono break-all">{{ v }}</dd></div>{% endif %}{% endmacro %}
+        {{ pmeta('Title', scan.page.get('title')) }}
+        {{ pmeta('Description', scan.page.get('description')) }}
+        {{ pmeta('Language', scan.page.get('lang')) }}
+        {{ pmeta('Favicon', scan.page.get('favicon')) }}
+        {{ pmeta('User agent', scan.user_agent) }}
+      </dl>
+    </div>
+
+    {# Links #}
+    {% if scan.links %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">Outbound Links ({{ scan.links | length }})</h3>
+      <div class="max-h-72 overflow-y-auto space-y-0.5">
+        {% for link in scan.links[:200] %}
+        <div class="text-xs font-mono text-gray-400 truncate hover:text-gray-200">
+          <a href="{{ link }}" target="_blank" rel="noopener nofollow" class="hover:text-blue-400">{{ link }}</a>
+        </div>
+        {% endfor %}
+        {% if scan.links | length > 200 %}
+        <div class="text-xs text-gray-600 pt-1">… and {{ scan.links | length - 200 }} more</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Console messages #}
+    {% if scan.console %}
+    <div class="nt-card p-4">
+      <h3 class="nt-card-title mb-3">Console Messages ({{ scan.console | length }})</h3>
+      <div class="max-h-64 overflow-y-auto space-y-1">
+        {% for msg in scan.console %}
+        <div class="flex gap-3 text-xs font-mono">
+          <span class="w-12 flex-shrink-0
+            {% if msg.type == 'error' %}text-red-400
+            {% elif msg.type == 'warning' %}text-yellow-400
+            {% else %}text-gray-500{% endif %}">{{ msg.type }}</span>
+          <span class="text-gray-400 truncate" title="{{ msg.text }}">{{ msg.text }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // Tab switching
+  document.querySelectorAll('.scan-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.scan-tab').forEach(b => {
+        b.classList.toggle('active', b === btn);
+        b.classList.toggle('border-blue-500', b === btn);
+        b.classList.toggle('text-blue-400', b === btn);
+        b.classList.toggle('border-transparent', b !== btn);
+        b.classList.toggle('text-gray-500', b !== btn);
+      });
+      document.querySelectorAll('.scan-panel').forEach(p => {
+        p.classList.toggle('hidden', p.dataset.panel !== target);
+      });
+    });
+  });
+
+  // Transaction filter
+  const filter = document.getElementById('txn-filter');
+  if (filter) {
+    filter.addEventListener('input', () => {
+      const q = filter.value.toLowerCase();
+      document.querySelectorAll('.txn-row').forEach(row => {
+        row.style.display = (row.dataset.search || '').includes(q) ? '' : 'none';
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -11,6 +11,7 @@ from .cyberchef_routes import register_cyberchef_routes
 from .cyberchef_api import cyberchef_api
 from .user_agent_routes import user_agent_bp
 from .enrichment_routes import enrichment_bp
+from .scan_routes import scan_bp
 
 def register_routes(app):
     """Register all route blueprints with the Flask application."""
@@ -29,6 +30,7 @@ def register_routes(app):
     app.register_blueprint(event_bp)
     app.register_blueprint(azure_error_bp)
     app.register_blueprint(user_agent_bp)
+    app.register_blueprint(scan_bp)
 
     # CyberChef routes
     register_cyberchef_routes(app)
