@@ -11,7 +11,7 @@ def setup_cyberchef(app):
 
     # Get the path to CyberChef files
     cyberchef_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                                'CyberChef_v10.19.4')
+                                'CyberChef_v11.3.0')
 
     @cyberchef_bp.after_request
     def cyberchef_security_headers(response):
@@ -36,7 +36,7 @@ def setup_cyberchef(app):
     @cyberchef_bp.route('/')
     def serve_cyberchef():
         """Serve the main CyberChef interface"""
-        return send_from_directory(cyberchef_path, 'CyberChef_v10.19.4.html')
+        return send_from_directory(cyberchef_path, 'CyberChef_v11.3.0.html')
     
     @cyberchef_bp.route('/assets/<path:filename>')
     def serve_assets(filename):
