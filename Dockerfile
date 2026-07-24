@@ -13,22 +13,34 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH"
 
-# System dependencies (for building any wheels that lack manylinux builds)
-RUN apt-get update && apt-get install -y \
+# System dependencies (build tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create logs directory and set permissions
+# Create logs directory
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-# Install dependencies first as a cached layer - only the manifests, no app code yet.
-# --frozen requires uv.lock to be in sync with pyproject.toml (CI-safe, no implicit relock).
+# Install Python dependencies first as a cached layer.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-# Create a non-root user
+# Create appuser now so the browser install below runs as that user,
+# putting Chromium in /home/appuser/.cache/ms-playwright/ — exactly
+# where Playwright looks at runtime.
 RUN useradd -m appuser && chown -R appuser:appuser /app
+
+# Install Chromium system libraries (apt-get needs root)
+RUN /app/.venv/bin/playwright install-deps chromium
+
+# Install the Chromium browser binary as appuser so it lands in the
+# correct cache path (/home/appuser/.cache/ms-playwright/)
+USER appuser
+RUN /app/.venv/bin/playwright install chromium
+
+# Back to root for the remaining file setup
+USER root
 
 # Copy app code
 COPY . .
