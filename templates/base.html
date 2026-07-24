@@ -57,10 +57,9 @@
                     <!-- Analyze group: core indicator lookups -->
                     <div class="nav-group">
                         <a href="/ip_search" class="nav-link{% if request.path == '/ip_search' %} active{% endif %}">IP</a>
-                        <a href="/domain_search" class="nav-link{% if request.path == '/domain_search' %} active{% endif %}">Domain</a>
+                        <a href="/url_scan" class="nav-link{% if request.path.startswith('/url_scan') %} active{% endif %}">URL Scan</a>
                         <a href="/hash_analysis" class="nav-link{% if request.path == '/hash_analysis' %} active{% endif %}">Hash</a>
                         <a href="/user_agent_search" class="nav-link{% if request.path == '/user_agent_search' %} active{% endif %}">User Agent</a>
-                        <a href="/url_scan" class="nav-link{% if request.path.startswith('/url_scan') %} active{% endif %}">URL Scan</a>
                     </div>
                     <div class="nav-sep" role="separator" aria-hidden="true"></div>
                     <!-- Investigate group: log & error analysis -->
@@ -135,8 +134,7 @@
                 <a href="/cyberchef" class="mobile-nav-link">CyberChef</a>
                 <a href="/user_agent_search" class="mobile-nav-link">User Agent Search</a>
                 <a href="/hash_analysis" class="mobile-nav-link">Hash Search</a>
-                <a href="/url_scan" class="mobile-nav-link">URL Scanner</a>
-                <a href="/domain_search" class="mobile-nav-link">Domain Search</a>
+                <a href="/url_scan" class="mobile-nav-link">URL Scan</a>
                 <a href="/ip_search" class="mobile-nav-link">IP Search</a>
                 <a href="/ad_event_search" class="mobile-nav-link">Windows Event Search</a>
                 <a href="/azure_error_search" class="mobile-nav-link">Azure Error Search</a>

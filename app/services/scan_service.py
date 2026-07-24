@@ -95,14 +95,17 @@ def list_scans(limit: int = 100) -> list:
     for f in files[:limit]:
         try:
             data = json.loads(f.read_text(encoding='utf-8'))
+            sid = data.get('id', '')
             result.append({
-                'id': data.get('id'),
+                'id': sid,
                 'url': data.get('url'),
                 'created_at': data.get('created_at'),
                 'status': data.get('status'),
                 'http_status': data.get('page', {}).get('status'),
                 'main_ip': data.get('main_ip'),
                 'asn': (data.get('asn') or {}).get('asn'),
+                'title': data.get('page', {}).get('title'),
+                'has_screenshot': screenshot_path(sid).exists() if sid else False,
             })
         except Exception:
             continue
@@ -494,6 +497,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
         'links': [],
         'verdict': None,
         'security': None,
+        'whois': None,
     }
 
     is_mobile = device == 'mobile'
@@ -688,6 +692,14 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 scan['main_ip'] = main_ip
                 scan['asn'] = lookup_asn(main_ip)
                 scan['ptr'] = reverse_ptr(main_ip)
+
+            # WHOIS enrichment for the primary host
+            if primary_host and not is_ip_literal:
+                try:
+                    from app.services.domain_service import get_whois_info
+                    scan['whois'] = get_whois_info(primary_host)
+                except Exception as e:
+                    logger.debug('WHOIS lookup failed for %s: %s', primary_host, e)
 
             scan['verdict'] = compute_verdict(scan)
             scan['status'] = 'error' if scan['error'] else 'done'

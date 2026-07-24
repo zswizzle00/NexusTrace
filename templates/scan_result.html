@@ -26,15 +26,22 @@
   {# ---- Meta summary card ---- #}
   {% set asn = scan.asn %}
   <div class="nt-card p-5 mb-5 flex flex-col lg:flex-row gap-5">
-    {# Screenshot thumbnail — click opens lightbox #}
+    {# Filmstrip: 3 equal crops of the full screenshot (top / mid / bottom) #}
     {% if scan.page.get('screenshot_url') %}
-    <div class="flex-shrink-0">
-      <button id="shot-thumb-btn" onclick="openLightbox()"
-        class="block rounded border border-gray-700 overflow-hidden focus:outline-none hover:border-blue-500 transition-colors cursor-zoom-in"
-        title="Click to view full screenshot" style="width:272px;height:172px;">
-        <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
-          class="object-cover object-top w-full h-full" />
-      </button>
+    <div class="flex-shrink-0" style="width:100%;max-width:522px;">
+      <div class="flex rounded border border-gray-700 overflow-hidden hover:border-blue-500 transition-colors"
+        style="height:134px;cursor:zoom-in;"
+        onclick="openLightbox()" title="Click to view full screenshot"
+        role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openLightbox()">
+        {% for pos in ['top', '50%', 'bottom'] %}
+        {% if not loop.first %}<div style="width:1px;flex-shrink:0;background:#374151;"></div>{% endif %}
+        <div style="flex:1;min-width:0;height:134px;overflow:hidden;">
+          <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
+            style="width:100%;height:134px;object-fit:cover;object-position:center {{ pos }};" />
+        </div>
+        {% endfor %}
+      </div>
+      <p style="font-size:10px;color:#4b5563;text-align:center;margin-top:4px;">top · mid · bottom — click to expand</p>
     </div>
     {% endif %}
 
@@ -220,6 +227,37 @@
         {{ tlskv('Protocol', tls.protocol ~ (' · ' ~ tls.cipher if tls.cipher else '')) }}
         {{ tlskv('Serial', tls.serial_number) }}
         {{ tlskv('SANs', tls.subject_alt_name) }}
+      </dl>
+    </div>
+    {% endif %}
+
+    {# WHOIS #}
+    {% set w = scan.whois %}
+    {% if w %}
+    <div class="nt-card p-4 mb-4">
+      <h3 class="nt-card-title mb-3">WHOIS</h3>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        {% macro wkv(k,v) %}{% if v %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ v }}</dd></div>{% endif %}{% endmacro %}
+        {% set reg = w.get('registrant') or {} %}
+        {% set rar = w.get('registrar') %}
+        {{ wkv('Domain', w.get('domain')) }}
+        {{ wkv('Registrar', (rar.name if rar is mapping else rar) if rar else None) }}
+        {{ wkv('Age', (w.get('domain_age') | string ~ ' days') if w.get('domain_age') else None) }}
+        {{ wkv('Status', (w.get('status') or '').split(' ')[0] or None) }}
+        {{ wkv('Created', (w.get('create_date') or '')[:10] or None) }}
+        {{ wkv('Updated', (w.get('update_date') or '')[:10] or None) }}
+        {{ wkv('Expires', (w.get('expire_date') or '')[:10] or None) }}
+        {{ wkv('Registrant', reg.get('name') or reg.get('organization') or reg.get('org')) }}
+        {{ wkv('Country', reg.get('country')) }}
+        {% set ns = w.get('nameservers') %}
+        {% if ns %}
+        <div class="sm:col-span-2">
+          <dt class="text-xs text-gray-500 uppercase tracking-wide">Name Servers</dt>
+          <dd class="text-gray-200 font-mono text-xs mt-0.5">
+            {% for n in ns %}<div>{{ n }}</div>{% endfor %}
+          </dd>
+        </div>
+        {% endif %}
       </dl>
     </div>
     {% endif %}

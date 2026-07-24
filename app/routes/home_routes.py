@@ -251,68 +251,15 @@ def _run_analysis(indicator):
                               indicator_type=indicator_type,
                               card_count=card_count,
                               **result_data)
-    elif indicator_type == 'url':
-        domain = urlparse(indicator).netloc
-        raw = _run_parallel({
-            'url_result':    lambda: analyze_url_quick(indicator),
-            'domain_info':   lambda: get_domain_info(domain),
-            'alienvault_raw': lambda: get_alienvault_data(domain),
-        }, max_workers=3, label='URL')
-        url_result = raw.get('url_result') or {}
-        result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
-        domain_info = raw.get('domain_info')
-        result_data['domain_info'] = domain_info if domain_info else None
-        result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        alienvault_raw = raw.get('alienvault_raw')
-        result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-
-        has_meaningful_data = (
-            (result_data['url_analysis'] and result_data['url_analysis'].get('response', {}).get('status_code') is not None) or
-            (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
-            (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
-            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
-        )
-
-        if not has_meaningful_data:
-            return render_template('no_results.html', indicator=indicator, error_type='url')
-
-        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
-        return render_template('analyze_result.html',
-                              indicator=indicator,
-                              indicator_type=indicator_type,
-                              card_count=card_count,
-                              **result_data)
-    elif indicator_type == 'domain':
-        normalized_url = f'https://{indicator}'
-        raw = _run_parallel({
-            'url_result':    lambda: analyze_url_quick(normalized_url),
-            'domain_info':   lambda: get_domain_info(indicator),
-            'alienvault_raw': lambda: get_alienvault_data(indicator),
-        }, max_workers=3, label='Domain')
-        url_result = raw.get('url_result') or {}
-        result_data['url_analysis'] = url_result.get('url_analysis') if url_result else None
-        domain_info = raw.get('domain_info')
-        result_data['domain_info'] = domain_info if domain_info else None
-        result_data['whois_info'] = domain_info.get('whois') if domain_info else None
-        alienvault_raw = raw.get('alienvault_raw')
-        result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
-
-        has_meaningful_data = (
-            (result_data['url_analysis'] and result_data['url_analysis'].get('response', {}).get('status_code') is not None) or
-            (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
-            (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
-            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
-        )
-
-        if not has_meaningful_data:
-            return render_template('no_results.html', indicator=indicator, error_type='domain')
-
-        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
-        return render_template('analyze_result.html',
-                              indicator=indicator,
-                              indicator_type=indicator_type,
-                              card_count=card_count,
-                              **result_data)
+    elif indicator_type in ('url', 'domain'):
+        # Both domains and full URLs go through the URL scanner for full Playwright analysis.
+        target = indicator if re.match(r'^https?://', indicator) else f'https://{indicator}'
+        from app.services.scan_service import run_scan, save_scan, is_scannable
+        if not is_scannable(target):
+            return render_template('no_results.html', indicator=indicator, error_type=indicator_type)
+        scan = run_scan(target)
+        save_scan(scan)
+        return redirect(url_for('scan.url_scan_result', scan_id=scan['id']))
 
 
 @home_bp.route('/analyze', methods=['POST'])

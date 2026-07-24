@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}URL Scanner | NexusTrace{% endblock %}
+{% block title %}URL Scan | NexusTrace{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto px-4 py-10">
   <div class="mb-8">
-    <h1 class="text-2xl font-semibold text-gray-100 mb-1">URL Scanner</h1>
-    <p class="text-sm text-gray-400">Loads the page in a headless Chromium browser and reports HTTP transactions, redirects, DNS records, TLS certificate, ASN, security headers, cookies, and detected technologies.</p>
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">URL Scan</h1>
+    <p class="text-sm text-gray-400">Enter a domain or URL. Loads the page in a headless Chromium browser and reports HTTP transactions, redirects, DNS records, TLS certificate, WHOIS, ASN, security headers, cookies, technologies, and a full-page screenshot.</p>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,7 +26,7 @@
         type="text"
         name="url"
         id="url-input"
-        placeholder="example.com or https://example.com"
+        placeholder="example.com or https://example.com/path"
         spellcheck="false"
         autocomplete="off"
         class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm font-mono"
@@ -49,22 +49,37 @@
   {% if recent %}
   <div>
     <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Recent Scans</h2>
-    <div class="space-y-1.5">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
       {% for s in recent %}
-      <a href="/url_scan/{{ s.id }}" class="flex items-center gap-3 px-4 py-2.5 nt-card hover:border-blue-700/50 transition-colors text-sm group">
-        <span class="font-mono text-xs px-1.5 py-0.5 rounded
-          {% if s.http_status and s.http_status < 400 %}bg-green-900/50 text-green-400
-          {% elif s.http_status and s.http_status < 500 %}bg-yellow-900/50 text-yellow-400
-          {% elif s.http_status %}bg-red-900/50 text-red-400
-          {% else %}bg-gray-700 text-gray-400{% endif %}">
-          {{ s.http_status or '?' }}
-        </span>
-        <span class="flex-1 text-gray-300 group-hover:text-gray-100 truncate font-mono text-xs">{{ s.url }}</span>
-        {% if s.asn %}
-          <span class="text-gray-500 text-xs hidden sm:inline">{{ s.asn }}</span>
-        {% elif s.main_ip %}
-          <span class="text-gray-500 text-xs hidden sm:inline">{{ s.main_ip }}</span>
-        {% endif %}
+      <a href="/url_scan/{{ s.id }}"
+        class="nt-card overflow-hidden hover:border-blue-700/50 transition-colors group block"
+        style="text-decoration:none;">
+        {# Screenshot strip #}
+        <div style="height:110px;overflow:hidden;position:relative;background:#1f2937;">
+          {% if s.has_screenshot %}
+          <img src="/url_scan/screenshot/{{ s.id }}" alt="screenshot"
+            style="width:100%;height:110px;object-fit:cover;object-position:center top;"
+            onerror="this.style.display='none'" />
+          {% endif %}
+          {# Status badge overlaid on the thumbnail #}
+          <span style="position:absolute;top:6px;left:6px;font-family:monospace;font-size:11px;padding:1px 5px;border-radius:3px;
+            {% if s.http_status and s.http_status < 400 %}background:rgba(6,78,59,0.85);color:#4ade80;
+            {% elif s.http_status and s.http_status < 500 %}background:rgba(78,63,6,0.85);color:#facc15;
+            {% elif s.http_status %}background:rgba(78,6,6,0.85);color:#f87171;
+            {% else %}background:rgba(31,41,55,0.85);color:#9ca3af;{% endif %}">
+            {{ s.http_status or '?' }}
+          </span>
+        </div>
+        {# Card text #}
+        <div style="padding:8px 10px 10px;">
+          {% if s.title %}
+          <div style="font-size:12px;font-weight:500;color:#d1d5db;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;">{{ s.title }}</div>
+          {% endif %}
+          <div style="font-size:11px;font-family:monospace;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ s.url }}</div>
+          {% if s.asn or s.main_ip %}
+          <div style="font-size:10px;color:#4b5563;margin-top:3px;">{{ s.asn or s.main_ip }}</div>
+          {% endif %}
+        </div>
       </a>
       {% endfor %}
     </div>
