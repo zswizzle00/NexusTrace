@@ -1,0 +1,180 @@
+# Pinned dependencies for Docker builds. Regenerate with:
+#   uv export --no-dev --no-hashes -o requirements.txt
+aiohappyeyeballs==2.6.2
+    # via aiohttp
+aiohttp==3.14.1
+    # via geoip2
+aiosignal==1.4.0
+    # via aiohttp
+attrs==26.1.0
+    # via aiohttp
+beautifulsoup4==4.12.3
+    # via nexustrace
+blinker==1.9.0
+    # via flask
+builtwith==1.3.4
+    # via nexustrace
+cachetools==7.1.4
+    # via ipinfo
+certifi==2026.5.20
+    # via requests
+cffi==2.0.0 ; platform_python_implementation != 'PyPy'
+    # via cryptography
+charset-normalizer==3.4.7
+    # via requests
+click==8.1.7
+    # via
+    #   click-plugins
+    #   flask
+    #   nexustrace
+    #   shodan
+click-plugins==1.1.1.2
+    # via shodan
+colorama==0.4.6
+    # via
+    #   click
+    #   shodan
+cryptography==42.0.8
+    # via pyopenssl
+dnspython==2.6.1
+    # via nexustrace
+et-xmlfile==2.0.0
+    # via openpyxl
+filelock==3.29.4
+    # via tldextract
+flask==3.0.2
+    # via
+    #   flask-wtf
+    #   nexustrace
+flask-talisman==1.1.0
+    # via nexustrace
+flask-wtf==1.2.1
+    # via nexustrace
+frozenlist==1.8.0
+    # via
+    #   aiohttp
+    #   aiosignal
+future==1.0.0
+    # via python-whois
+geoip2==4.8.0
+    # via nexustrace
+greenlet==3.5.3
+    # via playwright
+gunicorn==21.2.0
+    # via nexustrace
+idna==3.18
+    # via
+    #   requests
+    #   tldextract
+    #   yarl
+ipinfo==2.0.0
+    # via nexustrace
+itsdangerous==2.1.2
+    # via
+    #   flask
+    #   flask-wtf
+    #   nexustrace
+jinja2==3.1.3
+    # via
+    #   flask
+    #   nexustrace
+markupsafe==2.1.5
+    # via
+    #   jinja2
+    #   nexustrace
+    #   werkzeug
+    #   wtforms
+maxminddb==2.8.2
+    # via geoip2
+multidict==6.7.1
+    # via
+    #   aiohttp
+    #   yarl
+numpy==1.26.4
+    # via
+    #   nexustrace
+    #   pandas
+openpyxl==3.1.2
+    # via nexustrace
+otxv2==1.5.12
+    # via nexustrace
+packaging==26.2
+    # via gunicorn
+pandas==2.2.1
+    # via nexustrace
+pillow==11.2.1
+    # via nexustrace
+playwright==1.61.0
+    # via nexustrace
+propcache==0.5.2
+    # via
+    #   aiohttp
+    #   yarl
+pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+    # via cffi
+pyee==13.0.1
+    # via playwright
+pyopenssl==24.0.0
+    # via nexustrace
+python-dateutil==2.8.2
+    # via
+    #   nexustrace
+    #   otxv2
+    #   pandas
+python-dotenv==1.0.1
+    # via nexustrace
+python-json-logger==2.0.7
+    # via nexustrace
+python-whois==0.8.0
+    # via nexustrace
+pytz==2024.1
+    # via
+    #   nexustrace
+    #   otxv2
+    #   pandas
+requests==2.31.0
+    # via
+    #   geoip2
+    #   ipinfo
+    #   nexustrace
+    #   otxv2
+    #   requests-file
+    #   shodan
+    #   tldextract
+requests-file==3.0.1
+    # via tldextract
+setuptools==82.0.1
+    # via geoip2
+shodan==1.31.0
+    # via nexustrace
+six==1.16.0
+    # via
+    #   builtwith
+    #   ipinfo
+    #   nexustrace
+    #   python-dateutil
+soupsieve==2.8.4
+    # via beautifulsoup4
+tldextract==5.3.1
+    # via shodan
+typing-extensions==4.15.0
+    # via
+    #   aiohttp
+    #   aiosignal
+    #   pyee
+tzdata==2026.2
+    # via pandas
+urllib3==2.1.0
+    # via
+    #   nexustrace
+    #   requests
+werkzeug==3.0.1
+    # via
+    #   flask
+    #   nexustrace
+wtforms==3.2.2
+    # via flask-wtf
+xlsxwriter==3.2.9
+    # via shodan
+yarl==1.24.2
+    # via aiohttp

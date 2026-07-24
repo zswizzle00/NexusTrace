@@ -1,19 +1,12 @@
 FROM python:3.12-slim
 
-# Bring in the uv binary from the official image (pinned to match local tooling)
-COPY --from=ghcr.io/astral-sh/uv:0.9.22 /uv /uvx /bin/
-
-# Set working directory
 WORKDIR /app
 
-# Environment
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH"
 
-# System dependencies (build tools)
+# System build deps + Playwright will add its own via install-deps below
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -22,43 +15,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create logs directory
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-# Install Python dependencies first as a cached layer.
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# Create virtualenv and install Python dependencies
+COPY requirements.txt ./
+RUN python -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /app/.venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Create appuser now so the browser install below runs as that user,
-# putting Chromium in /home/appuser/.cache/ms-playwright/ — exactly
-# where Playwright looks at runtime.
+# Create appuser before the browser install so the binary lands in the
+# right place (/home/appuser/.cache/ms-playwright/) at runtime
 RUN useradd -m appuser && chown -R appuser:appuser /app
 
-# Install Chromium system libraries (apt-get needs root)
+# Install Chromium system libraries (apt-get must run as root)
 RUN /app/.venv/bin/playwright install-deps chromium
 
-# Install the Chromium browser binary as appuser so it lands in the
-# correct cache path (/home/appuser/.cache/ms-playwright/)
+# Install the Chromium browser binary as appuser
 USER appuser
 RUN /app/.venv/bin/playwright install chromium
 
-# Back to root for the remaining file setup
 USER root
 
 # Copy app code
 COPY . .
 
-# Create the data directory and set permissions
-RUN mkdir -p /app/data/cyberchef_recipes && chown -R appuser:appuser /app/data
-
-# Ensure static files and the virtualenv are accessible to the app user
-RUN chown -R appuser:appuser /app/static && chmod -R 755 /app/static && \
+# Pre-create data subdirs so they're owned by appuser even if the bind-mount
+# is missing or empty on the host
+RUN mkdir -p /app/data/scans /app/data/screenshots /app/data/cyberchef_recipes && \
+    chown -R appuser:appuser /app/data && \
+    chown -R appuser:appuser /app/static && chmod -R 755 /app/static && \
     chown -R appuser:appuser /app/.venv
 
 USER appuser
 
-# Expose port (internal)
 EXPOSE 5050
 
-# Start Gunicorn (resolved from /app/.venv via PATH).
-# Single worker + threads (gthread): the response cache and per-service rate limiters are
-# in-process, so one shared process keeps API throttling correct; threads provide concurrency
-# for the many blocking external-API calls. Scale threads (not workers) for more concurrency.
 CMD ["gunicorn", "--bind", "0.0.0.0:5050", "--workers", "1", "--threads", "8", "--worker-class", "gthread", "--timeout", "120", "main:app"]
