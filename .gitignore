@@ -48,3 +48,7 @@ CLAUDE.md
 
 # Tailwind standalone CLI binary (46MB; download on demand, see tailwind.config.js)
 tools/
+
+# Agent scratch: worktrees and subagent-driven-development ledgers/briefs/reviews
+.worktrees/
+.superpowers/
