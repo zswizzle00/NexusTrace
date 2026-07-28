@@ -253,12 +253,16 @@ def _run_analysis(indicator):
                               **result_data)
     elif indicator_type in ('url', 'domain'):
         # Both domains and full URLs go through the URL scanner for full Playwright analysis.
-        target = indicator if re.match(r'^https?://', indicator) else f'https://{indicator}'
+        # No ad-hoc scheme prepending here - url_guard.normalize() owns scheme
+        # defaulting (bare hosts default to http://), so this and /url_scan
+        # treat the same input identically (round 1 review, Finding 10: this
+        # used to default to https here but http in normalize(), so the same
+        # bare domain scanned differently depending on entry point).
         from app.services.scan_service import run_scan, save_scan
         from app.utils.url_guard import is_scannable
-        if not is_scannable(target):
+        if not is_scannable(indicator):
             return render_template('no_results.html', indicator=indicator, error_type=indicator_type)
-        scan = run_scan(target)
+        scan = run_scan(indicator)
         save_scan(scan)
         return redirect(url_for('scan.url_scan_result', scan_id=scan['id']))
 
