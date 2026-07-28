@@ -52,3 +52,7 @@ tools/
 # Agent scratch: worktrees and subagent-driven-development ledgers/briefs/reviews
 .worktrees/
 .superpowers/
+
+# Runtime scan artifacts (bind-mounted in Docker; never committed)
+data/scans/
+data/screenshots/
