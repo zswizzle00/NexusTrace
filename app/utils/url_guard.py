@@ -28,6 +28,7 @@ this module cannot provide either from a stdlib-only leaf position.
 """
 
 import ipaddress
+import re
 import socket
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -49,6 +50,11 @@ _BLOCKED_SUFFIXES = ('.localhost', '.internal', '.local')
 _NAT64_WELL_KNOWN_PREFIX = ipaddress.IPv6Network('64:ff9b::/96')
 # Deprecated IPv6 site-local range (RFC 3879) — ``is_global`` does not exclude it.
 _IPV6_SITE_LOCAL = ipaddress.IPv6Network('fec0::/10')
+
+# Matches the text immediately after "scheme:" when it is a bare port and
+# nothing else - i.e. the input was actually "host:port", not a real scheme.
+# Digits only, optionally followed by the start of a path/query/fragment.
+_PORT_ONLY_RE = re.compile(r'^\d+(?:[/?#].*)?$')
 
 Resolver = Callable[[str], Iterable[str]]
 
@@ -113,21 +119,39 @@ def normalize(raw: str) -> NormalizedTarget:
     IDNA/ASCII-encode the host.
 
     Raises :class:`UnsafeURLError` if the input cannot be unambiguously parsed
-    (an ambiguous authority, an invalid port, or a host that cannot be IDNA
-    encoded) — otherwise this function performs no *safety* checks; call
-    :func:`validate_target` for that.
+    (an ambiguous authority, an invalid or non-http(s) scheme, an invalid port,
+    or a host that cannot be IDNA encoded) — otherwise this function performs no
+    further *safety* checks; call :func:`validate_target` for that.
     """
     stripped = (raw or '').strip()
     parts = urlsplit(stripped)
-    # A parsed scheme is only real if it is one we allow, or the input actually
-    # used '://'. Otherwise urlsplit has misread a bare 'host:port' as a scheme
-    # (schemes may contain '.', so 'example.com:8080/x' parses as scheme
-    # 'example.com' with an empty netloc).
-    has_real_scheme = bool(parts.scheme) and (
-        parts.scheme.lower() in _ALLOWED_SCHEMES or '://' in stripped
-    )
-    if not has_real_scheme:
-        stripped = ('http:' if stripped.startswith('//') else 'http://') + stripped
+
+    # Classify by shape, not by a scheme allowlist/registry:
+    if '://' in stripped:
+        # A real scheme (http(s) or otherwise) - downstream (validate_target)
+        # decides whether it's allowed. No rewrite.
+        pass
+    elif stripped.startswith('//'):
+        # Protocol-relative.
+        stripped = 'http:' + stripped
+        parts = urlsplit(stripped)
+    elif parts.scheme:
+        # urlsplit found a "scheme:" prefix with no '://'. Schemes may contain
+        # '.', so 'example.com:8080/x' parses with scheme 'example.com' - the
+        # only way to tell that apart from a real opaque scheme like
+        # 'mailto:test@example.com' or 'javascript:x@evil.com' is to look at
+        # what follows the colon: a bare port (digits only, up to the next
+        # '/', '?', '#', or end) means this was 'host:port'; anything else is
+        # a real, non-http(s) scheme that must be rejected, not rewritten.
+        after_colon = stripped[len(parts.scheme) + 1:]
+        if _PORT_ONLY_RE.match(after_colon):
+            stripped = 'http://' + stripped
+            parts = urlsplit(stripped)
+        else:
+            raise UnsafeURLError(f'scheme {parts.scheme.lower()!r} is not allowed')
+    else:
+        # No scheme at all - bare host.
+        stripped = 'http://' + stripped
         parts = urlsplit(stripped)
 
     if _has_ambiguous_authority(parts.netloc):

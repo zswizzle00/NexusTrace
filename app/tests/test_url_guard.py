@@ -104,6 +104,24 @@ GUARD_CASES = [
     ('http://[fec0::1]/', {}, False, 'R1 Finding7: deprecated IPv6 site-local literal'),
     ('http://[64:ff9b::7f00:1]/', {}, False,
      'R1 Finding7: NAT64 well-known-prefix literal embedding 127.0.0.1'),
+
+    # R2 (Medium): the round-1 host:port fix made 'scheme:junk@host' shapes -
+    # opaque, non-http(s) schemes with no '://' - silently reinterpret as http
+    # and get accepted. They must be rejected like ftp://, not rewritten.
+    ('mailto:test@example.com', {}, False,
+     'R2: opaque non-http scheme (mailto:), not host:port - must be rejected, not rewritten to http'),
+    ('javascript:x@evil.com', {}, False,
+     'R2: opaque non-http scheme (javascript:) must be rejected, not rewritten to http'),
+    ('gopher:a@127.0.0.1', {}, False,
+     'R2: opaque non-http scheme (gopher:) must be rejected, not rewritten to http'),
+    ('data:text/html,x', {}, False,
+     'R2: opaque non-http scheme (data:) must be rejected, not rewritten to http'),
+    # Regression: 'host:port' must still be recognized as bare host+port, not an
+    # opaque scheme - localhost:3000/x parses fine but is then denylist-blocked.
+    ('localhost:3000/x', {}, False,
+     'R2: host:port shape must still parse as bare host+port (then denylist-blocked, not scheme-rejected)'),
+    ('example.com:8080', {'example.com': PUBLIC}, True,
+     'R2: bare host:port with no path must still parse and resolve normally'),
 ]
 
 # (raw, expected_url, expected_scheme, expected_host, expected_port)
@@ -122,6 +140,11 @@ NORMALIZE_CASES = [
     # R1 Finding 4: a genuine unicode hostname must come out IDNA/punycode-encoded
     # so .host matches what Chromium and getaddrinfo actually use on the wire.
     ('http://café.example/', 'http://xn--caf-dma.example/', 'http', 'xn--caf-dma.example', 80),
+    # R2: host:port shape must still parse as bare host+port even when the host
+    # part itself is a blocked name (denylist is validate_target's job, not
+    # normalize's) and when there is no path at all.
+    ('localhost:3000/x', 'http://localhost:3000/x', 'http', 'localhost', 3000),
+    ('example.com:8080', 'http://example.com:8080/', 'http', 'example.com', 8080),
 ]
 
 
