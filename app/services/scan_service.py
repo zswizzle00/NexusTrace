@@ -5,14 +5,15 @@ import re
 import socket
 import ssl
 import uuid
-import ipaddress
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import dns.resolver
 import dns.reversename
 import dns.exception
+
+from ..utils.url_guard import UnsafeURLError, caching_resolver, validate_target
 
 logger = logging.getLogger(__name__)
 
@@ -27,47 +28,6 @@ MOBILE_UA = (
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 )
-
-
-# ---------------------------------------------------------------------------
-# SSRF guard
-# ---------------------------------------------------------------------------
-
-def is_scannable(url: str) -> bool:
-    if not url or not isinstance(url, str):
-        return False
-    try:
-        parsed = urlparse(url if re.match(r'^https?://', url, re.I) else f'http://{url}')
-    except Exception:
-        return False
-    if parsed.scheme not in ('http', 'https'):
-        return False
-    host = parsed.hostname or ''
-    if not host:
-        return False
-    # Reject obviously-internal targets by hostname pattern.
-    if host in ('localhost',) or host.endswith('.localhost'):
-        return False
-    if host.endswith('.internal') or host.endswith('.local'):
-        return False
-    private_patterns = [
-        r'^127\.', r'^10\.', r'^192\.168\.', r'^169\.254\.', r'^0\.',
-        r'^172\.(1[6-9]|2\d|3[01])\.',
-    ]
-    for pat in private_patterns:
-        if re.match(pat, host):
-            return False
-    if host in ('::1',) or re.match(r'^f[cd][0-9a-f]{2}:', host) or host.startswith('fe80'):
-        return False
-    # Also resolve and check IPs for hostname-based SSRF.
-    try:
-        for _fam, _type, _proto, _canon, sockaddr in socket.getaddrinfo(host, None):
-            ip = ipaddress.ip_address(sockaddr[0])
-            if not ip.is_global:
-                return False
-    except (socket.gaierror, ValueError):
-        return False
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -465,19 +425,154 @@ def _safe_hostname(url: str) -> str | None:
         return None
 
 
+# Cap the blocked-request log so a hostile page cannot bloat the stored scan.
+MAX_BLOCKED_REQUESTS = 50
+
+# Defends against a redirect loop the guard itself would otherwise chase forever.
+MAX_REDIRECT_HOPS = 20
+
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+
+def _install_fetch_guard(context, scan: dict, resolver) -> dict:
+    """Re-validate every request Chromium makes, not just the URL we were given.
+
+    Two vectors this closes:
+
+    1. **Redirects.** ``is_scannable`` vets the submitted URL; Chromium then
+       follows the redirect chain itself, so a redirect to 127.0.0.1 or
+       169.254.169.254 was previously fetched.
+    2. **Subresources.** ``on_response`` records each response's status and
+       ``server_ip`` into ``scan['transactions']``, which is rendered to the
+       user - so an ``<img src="http://10.0.0.5:8080/">`` on a hostile page
+       leaked internal service liveness into the report.
+
+    Cost: every request round-trips to Python. ``resolver`` is the per-scan
+    caching resolver, so the repeated hosts on a real page resolve once each.
+
+    **Why navigations are chased manually.** ``route.continue_()`` only ever
+    invokes this handler once per *request object*: when the response to a
+    routed request is itself a redirect, Chromium follows it internally and
+    the redirected URL never reaches this handler again (verified against
+    Playwright 1.61 / Chromium 149 - matches the behavior tracked upstream in
+    microsoft/playwright#34994 and #13817; this is not merely a theoretical
+    concern, ``https://host/r`` -> ``http://169.254.169.254/`` sailed through
+    unblocked when tested with a plain ``route.continue_()`` handler). So for
+    ``document`` requests (page navigations - the highest-severity vector,
+    since it is a full arbitrary-URL fetch) each hop is fetched with
+    ``route.fetch(max_redirects=0)`` and its ``Location`` validated *before*
+    the browser is ever asked to visit it; only the final, non-redirect
+    response is handed to the browser via ``route.fulfill()``.
+
+    Re-emitting the redirect response itself via ``route.fulfill()`` instead
+    (letting Chromium follow it) was tried and rejected: it keeps ``page.url``
+    correct, but Chromium then follows that redirect the same "internal,
+    never re-routed" way as the ``continue_()`` case, so the target is never
+    revalidated - it would silently reopen the exact hole this function
+    exists to close. Fulfilling only the final response is the price of
+    actually validating every hop, and the cost is paid back below: because
+    fulfilling the *original* request with a *later* URL's body does not
+    update ``page.url``/``page.goto()``'s return value, this function tracks
+    the guard-validated final URL and hop chain itself, in ``nav_state``, for
+    ``run_scan`` to use instead of trusting ``page.url`` or
+    ``request.redirected_from`` (which reflect only the single fulfilled
+    request Chromium ever saw, not the chain this function actually walked).
+
+    Non-document resource types (image/script/xhr/...) keep the simpler
+    validate-then-``continue_()`` path: their *own* URL is still validated, so
+    a direct ``<img src="http://10.0.0.5:8080/">`` is blocked, but - for the
+    same upstream reason above - a subresource whose URL redirects to a
+    blocked target is not re-validated on the redirect hop. That residual gap
+    is analogous to the DNS-rebinding note in ``url_guard``'s module
+    docstring: narrowed, not eliminated, by a stdlib/Playwright-only guard.
+    """
+    blocked = scan['blocked_requests']
+    # Populated only for the navigation (document) request: the guard-
+    # validated final URL and the full hop chain it walked to get there.
+    # ``run_scan`` prefers this over ``page.url`` / ``request.redirected_from``
+    # for exactly the reason explained above.
+    nav_state = {'final_url': None, 'chain': []}
+
+    def block(route, url: str, reason: str) -> None:
+        if len(blocked) < MAX_BLOCKED_REQUESTS:
+            blocked.append({'url': url[:500], 'reason': reason})
+        logger.warning('Blocked unsafe request to %s: %s', url[:200], reason)
+        try:
+            route.abort('blockedbyclient')
+        except Exception:
+            pass
+
+    def handler(route):
+        request = route.request
+        try:
+            validate_target(request.url, resolver=resolver)
+        except UnsafeURLError as exc:
+            block(route, request.url, str(exc))
+            return
+
+        if request.resource_type != 'document':
+            try:
+                route.continue_()
+            except Exception:
+                # The page may have navigated away before we resumed this
+                # route; a dead route is not an error worth failing the scan.
+                pass
+            return
+
+        # Navigation request: chase the redirect chain ourselves so every hop
+        # is validated before Chromium ever opens a connection to it.
+        current_url = request.url
+        chain = []
+        for _ in range(MAX_REDIRECT_HOPS):
+            try:
+                response = route.fetch(url=current_url, max_redirects=0)
+            except Exception as exc:
+                block(route, current_url, f'fetch failed: {exc}')
+                return
+
+            if response.status in _REDIRECT_STATUSES:
+                location = response.headers.get('location')
+                chain.append({'url': current_url, 'status': response.status, 'location': location})
+                if not location:
+                    break  # Redirect status with no Location - nothing to chase; fall through and render it.
+                next_url = urljoin(current_url, location)
+                try:
+                    validate_target(next_url, resolver=resolver)
+                except UnsafeURLError as exc:
+                    block(route, next_url, str(exc))
+                    return
+                current_url = next_url
+                continue
+
+            chain.append({'url': current_url, 'status': response.status, 'location': None})
+            nav_state['final_url'] = current_url
+            nav_state['chain'] = chain
+            try:
+                route.fulfill(response=response)
+            except Exception:
+                pass
+            return
+
+        block(route, current_url, 'too many redirects')
+
+    context.route('**/*', handler)
+    return nav_state
+
+
 def run_scan(raw_url: str, device: str = 'desktop') -> dict:
     from playwright.sync_api import sync_playwright
 
     scan_id = str(uuid.uuid4())
-    url = raw_url.strip()
-    if not re.match(r'^https?://', url, re.I):
-        url = f'http://{url}'
+    created_at = datetime.utcnow().isoformat() + 'Z'
 
+    # Full scaffold up front (not just id/created_at) so templates that render
+    # an early error scan (never reached playwright) see the same empty-but-
+    # present shape as a scan that failed mid-flight further down.
     scan = {
         'id': scan_id,
-        'url': url,
+        'url': raw_url.strip(),
         'device': device,
-        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'created_at': created_at,
         'status': 'running',
         'error': None,
         'user_agent': None,
@@ -485,6 +580,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
         'transactions': [],
         'redirects': [],
         'console': [],
+        'blocked_requests': [],
         'cookies': [],
         'technologies': [],
         'dns': {},
@@ -500,6 +596,19 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
         'whois': None,
     }
 
+    try:
+        target = validate_target(raw_url.strip())
+    except UnsafeURLError as exc:
+        scan['status'] = 'error'
+        scan['error'] = str(exc)
+        return scan
+
+    # Store the canonical, normalized form - not the raw user input - so
+    # everything downstream (navigation, hostname extraction, rendering)
+    # agrees on one URL.
+    scan['url'] = target.url
+    url = target.url
+
     is_mobile = device == 'mobile'
 
     with sync_playwright() as pw:
@@ -511,6 +620,9 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 device_scale_factor=3 if is_mobile else 1,
                 ignore_https_errors=True,
             )
+            # One resolver per scan: hosts resolve once, and the cache dies with the scan.
+            guard_resolver = caching_resolver()
+            nav_state = _install_fetch_guard(context, scan, guard_resolver)
             page = context.new_page()
             scan['user_agent'] = page.evaluate('navigator.userAgent')
 
@@ -561,8 +673,17 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
 
             page.wait_for_timeout(1500)
 
-            # Redirect chain
-            if main_response:
+            # Redirect chain. Prefer the chain _install_fetch_guard actually
+            # walked and validated: every hop of a navigation is now served to
+            # Chromium as one fulfilled, non-redirecting response (see that
+            # function's docstring), so ``main_response.request.redirected_from``
+            # no longer reflects reality - it would show a single hop even when
+            # several were validated and followed. Fall back to the old
+            # derivation only if the guard never recorded one (e.g. the
+            # request errored before this scan's Playwright wiring engaged).
+            if nav_state.get('chain'):
+                scan['redirects'] = nav_state['chain']
+            elif main_response:
                 chain = []
                 stack = []
                 cur = main_response.request
@@ -596,7 +717,13 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 };
             }''')
 
-            final_url = page.url
+            # Same reasoning as the redirect chain above: nav_state['final_url']
+            # is the guard-validated URL actually rendered; page.url reflects
+            # the *original* request's URL when the guard fulfilled it with a
+            # later hop's body, which would otherwise mis-report the scheme
+            # (e.g. an http input whose site redirects to https) and silently
+            # skip TLS inspection further down.
+            final_url = nav_state.get('final_url') or page.url
             scan['page'] = {
                 'final_url': final_url,
                 'title': meta.get('title'),

@@ -1,7 +1,8 @@
 """URL scanner routes."""
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, send_file, abort, flash
-from ..services.scan_service import run_scan, get_scan, list_scans, screenshot_path, is_scannable
+from ..services.scan_service import run_scan, get_scan, list_scans, screenshot_path
+from ..utils.url_guard import is_scannable
 
 logger = logging.getLogger(__name__)
 

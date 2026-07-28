@@ -254,7 +254,8 @@ def _run_analysis(indicator):
     elif indicator_type in ('url', 'domain'):
         # Both domains and full URLs go through the URL scanner for full Playwright analysis.
         target = indicator if re.match(r'^https?://', indicator) else f'https://{indicator}'
-        from app.services.scan_service import run_scan, save_scan, is_scannable
+        from app.services.scan_service import run_scan, save_scan
+        from app.utils.url_guard import is_scannable
         if not is_scannable(target):
             return render_template('no_results.html', indicator=indicator, error_type=indicator_type)
         scan = run_scan(target)
