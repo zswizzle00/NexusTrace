@@ -6,20 +6,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Pattern for safe filenames: alphanumeric, underscore, hyphen only
 SAFE_FILENAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
 
 
 def sanitize_filename(name):
-    """Sanitize a filename to prevent path traversal attacks."""
-    # Strip any path components
+    """Sanitize a filename to prevent path traversal. None if unusable."""
     name = os.path.basename(name)
-    # Remove .json extension if present for validation
     if name.endswith('.json'):
         name = name[:-5]
-    # Replace spaces with underscores
     name = name.lower().replace(' ', '_')
-    # Only allow safe characters
     if not SAFE_FILENAME_PATTERN.match(name):
         return None
     return name
@@ -27,23 +22,19 @@ def sanitize_filename(name):
 
 def is_safe_path(base_dir, filepath):
     """Check if the resolved filepath is within the base directory."""
-    # Resolve to absolute paths
     base_dir = os.path.realpath(base_dir)
     filepath = os.path.realpath(filepath)
-    # Check that filepath starts with base_dir
     return filepath.startswith(base_dir + os.sep) or filepath == base_dir
 
 
 def register_cyberchef_routes(app):
     cyberchef_bp = Blueprint('cyberchef_tab', __name__)
 
-    # Ensure recipes directory exists with proper error handling
     recipes_dir = os.path.realpath(os.path.join(app.root_path, '..', 'data', 'cyberchef_recipes'))
     try:
         os.makedirs(recipes_dir, exist_ok=True)
     except PermissionError:
-        # If we can't create the directory, log a warning but continue
-        # The directory should be created by Docker during build
+        # Non-fatal: the Docker build is expected to have created it.
         logger.warning(f"Could not create cyberchef recipes directory at {recipes_dir}")
     except Exception as e:
         logger.error(f"Unexpected error creating cyberchef recipes directory: {e}")
@@ -79,7 +70,6 @@ def register_cyberchef_routes(app):
         if not data or 'name' not in data:
             return jsonify({'error': 'Recipe name is required'}), 400
 
-        # Sanitize the filename
         safe_name = sanitize_filename(data['name'])
         if not safe_name:
             return jsonify({'error': 'Invalid recipe name. Use only letters, numbers, underscores, and hyphens (max 50 chars)'}), 400
@@ -87,7 +77,6 @@ def register_cyberchef_routes(app):
         filename = f"{safe_name}.json"
         filepath = os.path.join(recipes_dir, filename)
 
-        # Verify path is safe
         if not is_safe_path(recipes_dir, filepath):
             logger.warning(f"Path traversal attempt blocked: {data['name']}")
             return jsonify({'error': 'Invalid recipe name'}), 400
@@ -104,7 +93,6 @@ def register_cyberchef_routes(app):
     @cyberchef_bp.route('/api/cyberchef/recipes/<filename>', methods=['GET'])
     def load_recipe(filename):
         """Load a specific recipe"""
-        # Sanitize the filename - strip path and validate
         safe_name = sanitize_filename(filename)
         if not safe_name:
             return jsonify({'error': 'Invalid filename'}), 400
@@ -112,7 +100,6 @@ def register_cyberchef_routes(app):
         filename = f"{safe_name}.json"
         filepath = os.path.join(recipes_dir, filename)
 
-        # Verify path is safe
         if not is_safe_path(recipes_dir, filepath):
             logger.warning(f"Path traversal attempt blocked: {filename}")
             return jsonify({'error': 'Invalid filename'}), 400

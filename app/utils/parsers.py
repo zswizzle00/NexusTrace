@@ -1,6 +1,5 @@
-"""Response-shaping helpers that transform raw API dicts into the structured
-form expected by templates. Kept here so service files own network logic
-and route files own HTTP handling — parsers belong to neither."""
+"""Reshape raw provider dicts into the {summary, tables, raw} form templates
+expect. Separate from services (network) and routes (HTTP)."""
 
 
 def parse_alienvault_otx(raw_data):

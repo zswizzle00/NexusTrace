@@ -23,20 +23,36 @@ Built for security analysts, incident responders, and researchers who need fast,
 - HTTP security headers analysis
 - SPF / DKIM / DMARC email security posture
 - Subdomain enumeration via certificate transparency logs (crt.sh)
-- Redirect chain tracking
+- Redirect chain tracking, validated hop-by-hop before the browser ever navigates (SSRF guard)
 - Technology stack fingerprinting
 - Meta tags, OpenGraph, and favicon extraction
 - Threat intelligence (AlienVault OTX)
+- Heuristic verdict with explicit signals (structural only - no reputation source yet)
+- Form capture with credential-prompt (password field) detection
+- Dropper detection: file downloads are hashed (SHA-256) and pivot into hash reputation lookup
+- Staged screenshots (on load / after scroll / after cookie-consent dismissal)
+- Defanged IOC extraction (URLs, domains, IPv4) from page content and network activity
 
 ### File & Hash Analysis
 - Multi-source reputation lookup (VirusTotal, MalwareBazaar, ThreatFox)
 - Threat intelligence cross-reference (AlienVault OTX)
 
+### E-mail Analysis (`.eml`)
+- Upload an `.eml` file or paste raw message source - no mail server needed
+- SPF / DKIM / DMARC authentication parsing
+- Spoofing detection: Reply-To mismatch, Return-Path mismatch, display-name impersonation
+- URL display-text-vs-target mismatch detection in message bodies
+- Attachment hashing (MD5 + SHA-256) with a reputation pivot into hash analysis
+- Received-chain IP extraction with enrichment (geolocation, ASN, abuse score)
+- DNSBL sender-IP reputation (Spamhaus, SpamCop, Barracuda)
+- Defanged IOC extraction with copy-all, and a heuristic verdict with explicit signals
+- Only parsed findings are ever stored - the raw message, body, and attachment bytes are not
+
 ### Additional Tools
 - **Azure AD Error Decoder** - Look up AADSTS error codes with descriptions and remediation steps
 - **Windows Event ID Reference** - Decode Windows Security event IDs
 - **User Agent Parser** - Break down browser, OS, device, and bot flags from any UA string
-- **CyberChef** - Embedded CyberChef v10.19.4 for in-browser data encoding, decoding, and transformation
+- **CyberChef** - Embedded CyberChef v11.3.0 for in-browser data encoding, decoding, and transformation
 
 ---
 
@@ -114,8 +130,8 @@ ALIENVAULT_KEY=        # https://otx.alienvault.com/api
 # Server
 SECRET_KEY=your-random-secret-key
 FLASK_DEBUG=False
-HOST=0.0.0.0
-PORT=5050
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5050
 
 # Optional: offline IP lookups
 # MMDB_PATH=/path/to/ipinfo_lite.mmdb
@@ -145,6 +161,8 @@ NexusTrace/
 │   │   ├── domain_routes.py     # Domain/URL analysis
 │   │   ├── hash_routes.py       # Hash reputation lookup
 │   │   ├── file_routes.py       # File malware analysis
+│   │   ├── scan_routes.py       # URL scanner (submit + result + screenshots)
+│   │   ├── email_routes.py      # .eml analysis (upload/paste + result)
 │   │   ├── azure_error_routes.py
 │   │   ├── user_agent_routes.py
 │   │   └── event_routes.py
@@ -155,17 +173,25 @@ NexusTrace/
 │   │   ├── url_service.py       # Security headers, redirect chains, BuiltWith
 │   │   ├── file_service.py      # File hashing + OTX reputation
 │   │   ├── hash_service.py      # VirusTotal, MalwareBazaar, ThreatFox
+│   │   ├── scan_service.py      # Playwright URL scanner
+│   │   ├── scan_rules.py        # Scanner heuristic verdict (pure)
+│   │   ├── email_service.py     # .eml enrichment + persistence
+│   │   ├── email_rules.py       # E-mail heuristic verdict (pure)
 │   │   ├── user_agent_service.py
 │   │   ├── azure_error_service.py
 │   │   └── event_service.py
 │   │
 │   └── utils/
-│       ├── cache.py       # Thread-safe LRU cache with TTL
-│       └── rate_limiter.py  # Sliding window rate limiter
+│       ├── cache.py         # Thread-safe LRU cache with TTL
+│       ├── rate_limiter.py  # Sliding window rate limiter
+│       ├── url_guard.py     # SSRF / target-safety guard for the scanner
+│       ├── email_parse.py   # .eml parsing (pure, stdlib only)
+│       ├── iocs.py          # IOC extraction + defanging (pure)
+│       └── validators.py    # IP / domain / URL validation
 │
 ├── templates/           # Jinja2 HTML templates
 ├── static/              # CSS, JS, images, PWA service worker
-├── CyberChef_v10.19.4/  # Embedded CyberChef (offline capable)
+├── CyberChef_v11.3.0/   # Embedded CyberChef (offline capable)
 ├── main.py              # App entry point
 ├── pyproject.toml       # Project metadata + dependencies (uv)
 ├── uv.lock              # Pinned, resolved dependency lockfile

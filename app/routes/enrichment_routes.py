@@ -22,6 +22,9 @@ _DOMAIN_RE = re.compile(
 
 def _detect_type(indicator):
     """Return ('ip'|'url'|'domain', normalized_indicator). Raises ValueError if unknown."""
+    # ip_address() accepts ints, so an unguarded 123 used to be reported as IP 0.0.0.123.
+    if not isinstance(indicator, str):
+        raise ValueError(f"Indicator must be a string, got {type(indicator).__name__}")
     try:
         normalized = str(ipaddress.ip_address(indicator))
         return 'ip', normalized
@@ -37,10 +40,6 @@ def _detect_type(indicator):
 def _now():
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-
-# ---------------------------------------------------------------------------
-# IP enrichment
-# ---------------------------------------------------------------------------
 
 def _enrich_ip(ip):
     from app.services.ip_service import (
@@ -152,10 +151,6 @@ def _enrich_ip(ip):
     }
 
 
-# ---------------------------------------------------------------------------
-# Domain / URL enrichment
-# ---------------------------------------------------------------------------
-
 def _enrich_domain(indicator, indicator_type):
     from app.services.domain_service import get_domain_info
     from app.services.ip_service import get_alienvault_data
@@ -188,7 +183,6 @@ def _enrich_domain(indicator, indicator_type):
     general = alienvault.get('general', {}) or {}
     threat_pulse_count = general.get('pulse_info', {}).get('count', 0) if general else 0
 
-    # URL analysis for status code / redirects
     url_data = None
     status_code = None
     redirect_count = 0
@@ -209,7 +203,9 @@ def _enrich_domain(indicator, indicator_type):
         'created_date': whois.get('create_date'),
         'expires_date': whois.get('expire_date'),
         'ip_address': domain_info.get('ip_address'),
-        'ssl_valid': ssl is not None,
+        # bool(ssl), not `is not None`: line 178 coalesces to {}, so the old test was
+        # always True and shipped a constant field to SIEM/SOAR consumers.
+        'ssl_valid': bool(ssl),
         'ssl_expires': ssl.get('not_after') if ssl else None,
         'threat_pulse_count': threat_pulse_count,
         'status_code': status_code,
@@ -230,10 +226,6 @@ def _enrich_domain(indicator, indicator_type):
         },
     }
 
-
-# ---------------------------------------------------------------------------
-# Shared dispatch
-# ---------------------------------------------------------------------------
 
 def _enrich_indicator(indicator):
     """Enrich a single indicator; returns result dict (may contain 'error')."""
@@ -259,10 +251,6 @@ def _enrich_indicator(indicator):
             'error': f"Internal error: {exc}",
         }
 
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 @enrichment_bp.route('/ip', methods=['POST'])
 @require_api_key

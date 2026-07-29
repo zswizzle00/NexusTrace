@@ -14,13 +14,11 @@
                 </p>
             </div>
 
-            <!-- Single IP Search Form -->
             <div>
                 <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Single IP Lookup</h3>
                 {{ search_form('Enter IPv4 or IPv6 address') }}
             </div>
 
-            <!-- Divider -->
             <div class="relative">
                 <div class="absolute inset-0 flex items-center">
                     <div class="w-full border-t border-gray-600"></div>
@@ -30,7 +28,6 @@
                 </div>
             </div>
 
-            <!-- Bulk IP Analysis -->
             <div class="bulk-analysis">
                 <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Bulk IP Analysis</h3>
                 <p class="text-gray-400 text-center mb-6">Upload a CSV, XLSX, or TXT file with IP addresses (one per line or in the first column) to analyze multiple IPs and download results as CSV.</p>
@@ -38,7 +35,6 @@
                 <form id="bulkIpForm" enctype="multipart/form-data" class="space-y-6">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                    <!-- File Upload Area -->
                     <div class="flex flex-col items-center">
                         <label for="ipFile" class="w-full max-w-md cursor-pointer">
                             <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-gray-700/50 transition-all duration-200">
@@ -52,18 +48,14 @@
                         <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
                     </div>
 
-                    <!-- Progress Bar (hidden by default) -->
-                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto">
-                        <div class="flex justify-between text-sm text-gray-400 mb-2">
-                            <span>Processing IPs...</span>
-                            <span id="progressText">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-700 rounded-full h-3">
-                            <div id="progressBar" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
+                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto text-center">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        <p class="text-sm text-gray-400 mt-3">
+                            Querying providers at about 2 IPs per second &mdash;
+                            <span id="elapsedText" class="font-mono text-gray-300">0s</span> elapsed
+                        </p>
                     </div>
 
-                    <!-- Submit Button -->
                     <div class="flex justify-center">
                         <button type="submit" id="submitBtn" class="btn btn-primary text-lg py-4 px-8 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,7 +66,6 @@
                     </div>
                 </form>
 
-                <!-- Error/Success Messages -->
                 <div id="messageArea" class="hidden mt-6 p-4 rounded-lg text-center max-w-md mx-auto"></div>
             </div>
         </div>
@@ -92,11 +83,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
+    const elapsedText = document.getElementById('elapsedText');
     const messageArea = document.getElementById('messageArea');
 
-    // File selection handler
     fileInput.addEventListener('change', function() {
         if (this.files.length > 0) {
             fileLabel.textContent = this.files[0].name;
@@ -109,7 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Drag and drop handlers
     dropZone.addEventListener('dragover', function(e) {
         e.preventDefault();
         this.classList.add('border-blue-500', 'bg-gray-700/50');
@@ -133,7 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Form submission
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -142,19 +129,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Show progress
         progressContainer.classList.remove('hidden');
         submitBtn.disabled = true;
         btnText.textContent = 'Processing...';
         messageArea.classList.add('hidden');
 
-        // Simulate progress (since we can't track actual progress)
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            updateProgress(progress);
-        }, 500);
+        // Elapsed time, not a percentage: nothing comes back until the whole CSV is
+        // built, so real completion is not knowable client-side.
+        const startedAt = Date.now();
+        elapsedText.textContent = '0s';
+        const elapsedInterval = setInterval(() => {
+            elapsedText.textContent = Math.round((Date.now() - startedAt) / 1000) + 's';
+        }, 1000);
 
         try {
             const formData = new FormData();
@@ -162,15 +148,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const response = await fetch('/api/ip/check_ips', {
                 method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: formData
             });
 
-            clearInterval(progressInterval);
+            const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
-            if (response.ok) {
-                updateProgress(100);
-
-                // Download the CSV
+            // Gated on the content type, not response.ok: the CSRF handler answers with a
+            // 303 to home and fetch follows redirects transparently, so a rejected upload
+            // arrived here as a 200 and the homepage HTML was saved as ip_report.csv.
+            if (response.ok && contentType.includes('csv')) {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -181,30 +170,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.URL.revokeObjectURL(url);
                 a.remove();
 
-                showMessage('Analysis complete! CSV downloaded successfully.', 'success');
+                showMessage('Analysis complete. ip_report.csv downloaded - check its error column for addresses that returned no data.', 'success');
+            } else if (contentType.includes('json')) {
+                const payload = await response.json().catch(() => ({}));
+                showMessage(payload.error || `Analysis failed (HTTP ${response.status}).`, 'error');
             } else {
-                const error = await response.json();
-                showMessage(error.error || 'An error occurred during analysis.', 'error');
+                showMessage(`The server returned ${contentType || 'an unknown content type'} instead of a CSV (HTTP ${response.status}). Your session may have expired - reload the page and try again.`, 'error');
             }
         } catch (error) {
-            clearInterval(progressInterval);
             showMessage('Network error. Please try again.', 'error');
         } finally {
-            // Reset UI
+            clearInterval(elapsedInterval);
             setTimeout(() => {
                 progressContainer.classList.add('hidden');
-                progressBar.style.width = '0%';
-                progressText.textContent = '0%';
                 submitBtn.disabled = false;
                 btnText.textContent = 'Analyze & Download CSV';
             }, 2000);
         }
     });
-
-    function updateProgress(percent) {
-        progressBar.style.width = percent + '%';
-        progressText.textContent = Math.round(percent) + '%';
-    }
 
     function showMessage(message, type) {
         messageArea.textContent = message;

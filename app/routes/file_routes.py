@@ -10,17 +10,16 @@ logger = logging.getLogger(__name__)
 
 file_bp = Blueprint('file', __name__)
 
-# Allowed file extensions for analysis
 ALLOWED_EXTENSIONS = {
-    'exe', 'dll', 'sys', 'scr', 'msi',  # Windows executables
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',  # Documents
-    'zip', 'rar', '7z', 'tar', 'gz',  # Archives
-    'js', 'vbs', 'ps1', 'bat', 'cmd',  # Scripts
-    'jar', 'class',  # Java
-    'apk',  # Android
-    'dmg', 'pkg',  # macOS
-    'elf', 'so',  # Linux
-    'bin', 'dat',  # Generic binary
+    'exe', 'dll', 'sys', 'scr', 'msi',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'zip', 'rar', '7z', 'tar', 'gz',
+    'js', 'vbs', 'ps1', 'bat', 'cmd',
+    'jar', 'class',
+    'apk',
+    'dmg', 'pkg',
+    'elf', 'so',
+    'bin', 'dat',
 }
 
 
@@ -33,7 +32,7 @@ def allowed_file(filename):
 
 @file_bp.route('/analyze_file', methods=['POST'])
 def analyze_file():
-    """Endpoint for analyzing an uploaded file by hashing it and checking reputation (AlienVault OTX)."""
+    """Hash an uploaded file and check its reputation (AlienVault OTX)."""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -42,42 +41,35 @@ def analyze_file():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Sanitize the original filename
         original_filename = secure_filename(file.filename)
         if not original_filename:
             original_filename = 'unnamed_file'
 
-        # Check file extension
         if not allowed_file(original_filename):
             return jsonify({'error': 'File type not allowed for analysis'}), 400
 
-        # Generate a random filename to prevent any path manipulation
+        # Random on-disk name so no part of user input reaches the path.
         file_ext = os.path.splitext(original_filename)[1] if '.' in original_filename else ''
         random_filename = f"{uuid.uuid4().hex}{file_ext}"
 
-        # Create a secure temporary file
         temp_dir = tempfile.mkdtemp(prefix='nexustrace_')
         temp_path = os.path.join(temp_dir, random_filename)
 
         try:
-            # Save with restrictive permissions (owner read/write only)
             file.save(temp_path)
             os.chmod(temp_path, 0o600)
 
             logger.info(f"Analyzing file: {original_filename} (saved as {random_filename})")
 
-            # Analyze the file
             analysis_result = get_combined_file_analysis(file_path=temp_path)
 
             if not analysis_result:
                 return jsonify({'error': 'Could not analyze file'}), 500
 
-            # Include original filename in result
             analysis_result['original_filename'] = original_filename
             return jsonify(analysis_result)
 
         finally:
-            # Clean up the temporary file and directory
             try:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)

@@ -4,7 +4,6 @@ from collections import deque
 from threading import Lock
 import time
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 class RateLimiter:
@@ -27,8 +26,8 @@ class RateLimiter:
                     self.requests.append(now)
                     return True
 
-                # Compute wait time, then release the lock before sleeping so
-                # other threads (on different limiters or the same one) aren't blocked.
+                # Compute the wait, then release the lock before sleeping so other
+                # threads aren't blocked.
                 sleep_time = (self.requests[0] + self.time_window - now).total_seconds()
 
             if sleep_time > 0:
@@ -37,14 +36,12 @@ class RateLimiter:
                 time.sleep(0.01)  # yield to avoid busy-spin when clock skew gives sleep_time <= 0
 
     def __enter__(self):
-        """Context manager entry."""
         self.acquire()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
         pass
 
 def setup_rate_limiters(app):
     """Setup rate limiters for the application."""
-    pass  # Add any necessary setup code here 
+    pass

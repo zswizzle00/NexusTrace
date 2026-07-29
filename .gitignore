@@ -48,3 +48,13 @@ CLAUDE.md
 
 # Tailwind standalone CLI binary (46MB; download on demand, see tailwind.config.js)
 tools/
+
+# Agent scratch: worktrees and subagent-driven-development ledgers/briefs/reviews
+.worktrees/
+.superpowers/
+
+# Runtime analysis artifacts (bind-mounted in Docker; never committed).
+# data/analyses/ holds e-mail findings: sender addresses, subjects, Received-chain IPs.
+data/scans/
+data/screenshots/
+data/analyses/

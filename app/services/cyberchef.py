@@ -2,21 +2,15 @@ import os
 from flask import send_from_directory, Blueprint
 
 def setup_cyberchef(app):
-    """
-    Setup CyberChef integration with the Flask application.
-    This will serve the CyberChef interface and handle its assets.
-    """
-    # Create a blueprint for CyberChef
+    """Serve the bundled CyberChef interface and its assets."""
     cyberchef_bp = Blueprint('cyberchef', __name__, url_prefix='/cyberchef_app')
 
-    # Get the path to CyberChef files
     cyberchef_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
                                 'CyberChef_v11.3.0')
 
     @cyberchef_bp.after_request
     def cyberchef_security_headers(response):
-        """Set permissive CSP for CyberChef which needs eval, blob workers, etc."""
-        # CyberChef needs a more permissive CSP than the rest of the app
+        """Set a CSP more permissive than the rest of the app: CyberChef needs eval and blob workers."""
         cyberchef_csp = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; "
@@ -52,6 +46,5 @@ def setup_cyberchef(app):
     def serve_modules(filename):
         """Serve CyberChef modules"""
         return send_from_directory(os.path.join(cyberchef_path, 'modules'), filename)
-    
-    # Register the blueprint
-    app.register_blueprint(cyberchef_bp) 
+
+    app.register_blueprint(cyberchef_bp)

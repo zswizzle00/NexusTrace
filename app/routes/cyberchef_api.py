@@ -10,7 +10,7 @@ def run_cyberchef():
     recipe = data.get('recipe')
     
     try:
-        # Return the recipe and input to be processed by the frontend
+        # Echo only — the recipe is executed client-side in the CyberChef iframe.
         return jsonify({
             'input': input_data,
             'recipe': recipe

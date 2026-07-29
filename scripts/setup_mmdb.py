@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Comprehensive MMDB database setup script for NexusTrace.
-This script provides multiple options for setting up IP geolocation databases.
-"""
+"""Interactive setup for a local MMDB IP-geolocation database."""
 
 import os
 import requests
@@ -51,21 +48,17 @@ def download_geolite2_city():
         return None
     
     try:
-        # Download GeoLite2 City database
         url = f"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key={license_key}&suffix=tar.gz"
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        
-        # Save the compressed file
+
         compressed_path = data_dir / "GeoLite2-City.tar.gz"
         with open(compressed_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        
-        # Extract the tar.gz file
+
         import tarfile
         with tarfile.open(compressed_path, 'r:gz') as tar:
-            # Find the .mmdb file in the archive
             mmdb_member = None
             for member in tar.getmembers():
                 if member.name.endswith('.mmdb'):
@@ -75,8 +68,7 @@ def download_geolite2_city():
             if mmdb_member:
                 with open(mmdb_path, 'wb') as f:
                     shutil.copyfileobj(tar.extractfile(mmdb_member), f)
-        
-        # Clean up compressed file
+
         compressed_path.unlink()
         
         print(f"✓ Successfully downloaded GeoLite2 City database to {mmdb_path}")
@@ -115,11 +107,8 @@ def create_sample_mmdb():
     print("Creating a minimal sample MMDB database for testing...")
     print("Note: This is a placeholder file and won't provide real geolocation data")
     
-    # Create a minimal MMDB file structure (this is just a placeholder)
     try:
-        # Create a simple binary file that geoip2 can read (minimal valid MMDB)
         with open(mmdb_path, 'wb') as f:
-            # Write a minimal MMDB header
             f.write(b'\xab\xcd\xefMaxMind.com')
             f.write(b'\x00' * 16)  # Metadata size placeholder
             f.write(b'\x00' * 4)   # Metadata offset placeholder
@@ -141,15 +130,25 @@ def update_ip_service_config():
         return False
     
     print("Updating IP service configuration...")
-    
-    # Read the current file
+
     with open(ip_service_path, 'r') as f:
         content = f.read()
-    
-    # Update the MMDB path configuration
-    updated_content = content.replace(
-        "mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))",
-        """mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))
+
+    anchor = "mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))"
+    marker = 'alternative_paths = ['
+
+    # The anchor is the first line of what gets inserted, so it still matches on a
+    # second run: without this guard the block is appended again every time.
+    if marker in content:
+        print("✓ IP service already configured for alternative MMDB paths")
+        return True
+
+    if anchor not in content:
+        print("✗ Could not find the mmdb_path assignment in ip_service.py - "
+              "not modifying it. Set MMDB_PATH in .env instead.")
+        return False
+
+    updated_content = content.replace(anchor, anchor + """
     # Try alternative MMDB databases if primary doesn't exist
     if not os.path.exists(mmdb_path):
         alternative_paths = [
@@ -160,13 +159,11 @@ def update_ip_service_config():
             if os.path.exists(alt_path):
                 mmdb_path = alt_path
                 logger.info(f"Using alternative MMDB database: {mmdb_path}")
-                break"""
-    )
-    
-    # Write the updated content
+                break""")
+
     with open(ip_service_path, 'w') as f:
         f.write(updated_content)
-    
+
     print("✓ Updated IP service configuration")
     return True
 
@@ -174,8 +171,7 @@ def main():
     """Main setup function."""
     print("NexusTrace MMDB Database Setup")
     print("=" * 40)
-    
-    # Check requirements
+
     if not check_geoip2():
         print("\nPlease install geoip2 first:")
         print("pip install geoip2")

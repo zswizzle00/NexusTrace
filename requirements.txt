@@ -110,6 +110,8 @@ propcache==0.5.2
     # via
     #   aiohttp
     #   yarl
+publicsuffixlist==1.0.2.20260726
+    # via nexustrace
 pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
     # via cffi
 pyee==13.0.1

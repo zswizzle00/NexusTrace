@@ -1,20 +1,7 @@
-{#
-  Unified search form macro used across all search/analysis pages.
-
-  Every page POSTs an indicator to /analyze (which auto-detects the type), so the only
-  per-page differences are the placeholder and the button label. Special cases:
-    - home: needs form_id/input_id for the quick-pick chip script.
-    - azure: handled client-side (its JS preventDefaults on the form and reads the input),
-      so it passes its own form_id/input_id/name; the action is a harmless no-op fallback.
-
-  Sizing/typography come from the global .form-input and .btn-primary rules in app.css, so
-  the input and button always render at the same height. Stacks on mobile, row on >=sm.
-
-  Usage:
-    {% from "_search_form.html" import search_form %}
-    {{ search_form('Enter domain or URL...') }}
-    {{ search_form('Enter Windows Event ID...', button_label='Search') }}
-#}
+{# Every page POSTs an indicator to /analyze, which auto-detects the type, so callers
+   normally override only the placeholder and button label. home passes form_id/input_id
+   for its quick-pick script; azure is handled client-side (its JS preventDefaults the
+   form), so for it the action is a no-op fallback. #}
 {% macro search_form(placeholder, button_label='Analyze', name='indicator', action='/analyze', form_id='', input_id='') -%}
 <form {% if form_id %}id="{{ form_id }}" {% endif %}action="{{ action }}" method="POST"
       class="w-full max-w-2xl mx-auto flex flex-col sm:flex-row gap-3 items-stretch justify-center">

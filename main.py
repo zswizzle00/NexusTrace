@@ -1,23 +1,21 @@
 from dotenv import load_dotenv
 import os
 
-# Load environment variables first, before any other imports
-load_dotenv()
+load_dotenv()  # must precede app imports, which read env at import time
 
 from app import create_app
 from flask import send_from_directory
 
 app = create_app()
 
-# Serve the service worker at /sw.js (must be at root scope for full-origin coverage).
-# Use app.static_folder (absolute path) — 'static' relative resolves against app.root_path
-# which is app/, not the project root where static/ actually lives.
+# /sw.js must be at root scope for full-origin service-worker coverage. Use the
+# absolute app.static_folder — relative 'static' resolves against app/, not the
+# project root where static/ actually lives.
 @app.route('/sw.js')
 def service_worker():
     return send_from_directory(app.static_folder, 'sw.js')
 
 if __name__ == '__main__':
-    # Ensure we bind to all interfaces in Docker
     host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_PORT', 5050))
     app.run(host=host, port=port, threaded=True) 

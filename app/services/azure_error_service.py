@@ -6,20 +6,10 @@ from ..utils.constants import TIMEOUT_MEDIUM
 
 @timed_lru_cache(seconds=3600)
 def get_azure_error_info(error_code):
-    """
-    Fetch information about an Azure error code from the Microsoft error lookup website.
-    
-    Args:
-        error_code (str): The Azure error code to look up (e.g., 'AADSTS50058')
-        
-    Returns:
-        dict: A dictionary containing the error information
-    """
+    """Scrape an Azure AD error code (e.g. 'AADSTS50058') from Microsoft's error lookup page."""
     try:
-        # Clean the error code - remove 'AADSTS' prefix if present and ensure proper format
         clean_code = error_code.upper().replace('AADSTS', '').strip()
-        
-        # Construct the URL for the error lookup
+
         url = f"https://login.microsoftonline.com/error?code={clean_code}"
         response = requests.get(url, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
@@ -35,8 +25,6 @@ def get_azure_error_info(error_code):
             'severity': ''
         }
 
-        # Look for the error information table
-        # Based on the actual page structure, we need to find the table with error details
         tables = soup.find_all('table')
         
         for table in tables:
@@ -44,27 +32,21 @@ def get_azure_error_info(error_code):
             for row in rows:
                 cells = row.find_all(['td', 'th'])
                 if len(cells) >= 2:
-                    # Check if this row contains error information
                     first_cell = cells[0].get_text(strip=True).lower()
                     second_cell = cells[1].get_text(strip=True)
-                    
+
                     if 'error code' in first_cell:
-                        # Found the error code row
                         error_info['title'] = f"Azure Error Code: AADSTS{clean_code}"
                     elif 'message' in first_cell:
-                        # Found the message/description row
                         error_info['description'] = second_cell
                     elif 'remediation' in first_cell:
-                        # Found the remediation/solutions row
                         error_info['solutions'] = [second_cell]
-                        # Split long remediation text into multiple solutions if it contains multiple sentences
                         if '. ' in second_cell:
                             sentences = [s.strip() for s in second_cell.split('. ') if s.strip()]
-                            error_info['solutions'] = sentences[:5]  # Limit to 5 solutions
+                            error_info['solutions'] = sentences[:5]
 
-        # If we didn't find structured data, try to extract from general content
+        # Fall back to free-text paragraphs when the page has no structured table.
         if not error_info['description']:
-            # Look for any paragraph content that might contain error information
             paragraphs = soup.find_all('p')
             for p in paragraphs:
                 text = p.get_text(strip=True)
@@ -72,10 +54,8 @@ def get_azure_error_info(error_code):
                     error_info['description'] = text
                     break
 
-        # Determine error type based on error code patterns and content
         content_text = soup.get_text().lower()
-        
-        # Determine error type based on common patterns
+
         if any(word in content_text for word in ['authentication', 'auth', 'login', 'sign in']):
             error_info['error_type'] = 'Authentication'
         elif any(word in content_text for word in ['authorization', 'permission', 'access']):
@@ -89,7 +69,6 @@ def get_azure_error_info(error_code):
         else:
             error_info['error_type'] = 'General'
 
-        # Determine severity based on error code patterns and content
         if any(word in content_text for word in ['critical', 'fatal', 'blocking']):
             error_info['severity'] = 'Critical'
         elif any(word in content_text for word in ['warning', 'temporary', 'retry']):
@@ -97,7 +76,6 @@ def get_azure_error_info(error_code):
         elif any(word in content_text for word in ['information', 'info']):
             error_info['severity'] = 'Information'
         else:
-            # Default severity based on error code patterns
             if clean_code.startswith(('5', '6', '7')):
                 error_info['severity'] = 'Error'
             elif clean_code.startswith(('1', '2')):
@@ -105,7 +83,6 @@ def get_azure_error_info(error_code):
             else:
                 error_info['severity'] = 'Warning'
 
-        # If no meaningful content was found, provide a generic response
         if not error_info['title'] and not error_info['description']:
             error_info['title'] = f"Azure Error Code: AADSTS{clean_code}"
             error_info['description'] = f"No specific information found for error code AADSTS{clean_code}. Please check the Microsoft documentation for the most up-to-date information."
