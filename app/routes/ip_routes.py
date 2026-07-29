@@ -80,60 +80,115 @@ def check_ip():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Measured throughput is ~2 IPs/s and flat: each row queries three providers behind
+# process-global 2 req/s limiters, so more workers cannot raise it. 200 rows is what fits
+# inside the 120s gunicorn/Docker request timeout; the old 1000 could not.
+MAX_BATCH_IPS = 200
+
+
+class UnreadableUpload(Exception):
+    """Carries a message that is safe to return to the client - no pandas, codec, or
+    zipfile internals, which the old broad `except` echoed straight back."""
+
+
+def _parse_table(reader, raw, **kwargs):
+    try:
+        return reader(io.BytesIO(raw), **kwargs)
+    except UnicodeDecodeError as e:
+        logger.warning("Bulk IP upload is not UTF-8: %s", e)
+        raise UnreadableUpload(
+            'The file could not be decoded as UTF-8 text. Re-save it as UTF-8 CSV, '
+            'or upload it as .xlsx.'
+        ) from e
+    except pd.errors.EmptyDataError as e:
+        raise UnreadableUpload('The file is empty.') from e
+    except Exception as e:
+        logger.warning("Bulk IP upload could not be parsed: %s: %s", type(e).__name__, e)
+        raise UnreadableUpload(
+            'The file could not be read. Provide a CSV, XLSX, or TXT file with one IP '
+            'address per row in the first column.'
+        ) from e
+
+
+def _first_cell_is_data(df):
+    return df.shape[1] > 0 and is_valid_ip(str(df.columns[0]).strip()) is not None
+
+
+def _read_ip_column(filename, raw):
+    """First column of an uploaded CSV/XLSX/TXT as a list of cells.
+
+    A headerless CSV/XLSX loses its first address to pandas' header row (a single-IP file
+    loses its only one), so the file is re-read with `header=None` when the header cell
+    itself parses as an IP. TXT is always headerless.
+    """
+    name = (filename or '').lower()
+    if name.endswith('.txt'):
+        df = _parse_table(pd.read_csv, raw, header=None)
+    elif name.endswith('.csv'):
+        df = _parse_table(pd.read_csv, raw)
+        if _first_cell_is_data(df):
+            df = _parse_table(pd.read_csv, raw, header=None)
+    elif name.endswith('.xlsx'):
+        df = _parse_table(pd.read_excel, raw)
+        if _first_cell_is_data(df):
+            df = _parse_table(pd.read_excel, raw, header=None)
+    else:
+        raise UnreadableUpload('Unsupported file format. Upload a .csv, .xlsx, or .txt file.')
+
+    if df.shape[1] == 0 or df.empty:
+        raise UnreadableUpload('The file contains no rows to analyze.')
+    return df.iloc[:, 0].tolist()
+
+
 @ip_bp.route('/check_ips', methods=['POST'])
 def check_ips():
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
-    
+
     file = request.files['file']
-    if file.filename == '':
+    if not file.filename:
         return jsonify({'error': 'No file selected'}), 400
-    
+
     try:
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(file)
-        elif file.filename.endswith('.xlsx'):
-            df = pd.read_excel(file)
-        elif file.filename.endswith('.txt'):
-            df = pd.read_csv(file, header=None, names=['ip'])
-        else:
-            return jsonify({'error': 'Unsupported file format'}), 400
-        
-        ip_addresses = df.iloc[:, 0].tolist()
+        cells = _read_ip_column(file.filename, file.read())
+    except UnreadableUpload as e:
+        return jsonify({'error': str(e)}), 400
 
-        # Cap input size to prevent quota exhaustion against paid APIs.
-        MAX_BATCH_IPS = 1000
-        if len(ip_addresses) > MAX_BATCH_IPS:
-            return jsonify({'error': f'Too many IPs. Maximum batch size is {MAX_BATCH_IPS}.'}), 400
+    # Normalize first, so variants of the same address dedupe together.
+    valid_ips = []
+    seen = set()
+    for cell in cells:
+        normalized = is_valid_ip(str(cell).strip()) if cell is not None else None
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            valid_ips.append(normalized)
 
-        # Normalize first, so variants of the same address dedupe together.
-        valid_ips = []
-        seen = set()
-        for ip in ip_addresses:
-            if isinstance(ip, str):
-                normalized = is_valid_ip(ip.strip())
-                if normalized and normalized not in seen:
-                    seen.add(normalized)
-                    valid_ips.append(normalized)
-        
-        if not valid_ips:
-            return jsonify({'error': 'No valid IP addresses found in the file'}), 400
+    if not valid_ips:
+        return jsonify({'error': 'No valid IP addresses found in the first column of the file.'}), 400
 
-        from ..services.ip_service import process_ip_batch
+    # Capped after dedup, because unique addresses are what actually get looked up.
+    if len(valid_ips) > MAX_BATCH_IPS:
+        return jsonify({'error': (
+            f'Too many IP addresses: {len(valid_ips)} unique, maximum is {MAX_BATCH_IPS}. '
+            'Bulk analysis runs at roughly 2 IPs per second against rate-limited providers, '
+            f'so more than {MAX_BATCH_IPS} cannot finish inside the request timeout. '
+            'Split the file into smaller batches.'
+        )}), 400
+
+    from ..services.ip_service import BATCH_COLUMNS, process_ip_batch
+    try:
         rows = process_ip_batch(valid_ips)
+    except Exception:
+        logger.exception("Bulk IP analysis failed for %d addresses", len(valid_ips))
+        return jsonify({'error': 'Bulk analysis failed unexpectedly. Check the server log.'}), 500
 
-        if not rows:
-            return jsonify({'error': 'No valid results could be obtained for any IP addresses'}), 400
-
-        out_df = pd.DataFrame(rows)
-        output = io.StringIO()
-        out_df.to_csv(output, index=False)
-        output.seek(0)
-        return send_file(
-            io.BytesIO(output.getvalue().encode()),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name='ip_report.csv'
-        )
-    except Exception as e:
-        return jsonify({'error': f'Error processing file: {str(e)}'}), 500 
+    output = io.StringIO()
+    # dtype=object: without it a column holding an int plus a null is inferred as float64
+    # and abuse_score 42 is written as "42.0".
+    pd.DataFrame(rows, columns=list(BATCH_COLUMNS), dtype=object).to_csv(output, index=False)
+    return send_file(
+        io.BytesIO(output.getvalue().encode()),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='ip_report.csv'
+    )

@@ -3,12 +3,12 @@ import requests
 import logging
 from urllib.parse import quote
 import concurrent.futures
-import time
 from datetime import timedelta
 import shodan
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
 from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
+from ..utils.url_guard import _blocked_ip
 import json
 import re
 import ipaddress
@@ -110,6 +110,9 @@ def check_abuseipdb(ip_address):
 def get_ipinfo_data(ip_address):
     """Get IP information from IPinfo Lite API (no MMDB support, supports flat IPinfo Lite response)."""
     token = os.getenv('IPINFO_TOKEN')
+    if not token:
+        logger.warning("IPinfo token not configured")
+        return None
     encoded_ip = quote(ip_address)
     url = f"https://api.ipinfo.io/lite/{encoded_ip}?token={token}"
     with ipinfo_limiter:
@@ -356,72 +359,150 @@ def get_vpn_data(ip_address):
             logger.error(f"VPNapi.io API request failed: {str(e)}")
             return None
 
+BATCH_COLUMNS = (
+    'ip', 'vpn', 'proxy', 'tor', 'relay',
+    'city', 'region', 'country', 'continent', 'latitude', 'longitude',
+    'network', 'asn', 'asn_org',
+    'abuse_score', 'abuse_total_reports', 'abuse_distinct_users', 'abuse_last_reported',
+    'abuse_usage_type', 'abuse_isp', 'abuse_domain', 'abuse_whitelisted',
+    'ipinfo_hostname', 'ipinfo_org', 'ipinfo_city', 'ipinfo_region', 'ipinfo_country',
+    'whois_domain', 'whois_registrar', 'whois_status', 'whois_create_date',
+    'whois_expire_date',
+    'error',
+)
+
+BATCH_SOURCES = ('vpnapi', 'abuseipdb', 'ipinfo')
+
+
+def batch_row(ip, error=None, **values):
+    """A batch row with every column present, so the CSV shape never depends on which
+    sources answered."""
+    row = dict.fromkeys(BATCH_COLUMNS)
+    row.update(values)
+    row['ip'] = ip
+    row['error'] = error
+    return row
+
+
 def process_ip_batch(ip_addresses):
-    """Process a batch of IP addresses concurrently."""
-    rows = []
+    """One row per input address, in input order.
+
+    A row is never dropped: an IP that could not be queried or that no source answered
+    for comes back with its ``error`` column set. Silent omission would make the report
+    lie about how many indicators were checked.
+    """
+    rows = [None] * len(ip_addresses)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_ip = {executor.submit(process_single_ip, ip): ip for ip in ip_addresses}
-        
-        for future in concurrent.futures.as_completed(future_to_ip):
-            result = future.result()
-            if result:
-                rows.append(result)
-            time.sleep(0.2)
-    
+        future_to_index = {
+            executor.submit(process_single_ip, ip): index
+            for index, ip in enumerate(ip_addresses)
+        }
+        for future in concurrent.futures.as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                rows[index] = future.result()
+            except Exception as e:
+                logger.error(f"Error processing IP {ip_addresses[index]}: {e}")
+                rows[index] = batch_row(ip_addresses[index], error=f'internal error: {e}')
     return rows
 
+
 def process_single_ip(ip):
-    """Process a single IP address with all its checks."""
+    """Enrich one IP into a batch row from whatever sources answer.
+
+    Every source is optional: a service whose key is missing is a skipped source, not a
+    failed row. VPNapi used to gate the whole row, which silently made VPNAPI_KEY a hard
+    dependency of the bulk report.
+    """
     try:
-        vpn_data = get_vpn_data(ip)
-        if not vpn_data or 'error' in vpn_data:
-            return None
+        parsed = ipaddress.ip_address(ip)
+    except ValueError:
+        return batch_row(ip, error='not queried: not a valid IP address')
 
-        abuse_data = check_abuseipdb(ip)
-        ipinfo_data = get_ipinfo_data(ip)
+    # url_guard._blocked_ip is the app's only IP-safety classifier, and its ipv4-mapped,
+    # NAT64, site-local and reserved-range branches each closed a real bypass. Private by
+    # name, but a second implementation here would drift from the one under test.
+    if _blocked_ip(parsed):
+        return batch_row(ip, error='not queried: not a globally routable address')
 
-        whois_data = None
-        if ipinfo_data and ipinfo_data.get('hostname'):
+    sources = {}
+    for name, fetch in (('vpnapi', get_vpn_data),
+                        ('abuseipdb', check_abuseipdb),
+                        ('ipinfo', get_ipinfo_data)):
+        try:
+            sources[name] = fetch(ip)
+        except Exception as e:
+            logger.error(f"Batch source {name} failed for {ip}: {e}")
+            sources[name] = None
+
+    # get_vpn_data returns raw provider JSON, which is not guaranteed to be an object.
+    vpn_data = sources['vpnapi'] if isinstance(sources['vpnapi'], dict) else None
+    if vpn_data is None or 'error' in vpn_data:
+        sources['vpnapi'] = None
+        vpn_data = {}
+    abuse_data = sources['abuseipdb'] or {}
+    ipinfo_data = sources['ipinfo'] or {}
+
+    whois_data = {}
+    hostname = ipinfo_data.get('hostname')
+    if hostname:
+        try:
             from .domain_service import get_whois_info
-            whois_data = get_whois_info(ipinfo_data['hostname'])
+            whois = get_whois_info(hostname)
+            whois_data = whois if isinstance(whois, dict) else {}
+        except Exception as e:
+            logger.error(f"WHOIS lookup failed for {hostname} ({ip}): {e}")
 
-        return {
-            'ip': ip,
-            'vpn': vpn_data.get('security', {}).get('vpn'),
-            'proxy': vpn_data.get('security', {}).get('proxy'),
-            'tor': vpn_data.get('security', {}).get('tor'),
-            'relay': vpn_data.get('security', {}).get('relay'),
-            'city': vpn_data.get('location', {}).get('city'),
-            'region': vpn_data.get('location', {}).get('region'),
-            'country': vpn_data.get('location', {}).get('country'),
-            'continent': vpn_data.get('location', {}).get('continent'),
-            'latitude': vpn_data.get('location', {}).get('latitude'),
-            'longitude': vpn_data.get('location', {}).get('longitude'),
-            'network': vpn_data.get('network', {}).get('network'),
-            'asn': vpn_data.get('network', {}).get('autonomous_system_number'),
-            'asn_org': vpn_data.get('network', {}).get('autonomous_system_organization'),
-            'abuse_score': abuse_data.get('abuse_confidence_score') if abuse_data else None,
-            'abuse_total_reports': abuse_data.get('total_reports') if abuse_data else None,
-            'abuse_distinct_users': abuse_data.get('distinct_users') if abuse_data else None,
-            'abuse_last_reported': abuse_data.get('last_reported') if abuse_data else None,
-            'abuse_usage_type': abuse_data.get('usage_type') if abuse_data else None,
-            'abuse_isp': abuse_data.get('isp') if abuse_data else None,
-            'abuse_domain': abuse_data.get('domain') if abuse_data else None,
-            'abuse_whitelisted': abuse_data.get('is_whitelisted') if abuse_data else None,
-            'ipinfo_hostname': ipinfo_data.get('hostname') if ipinfo_data else None,
-            'ipinfo_org': ipinfo_data.get('org') if ipinfo_data else None,
-            'ipinfo_city': ipinfo_data.get('city') if ipinfo_data else None,
-            'ipinfo_region': ipinfo_data.get('region') if ipinfo_data else None,
-            'ipinfo_country': ipinfo_data.get('country') if ipinfo_data else None,
-            'whois_domain': whois_data.get('domain') if whois_data else None,
-            'whois_registrar': whois_data.get('registrar', {}).get('name') if whois_data and whois_data.get('registrar') else None,
-            'whois_status': whois_data.get('status') if whois_data else None,
-            'whois_create_date': whois_data.get('create_date') if whois_data else None,
-            'whois_expire_date': whois_data.get('expire_date') if whois_data else None,
-        }
-    except Exception as e:
-        logger.error(f"Error processing IP {ip}: {str(e)}")
-        return None 
+    security = vpn_data.get('security') or {}
+    location = vpn_data.get('location') or {}
+    network = vpn_data.get('network') or {}
+    registrar = whois_data.get('registrar')
+    registrar = registrar if isinstance(registrar, dict) else {}
+
+    silent = [name for name in BATCH_SOURCES if not sources.get(name)]
+    if len(silent) == len(BATCH_SOURCES):
+        error = 'no data returned by any source: ' + ', '.join(silent)
+    elif silent:
+        error = 'no data from: ' + ', '.join(silent)
+    else:
+        error = None
+
+    return batch_row(
+        ip,
+        error=error,
+        vpn=security.get('vpn'),
+        proxy=security.get('proxy'),
+        tor=security.get('tor'),
+        relay=security.get('relay'),
+        city=location.get('city'),
+        region=location.get('region'),
+        country=location.get('country'),
+        continent=location.get('continent'),
+        latitude=location.get('latitude'),
+        longitude=location.get('longitude'),
+        network=network.get('network'),
+        asn=network.get('autonomous_system_number'),
+        asn_org=network.get('autonomous_system_organization'),
+        abuse_score=abuse_data.get('abuse_confidence_score'),
+        abuse_total_reports=abuse_data.get('total_reports'),
+        abuse_distinct_users=abuse_data.get('distinct_users'),
+        abuse_last_reported=abuse_data.get('last_reported'),
+        abuse_usage_type=abuse_data.get('usage_type'),
+        abuse_isp=abuse_data.get('isp'),
+        abuse_domain=abuse_data.get('domain'),
+        abuse_whitelisted=abuse_data.get('is_whitelisted'),
+        ipinfo_hostname=ipinfo_data.get('hostname'),
+        ipinfo_org=ipinfo_data.get('org'),
+        ipinfo_city=ipinfo_data.get('city'),
+        ipinfo_region=ipinfo_data.get('region'),
+        ipinfo_country=ipinfo_data.get('country'),
+        whois_domain=whois_data.get('domain'),
+        whois_registrar=registrar.get('name'),
+        whois_status=whois_data.get('status'),
+        whois_create_date=whois_data.get('create_date'),
+        whois_expire_date=whois_data.get('expire_date'),
+    )
+
 
 @timed_lru_cache(seconds=1800)
 def get_ip2location_data(ip_address):

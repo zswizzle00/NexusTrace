@@ -48,14 +48,12 @@
                         <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
                     </div>
 
-                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto">
-                        <div class="flex justify-between text-sm text-gray-400 mb-2">
-                            <span>Processing IPs...</span>
-                            <span id="progressText">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-700 rounded-full h-3">
-                            <div id="progressBar" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
+                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto text-center">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        <p class="text-sm text-gray-400 mt-3">
+                            Querying providers at about 2 IPs per second &mdash;
+                            <span id="elapsedText" class="font-mono text-gray-300">0s</span> elapsed
+                        </p>
                     </div>
 
                     <div class="flex justify-center">
@@ -85,8 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
+    const elapsedText = document.getElementById('elapsedText');
     const messageArea = document.getElementById('messageArea');
 
     fileInput.addEventListener('change', function() {
@@ -137,13 +134,13 @@ document.addEventListener('DOMContentLoaded', function() {
         btnText.textContent = 'Processing...';
         messageArea.classList.add('hidden');
 
-        // Simulate progress (since we can't track actual progress)
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            updateProgress(progress);
-        }, 500);
+        // Elapsed time, not a percentage: nothing comes back until the whole CSV is
+        // built, so real completion is not knowable client-side.
+        const startedAt = Date.now();
+        elapsedText.textContent = '0s';
+        const elapsedInterval = setInterval(() => {
+            elapsedText.textContent = Math.round((Date.now() - startedAt) / 1000) + 's';
+        }, 1000);
 
         try {
             const formData = new FormData();
@@ -151,14 +148,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const response = await fetch('/api/ip/check_ips', {
                 method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: formData
             });
 
-            clearInterval(progressInterval);
+            const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
-            if (response.ok) {
-                updateProgress(100);
-
+            // Gated on the content type, not response.ok: the CSRF handler answers with a
+            // 303 to home and fetch follows redirects transparently, so a rejected upload
+            // arrived here as a 200 and the homepage HTML was saved as ip_report.csv.
+            if (response.ok && contentType.includes('csv')) {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -169,29 +170,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.URL.revokeObjectURL(url);
                 a.remove();
 
-                showMessage('Analysis complete! CSV downloaded successfully.', 'success');
+                showMessage('Analysis complete. ip_report.csv downloaded - check its error column for addresses that returned no data.', 'success');
+            } else if (contentType.includes('json')) {
+                const payload = await response.json().catch(() => ({}));
+                showMessage(payload.error || `Analysis failed (HTTP ${response.status}).`, 'error');
             } else {
-                const error = await response.json();
-                showMessage(error.error || 'An error occurred during analysis.', 'error');
+                showMessage(`The server returned ${contentType || 'an unknown content type'} instead of a CSV (HTTP ${response.status}). Your session may have expired - reload the page and try again.`, 'error');
             }
         } catch (error) {
-            clearInterval(progressInterval);
             showMessage('Network error. Please try again.', 'error');
         } finally {
+            clearInterval(elapsedInterval);
             setTimeout(() => {
                 progressContainer.classList.add('hidden');
-                progressBar.style.width = '0%';
-                progressText.textContent = '0%';
                 submitBtn.disabled = false;
                 btnText.textContent = 'Analyze & Download CSV';
             }, 2000);
         }
     });
-
-    function updateProgress(percent) {
-        progressBar.style.width = percent + '%';
-        progressText.textContent = Math.round(percent) + '%';
-    }
 
     function showMessage(message, type) {
         messageArea.textContent = message;

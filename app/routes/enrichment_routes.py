@@ -22,6 +22,9 @@ _DOMAIN_RE = re.compile(
 
 def _detect_type(indicator):
     """Return ('ip'|'url'|'domain', normalized_indicator). Raises ValueError if unknown."""
+    # ip_address() accepts ints, so an unguarded 123 used to be reported as IP 0.0.0.123.
+    if not isinstance(indicator, str):
+        raise ValueError(f"Indicator must be a string, got {type(indicator).__name__}")
     try:
         normalized = str(ipaddress.ip_address(indicator))
         return 'ip', normalized

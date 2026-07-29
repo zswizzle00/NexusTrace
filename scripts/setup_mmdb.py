@@ -134,9 +134,21 @@ def update_ip_service_config():
     with open(ip_service_path, 'r') as f:
         content = f.read()
 
-    updated_content = content.replace(
-        "mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))",
-        """mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))
+    anchor = "mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))"
+    marker = 'alternative_paths = ['
+
+    # The anchor is the first line of what gets inserted, so it still matches on a
+    # second run: without this guard the block is appended again every time.
+    if marker in content:
+        print("✓ IP service already configured for alternative MMDB paths")
+        return True
+
+    if anchor not in content:
+        print("✗ Could not find the mmdb_path assignment in ip_service.py - "
+              "not modifying it. Set MMDB_PATH in .env instead.")
+        return False
+
+    updated_content = content.replace(anchor, anchor + """
     # Try alternative MMDB databases if primary doesn't exist
     if not os.path.exists(mmdb_path):
         alternative_paths = [
@@ -147,12 +159,11 @@ def update_ip_service_config():
             if os.path.exists(alt_path):
                 mmdb_path = alt_path
                 logger.info(f"Using alternative MMDB database: {mmdb_path}")
-                break"""
-    )
+                break""")
 
     with open(ip_service_path, 'w') as f:
         f.write(updated_content)
-    
+
     print("✓ Updated IP service configuration")
     return True
 
