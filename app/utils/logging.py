@@ -4,11 +4,9 @@ import os
 
 def setup_logging(app):
     """Setup logging for the application."""
-    # Create logs directory if it doesn't exist
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
-    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -22,6 +20,5 @@ def setup_logging(app):
         ]
     )
 
-    # Set up request logging
     if app.debug:
         logging.getLogger('werkzeug').setLevel(logging.INFO) 

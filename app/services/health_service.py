@@ -1,21 +1,18 @@
 import os
 import logging
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 def setup_health_services(app):
     """Setup health check services."""
-    pass  # Add any necessary setup code here
+    pass
 
 def check_health():
-    """Liveness check: confirms the app process is up and able to serve requests.
+    """Liveness check polled by orchestrators / load balancers.
 
-    This is what container orchestrators / load balancers poll, so it must be fast and
-    self-contained: NO external network calls, and it must NOT fail on optional config.
-    All API keys are optional (the app degrades gracefully per service), so configured
-    integrations are reported as informational diagnostics only - they never flip the
-    status to unhealthy.
+    Must stay fast and self-contained: no external network calls, and no failing on
+    optional config. Every API key is optional, so configured integrations are
+    informational only and never flip the status to unhealthy.
     """
     optional_keys = [
         'VPNAPI_KEY', 'IPINFO_TOKEN', 'SHODAN_KEY', 'ABUSEIPDB_KEY',

@@ -13,13 +13,10 @@ from ..utils.rate_limiter import RateLimiter
 from ..utils.cache import timed_lru_cache
 from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM, TIMEOUT_LONG
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiters
 ip2whois_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
-# Configure DNS resolver with timeout
 dns_resolver = dns.resolver.Resolver()
 dns_resolver.timeout = TIMEOUT_SHORT
 dns_resolver.lifetime = TIMEOUT_MEDIUM
@@ -90,7 +87,6 @@ def get_dns_records(domain):
             logger.debug(f"Could not fetch {record_type} records: {str(e)}")
             return record_type, []
 
-    # Fetch all DNS records in parallel
     with ThreadPoolExecutor(max_workers=len(record_types)) as executor:
         futures = {executor.submit(fetch_record, rt): rt for rt in record_types}
         for future in as_completed(futures, timeout=TIMEOUT_MEDIUM):
@@ -108,7 +104,6 @@ def get_ssl_info(domain):
     """Fetch SSL/TLS certificate information for a domain with timeout."""
     try:
         context = ssl.create_default_context()
-        # Set socket timeout
         with socket.create_connection((domain, 443), timeout=TIMEOUT_SHORT) as sock:
             sock.settimeout(TIMEOUT_SHORT)
             with context.wrap_socket(sock, server_hostname=domain) as ssock:
@@ -142,7 +137,7 @@ def get_reverse_ip_domains(ip):
         )
         if resp.status_code == 200 and 'No records' not in resp.text and 'error' not in resp.text.lower():
             domains = [d.strip() for d in resp.text.splitlines() if d.strip()]
-            return domains[:50]  # Limit results
+            return domains[:50]
     except requests.Timeout:
         logger.warning(f"Reverse IP lookup timed out for {ip}")
     except Exception as e:
@@ -154,7 +149,7 @@ def get_reverse_ip_domains(ip):
 def get_subdomains_crtsh(domain):
     """Get subdomains from crt.sh (certificate transparency logs)."""
     try:
-        # crt.sh is often slow, use short timeout
+        # crt.sh is often slow; keep the timeout short rather than stall the caller.
         resp = requests.get(
             f'https://crt.sh/?q=%25.{domain}&output=json',
             timeout=TIMEOUT_SHORT,
@@ -163,14 +158,14 @@ def get_subdomains_crtsh(domain):
         if resp.status_code == 200:
             data = resp.json()
             subdomains = set()
-            for entry in data[:500]:  # Limit processing
+            for entry in data[:500]:
                 name = entry.get('name_value')
                 if name:
                     for sub in name.split('\n'):
                         sub = sub.strip().lower()
                         if sub.endswith(domain.lower()) and '*' not in sub:
                             subdomains.add(sub)
-            return sorted(subdomains)[:100]  # Limit results
+            return sorted(subdomains)[:100]
     except requests.Timeout:
         logger.warning(f"crt.sh lookup timed out for {domain}")
     except Exception as e:
@@ -245,7 +240,7 @@ def get_domain_info(domain):
     }
 
     try:
-        # Phase 1: Core lookups in parallel (fast, essential)
+        # Phase 1: fast, essential lookups.
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(get_whois_info, domain): 'whois_api',
@@ -270,21 +265,18 @@ def get_domain_info(domain):
                     results['errors'].append(f"{key}: {str(e)}")
                     logger.debug(f"Phase 1 {key} failed: {str(e)}")
 
-        # Parse email security from DNS TXT records
         txt_records = results['dns_records'].get('TXT', [])
         results['email_security'] = parse_spf_dkim_dmarc(txt_records)
 
-        # Get DMARC if not in TXT records
         if not results['email_security']['dmarc']:
             dmarc = get_dmarc_record(domain)
             if dmarc:
                 results['email_security']['dmarc'] = dmarc
 
-        # Generate static URLs (no network call needed)
         results['phishtank_url'] = check_phishtank(domain)
         results['talos_reputation'] = get_talos_reputation(domain)
 
-        # Phase 2: Enrichment lookups in parallel (slower, optional)
+        # Phase 2: slower, optional enrichment.
         ip_address = results['ip_address']
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {}
@@ -306,7 +298,6 @@ def get_domain_info(domain):
                     results['errors'].append(f"{key}: timed out or failed")
                     logger.debug(f"Phase 2 {key} failed: {str(e)}")
 
-        # Clean up errors list if empty
         if not results['errors']:
             del results['errors']
 

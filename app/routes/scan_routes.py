@@ -50,7 +50,12 @@ def url_scan_screenshot(scan_id):
     scan = get_scan(scan_id)
     if not scan:
         abort(404)
-    path = screenshot_path(scan_id)
+    # ?stage=load|after-scroll|after-consent selects a staged frame; no stage is
+    # the full-page shot. Whitelisted, never used to build a path from raw input.
+    stage = request.args.get('stage')
+    if stage is not None and stage not in ('load', 'after-scroll', 'after-consent'):
+        abort(404)
+    path = screenshot_path(scan_id, stage)
     if not path.exists():
         abort(404)
     return send_file(path, mimetype='image/png')

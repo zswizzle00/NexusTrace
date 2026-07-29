@@ -9,45 +9,49 @@ from ..utils.rate_limiter import RateLimiter
 from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
 from datetime import timedelta
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Rate limiters
 virustotal_limiter = RateLimiter(max_requests=4, time_window=timedelta(minutes=1))  # VT free tier: 4/min
 
 
 def identify_hash_type(hash_value: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Identify the type of hash and validate its format.
-    Returns a tuple of (hash_type, error_message)
-    """
+    """Identify a hash's algorithm from its length. Returns (hash_type, error_message)."""
     hash_value = hash_value.lower().strip()
 
-    # MD5: 32 characters
     if re.match(r'^[a-f0-9]{32}$', hash_value):
         return 'MD5', None
 
-    # SHA1: 40 characters
     if re.match(r'^[a-f0-9]{40}$', hash_value):
         return 'SHA1', None
 
-    # SHA256: 64 characters
     if re.match(r'^[a-f0-9]{64}$', hash_value):
         return 'SHA256', None
 
-    # SHA512: 128 characters
     if re.match(r'^[a-f0-9]{128}$', hash_value):
         return 'SHA512', None
 
     return None, 'Invalid hash format. Supported: MD5 (32), SHA1 (40), SHA256 (64), SHA512 (128)'
 
 
+def reference_links(hash_value: str) -> Dict[str, str]:
+    """Outbound per-hash search URLs, defined here and nowhere else, so routes and
+    templates never build provider URLs themselves."""
+    return {
+        'virustotal': f"https://www.virustotal.com/gui/search/{hash_value}",
+        'malwarebazaar': f"https://bazaar.abuse.ch/browse.php?search=sha256:{hash_value}",
+        # ThreatFox indexes every IOC type under one 'ioc:' search term, not
+        # per-algorithm like MalwareBazaar's 'sha256:'.
+        'threatfox': f"https://threatfox.abuse.ch/browse.php?search=ioc%3A{hash_value}",
+        'alienvault_otx': f"https://otx.alienvault.com/indicator/file/{hash_value}",
+        'hybrid_analysis': f"https://www.hybrid-analysis.com/search?query={hash_value}",
+        'any_run': f"https://any.run/report/{hash_value}",
+        'joesandbox': f"https://www.joesandbox.com/search?q={hash_value}"
+    }
+
+
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_virustotal_report(hash_value: str) -> Optional[Dict]:
-    """
-    Get VirusTotal report for a hash.
-    Requires VIRUSTOTAL_API_KEY environment variable.
-    """
+    """Get a VirusTotal report for a hash. Requires VIRUSTOTAL_API_KEY."""
     api_key = os.getenv('VIRUSTOTAL_API_KEY')
     if not api_key:
         logger.debug("VIRUSTOTAL_API_KEY not configured")
@@ -72,13 +76,11 @@ def get_virustotal_report(hash_value: str) -> Optional[Dict]:
         data = response.json().get('data', {})
         attributes = data.get('attributes', {})
 
-        # Parse detection stats
         stats = attributes.get('last_analysis_stats', {})
         total_engines = sum(stats.values())
         malicious = stats.get('malicious', 0)
         suspicious = stats.get('suspicious', 0)
 
-        # Get detailed results
         results = attributes.get('last_analysis_results', {})
         detections = []
         for engine, result in results.items():
@@ -97,7 +99,7 @@ def get_virustotal_report(hash_value: str) -> Optional[Dict]:
             'md5': attributes.get('md5'),
             'file_size': attributes.get('size'),
             'file_type': attributes.get('type_description'),
-            'file_names': attributes.get('names', [])[:10],  # Limit to 10 names
+            'file_names': attributes.get('names', [])[:10],
             'first_seen': attributes.get('first_submission_date'),
             'last_seen': attributes.get('last_analysis_date'),
             'detection_stats': {
@@ -107,7 +109,7 @@ def get_virustotal_report(hash_value: str) -> Optional[Dict]:
                 'total': total_engines,
                 'detection_ratio': f"{malicious + suspicious}/{total_engines}"
             },
-            'detections': detections[:20],  # Limit to top 20 detections
+            'detections': detections[:20],
             'tags': attributes.get('tags', []),
             'signature_info': attributes.get('signature_info'),
             'vt_link': f"https://www.virustotal.com/gui/file/{attributes.get('sha256', hash_value)}"
@@ -126,9 +128,7 @@ def get_virustotal_report(hash_value: str) -> Optional[Dict]:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_malwarebazaar_report(hash_value: str) -> Optional[Dict]:
-    """
-    Get MalwareBazaar report for a hash (free, no API key required).
-    """
+    """Get a MalwareBazaar report for a hash (free, no API key required)."""
     try:
         response = requests.post(
             'https://mb-api.abuse.ch/api/v1/',
@@ -173,9 +173,7 @@ def get_malwarebazaar_report(hash_value: str) -> Optional[Dict]:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
-    """
-    Search ThreatFox for IOCs related to a hash (free, no API key required).
-    """
+    """Search ThreatFox for IOCs related to a hash (free, no API key required)."""
     try:
         response = requests.post(
             'https://threatfox-api.abuse.ch/api/v1/',
@@ -201,7 +199,7 @@ def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
                     'confidence': ioc.get('confidence_level'),
                     'first_seen': ioc.get('first_seen_utc'),
                     'tags': ioc.get('tags', [])
-                } for ioc in iocs[:10]]  # Limit to 10
+                } for ioc in iocs[:10]]
             }
 
         return {'status': 'error'}
@@ -213,13 +211,8 @@ def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
-    """
-    Get comprehensive information about a hash from multiple sources.
-
-    Args:
-        hash_value: The hash to look up
-        deep_scan: If True, wait for all sources. If False, use shorter timeouts.
-    """
+    """Look a hash up across every source. `deep_scan` waits for all of them;
+    otherwise shorter timeouts apply."""
     hash_value = hash_value.lower().strip()
     hash_type, error = identify_hash_type(hash_value)
 
@@ -239,7 +232,6 @@ def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
         }
     }
 
-    # Run lookups in parallel
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             executor.submit(get_virustotal_report, hash_value): 'virustotal',
@@ -256,9 +248,7 @@ def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
                 if data:
                     result['sources'][source] = data
 
-                    # Update summary
                     if data.get('status') == 'found':
-                        # VirusTotal detections
                         if source == 'virustotal':
                             stats = data.get('detection_stats', {})
                             malicious = stats.get('malicious', 0) + stats.get('suspicious', 0)
@@ -268,14 +258,12 @@ def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
                                 result['summary']['total_engines'] = stats.get('total', 0)
                             result['summary']['tags'].update(data.get('tags', []))
 
-                        # MalwareBazaar
                         if source == 'malwarebazaar':
                             result['summary']['is_malicious'] = True
                             if data.get('signature'):
                                 result['summary']['malware_names'].add(data['signature'])
                             result['summary']['tags'].update(data.get('tags', []))
 
-                        # ThreatFox
                         if source == 'threatfox':
                             result['summary']['is_malicious'] = True
                             for ioc in data.get('iocs', []):
@@ -286,18 +274,11 @@ def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
                 logger.debug(f"Hash lookup {source} failed: {str(e)}")
                 result['sources'][source] = {'status': 'error', 'message': str(e)}
 
-    # Convert sets to lists for JSON serialization
+    # Sets are not JSON-serializable.
     result['summary']['malware_names'] = list(result['summary']['malware_names'])
     result['summary']['tags'] = list(result['summary']['tags'])
 
-    # Add quick reference links
-    result['reference_links'] = {
-        'virustotal': f"https://www.virustotal.com/gui/search/{hash_value}",
-        'malwarebazaar': f"https://bazaar.abuse.ch/browse.php?search=sha256:{hash_value}",
-        'hybrid_analysis': f"https://www.hybrid-analysis.com/search?query={hash_value}",
-        'any_run': f"https://any.run/report/{hash_value}",
-        'joesandbox': f"https://www.joesandbox.com/search?q={hash_value}"
-    }
+    result['reference_links'] = reference_links(hash_value)
 
     return result
 
@@ -310,3 +291,83 @@ def get_hash_info_quick(hash_value: str) -> Dict:
 def get_hash_info_deep(hash_value: str) -> Dict:
     """Deep hash lookup - full analysis with longer timeouts."""
     return get_hash_info(hash_value, deep_scan=True)
+
+
+# Unknown-hash reporting is shared by every hash entry point (GET /i/<hash>,
+# POST /analyze, POST /api/hash/analyze) so one hash renders one page whichever
+# route you arrived through. It lives here rather than in a route because it is
+# entirely about this module's sources.
+
+# OTX is keyed off three different env-var names; all three are accepted, so all
+# three count as "configured".
+OTX_KEY_ENV = ('ALIENVAULT_KEY', 'ALIENVAULT', 'OTX_API_KEY')
+
+
+def _otx_pulse_count(alienvault_raw) -> int:
+    return (alienvault_raw or {}).get('general', {}).get('pulse_info', {}).get('count', 0)
+
+
+def has_reputation_record(hash_info: Optional[Dict], alienvault_raw) -> bool:
+    """True when at least one source actually holds a record of this hash.
+
+    False is the "nobody has seen it" case, a finding in its own right rather than
+    an error - see unknown_hash_report().
+    """
+    hash_info = hash_info or {}
+    sources = hash_info.get('sources') or {}
+    return bool(
+        hash_info.get('summary', {}).get('is_malicious')
+        or (sources.get('virustotal') or {}).get('status') == 'found'
+        or (sources.get('malwarebazaar') or {}).get('status') == 'found'
+        or _otx_pulse_count(alienvault_raw) > 0
+    )
+
+
+def source_state(configured: bool, status: Optional[str]) -> str:
+    """Classify one reputation source for the unknown-hash page.
+
+    'skipped' (no API key, never queried) is deliberately distinct from 'no_record':
+    a source that was never asked says nothing about the hash.
+    """
+    if not configured:
+        return 'skipped'
+    if status == 'found':
+        return 'found'
+    if status == 'not_found':
+        return 'no_record'
+    return 'unavailable'
+
+
+def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_raw) -> Dict:
+    """Per-source accounting for a hash that no source has a record of."""
+    hash_info = hash_info or {}
+    provider = hash_info.get('sources') or {}
+    # hash_info is absent exactly when every lookup failed, which is when the
+    # manual pivots matter most - so rebuild the links rather than skip them.
+    links = hash_info.get('reference_links') or reference_links(hash_value)
+
+    def status_of(name):
+        return (provider.get(name) or {}).get('status')
+
+    otx_status = None
+    if alienvault_raw is not None:
+        otx_status = 'found' if _otx_pulse_count(alienvault_raw) else 'not_found'
+
+    sources = [
+        {'name': 'VirusTotal', 'key_env': 'VIRUSTOTAL_API_KEY', 'url': links.get('virustotal'),
+         'state': source_state(bool(os.getenv('VIRUSTOTAL_API_KEY')), status_of('virustotal'))},
+        {'name': 'MalwareBazaar', 'key_env': None, 'url': links.get('malwarebazaar'),
+         'state': source_state(True, status_of('malwarebazaar'))},
+        {'name': 'ThreatFox', 'key_env': None, 'url': links.get('threatfox'),
+         'state': source_state(True, status_of('threatfox'))},
+        {'name': 'AlienVault OTX', 'key_env': 'ALIENVAULT_KEY', 'url': links.get('alienvault_otx'),
+         'state': source_state(any(os.getenv(k) for k in OTX_KEY_ENV), otx_status)},
+    ]
+    return {
+        'hash': hash_value,
+        'type': hash_info.get('type') or identify_hash_type(hash_value)[0],
+        'sources': sources,
+        'counts': {state: sum(1 for s in sources if s['state'] == state)
+                   for state in ('no_record', 'skipped', 'unavailable', 'found')},
+        'reference_links': links,
+    }

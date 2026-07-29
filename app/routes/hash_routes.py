@@ -1,10 +1,12 @@
 from flask import Blueprint, render_template, request, jsonify
-from ..services.hash_service import get_hash_info, get_hash_info_quick, get_hash_info_deep
+from ..services.hash_service import (
+    get_hash_info, get_hash_info_quick, get_hash_info_deep,
+    has_reputation_record, unknown_hash_report,
+)
 from ..services.ip_service import get_alienvault_data
 from app.utils.parsers import parse_alienvault_otx
 import logging
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 hash_bp = Blueprint('hash', __name__)
@@ -12,7 +14,7 @@ hash_bp = Blueprint('hash', __name__)
 
 @hash_bp.route('/check_hash', methods=['POST'])
 def check_hash():
-    """Endpoint for checking hash information."""
+    """Hash reputation lookup (JSON)."""
     try:
         data = request.get_json()
         hash_value = data.get('hash', '').strip()
@@ -21,7 +23,6 @@ def check_hash():
         if not hash_value:
             return jsonify({'error': 'Hash is required'}), 400
 
-        # Get hash information based on scan mode
         hash_info = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
 
         if 'error' in hash_info:
@@ -45,12 +46,24 @@ def analyze_hash():
         if not hash_value:
             error = 'Hash is required'
         else:
-            # Get comprehensive hash info (includes VT, MalwareBazaar, ThreatFox)
             result = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
 
-            # AlienVault enrichment
-            alienvault_raw = get_alienvault_data(hash_value)
-            alienvault = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+            if result.get('error'):
+                # Bad hash format — a real input error, not an unknown hash.
+                error = result['error']
+                result = None
+            else:
+                alienvault_raw = get_alienvault_data(hash_value)
+                alienvault = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+
+                if not has_reputation_record(result, alienvault_raw):
+                    # Same "nobody has seen it" page /analyze and /i/<hash> render.
+                    return render_template(
+                        'hash_analysis.html',
+                        indicator=hash_value,
+                        indicator_type='hash',
+                        unknown_hash=unknown_hash_report(hash_value, result, alienvault_raw)
+                    )
 
     return render_template(
         'hash_analysis.html',

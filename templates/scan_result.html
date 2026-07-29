@@ -5,7 +5,6 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 py-6">
 
-  {# ---- Summary bar ---- #}
   <div class="mb-5 flex items-start gap-2 flex-wrap">
     <a href="/url_scan" class="text-xs text-gray-500 hover:text-gray-300 transition-colors mr-2 mt-0.5">← New scan</a>
     <span class="text-gray-600">|</span>
@@ -23,29 +22,38 @@
     {% endif %}
   </div>
 
-  {# ---- Meta summary card ---- #}
   {% set asn = scan.asn %}
   <div class="nt-card p-5 mb-5 flex flex-col lg:flex-row gap-5">
-    {# Filmstrip: 3 equal crops of the full screenshot (top / mid / bottom) #}
-    {% if scan.page.get('screenshot_url') %}
+    {% if scan.screenshots %}
+    {# Staged captures: load / after-scroll / after-consent. The post-consent frame is
+       often the only one showing a phishing page's real content. #}
     <div class="flex-shrink-0" style="width:100%;max-width:522px;">
-      <div class="flex rounded border border-gray-700 overflow-hidden hover:border-blue-500 transition-colors"
-        style="height:134px;cursor:zoom-in;"
-        onclick="openLightbox()" title="Click to view full screenshot"
-        role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openLightbox()">
-        {% for pos in ['top', '50%', 'bottom'] %}
-        {% if not loop.first %}<div style="width:1px;flex-shrink:0;background:#374151;"></div>{% endif %}
-        <div style="flex:1;min-width:0;height:134px;overflow:hidden;">
-          <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
-            style="width:100%;height:134px;object-fit:cover;object-position:center {{ pos }};" />
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {% for shot in scan.screenshots %}
+        <figure class="rounded overflow-hidden border border-gray-700 bg-gray-900">
+          <img src="{{ shot.url }}" alt="{{ shot.label }} screenshot"
+               loading="lazy"
+               style="height:134px;object-fit:cover;object-position:top;"
+               class="w-full cursor-pointer"
+               onclick="openLightbox('{{ shot.url }}')">
+          <figcaption class="px-2 py-1 text-xs text-gray-500 font-mono">{{ shot.label }}</figcaption>
+        </figure>
         {% endfor %}
       </div>
-      <p style="font-size:10px;color:#4b5563;text-align:center;margin-top:4px;">top · mid · bottom — click to expand</p>
+    </div>
+    {% elif scan.page.get('screenshot_url') %}
+    <div class="flex-shrink-0" style="width:100%;max-width:522px;">
+      <div class="rounded border border-gray-700 overflow-hidden hover:border-blue-500 transition-colors"
+        style="cursor:zoom-in;"
+        onclick="openLightbox('{{ scan.page.screenshot_url }}')" title="Click to view full screenshot"
+        role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')openLightbox('{{ scan.page.screenshot_url }}')">
+        <img src="{{ scan.page.screenshot_url }}" alt="screenshot"
+          style="width:100%;height:134px;object-fit:cover;object-position:top;" />
+      </div>
+      <p style="font-size:10px;color:#4b5563;text-align:center;margin-top:4px;">click to expand</p>
     </div>
     {% endif %}
 
-    {# Facts grid #}
     <div class="flex-1 min-w-0">
       {% if scan.page.get('title') %}
         <div class="text-lg font-semibold text-gray-100 mb-1 truncate">{{ scan.page.title }}</div>
@@ -73,22 +81,140 @@
         {% if scan.ptr %}{{ fact('PTR', scan.ptr[0]) }}{% endif %}
       </div>
 
-      {# Verdict signals #}
-      {% if scan.verdict and scan.verdict.signals %}
-      <div class="mt-3 flex flex-wrap gap-2">
-        {% for sig in scan.verdict.signals %}
-        <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-800/60">{{ sig }}</span>
-        {% endfor %}
+      {# A structural heuristic, NOT a reputation verdict — the scan path queries no
+         reputation source, so the caption is deliberately hedged. See scan_rules.py. #}
+      {% set v = scan.verdict or {} %}
+      {% set level = v.level or 'unknown' %}
+      {# .get() with a default, NOT [level]: scans written before the rule engine
+         carry level 'informational', and a bare subscript would raise. #}
+      {% set tone = {
+           'malicious':  ('bg-red-900/40', 'text-red-300', 'border-red-800/60'),
+           'suspicious': ('bg-yellow-900/40', 'text-yellow-300', 'border-yellow-800/60'),
+           'benign':     ('bg-green-900/40', 'text-green-300', 'border-green-800/60'),
+           'unknown':    ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')
+         }.get(level, ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')) %}
+      {% set labels = {
+           'brand_domain_mismatch': 'Names a known brand not in its own domain',
+           'payload_download': 'Served a file to download rather than a page',
+           'untrusted_tls': 'TLS certificate is not trusted',
+           'young_domain': 'Domain registered within the last 30 days',
+           'password_form': 'Asks for a password',
+           'cross_domain_redirect': 'Redirects to a different registrable domain',
+           'fresh_cert': 'TLS certificate issued within the last 14 days',
+           'no_security_headers': 'Few or no security headers present',
+           'many_third_party_domains': 'Contacts many third-party domains',
+           'brand_domain_mismatch+password_form': 'Brand impersonation plus credential prompt',
+           'password_form+young_domain': 'Credential prompt on a brand-new domain',
+           'payload_download+young_domain': 'File download from a brand-new domain'
+         } %}
+      <div class="mt-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="px-2.5 py-1 rounded text-sm font-semibold uppercase tracking-wide
+                       {{ tone[0] }} {{ tone[1] }} border {{ tone[2] }}">{{ level }}</span>
+          {% if v.score is defined and v.score is not none %}
+          <span class="text-xs text-gray-500 font-mono">score {{ '%.2f' % v.score }}</span>
+          {% else %}
+          <span class="text-xs text-gray-600 font-mono">scanned before scoring existed</span>
+          {% endif %}
+          <span class="text-xs text-gray-600">
+            Structural heuristic — no reputation source was queried.
+          </span>
+        </div>
+        {% if v.signals %}
+        <ul class="mt-3 space-y-1">
+          {% for sig in v.signals %}
+          <li class="text-xs text-gray-300 flex items-start gap-2">
+            <span class="text-gray-600 mt-0.5">▸</span>
+            <span>{{ labels.get(sig, sig) }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="mt-3 text-xs text-gray-500">No notable structural signals.</div>
+        {% endif %}
       </div>
-      {% else %}
-      <div class="mt-3">
-        <span class="px-2 py-0.5 rounded text-xs bg-green-900/40 text-green-400 border border-green-800/60">No notable signals</span>
+
+      {# Discriminate on 'network_error', not on 'blocked', so an entry with no `kind` at
+         all — every scan persisted before `kind` existed — falls under 'blocked'. #}
+      {% set blocked_security = (scan.blocked_requests or []) | rejectattr('kind', 'equalto', 'network_error') | list %}
+      {% set blocked_network = (scan.blocked_requests or []) | selectattr('kind', 'equalto', 'network_error') | list %}
+      {% if scan.blocked_requests %}
+      {# Only a 'blocked' entry is a security finding; 'network_error' is a transport
+         failure. Listed apart so a DNS failure isn't read as an SSRF block. #}
+      <div class="mt-4 rounded border border-orange-800/60 bg-orange-900/20 p-3">
+        <div class="text-xs font-semibold text-orange-300 uppercase tracking-wide">
+          {{ blocked_security | length }} request(s) blocked by the SSRF guard
+        </div>
+        {% if blocked_security %}
+        <ul class="mt-2 space-y-1">
+          {% for b in blocked_security[:10] %}
+          <li class="text-xs text-orange-200/80 font-mono break-all">
+            {{ b.url }} — {{ b.reason }}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if blocked_network %}
+        <div class="mt-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          {{ blocked_network | length }} request(s) failed at the network layer
+        </div>
+        <ul class="mt-2 space-y-1">
+          {% for b in blocked_network[:10] %}
+          <li class="text-xs text-gray-400 font-mono break-all">
+            {{ b.url }} — {{ b.reason }}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if scan.payload and scan.payload.is_payload %}
+      {# A dropper URL renders nothing; the file is the evidence, so the SHA-256 pivots
+         into hash analysis. #}
+      <div class="mt-4 rounded border border-red-800/60 bg-red-900/20 p-3">
+        <div class="text-xs font-semibold text-red-300 uppercase tracking-wide">
+          This URL served a file, not a page
+        </div>
+        <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Filename</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.filename or '—' }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Content type</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.content_type or '—' }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Size</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5">
+              {{ scan.payload.size_bytes if scan.payload.size_bytes is not none else '—' }}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">SHA-256</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5 break-all">
+              {{ scan.payload.sha256 or '—' }}
+            </div>
+          </div>
+        </div>
+        {% if scan.payload.sha256 %}
+        <a href="/i/{{ scan.payload.sha256 }}"
+           class="inline-block mt-3 px-3 py-1.5 rounded text-xs font-medium
+                  bg-red-800/50 text-red-200 border border-red-700/60 hover:bg-red-800/70">
+          Analyze this hash →
+        </a>
+        {% else %}
+        <div class="mt-3 text-xs text-red-300/80">
+          Not hashed: the file exceeds the 25 MB hashing cap, so there is no pivot into hash
+          reputation. Retrieve and hash it out of band.
+        </div>
+        {% endif %}
       </div>
       {% endif %}
     </div>
   </div>
 
-  {# ---- Tabs ---- #}
   <div class="scan-tabs flex gap-0 border-b border-gray-700 mb-5 overflow-x-auto">
     {% set tabs = [
       ('http',     'HTTP',          scan.transactions | length),
@@ -96,6 +222,7 @@
       ('security', 'Security',      None),
       ('tech',     'Technologies',  scan.technologies | length),
       ('page',     'Page',          None),
+      ('iocs',     'IOCs',          scan.iocs | length if scan.iocs else 0),
     ] %}
     {% for tid, label, count in tabs %}
     <button class="scan-tab {% if loop.first %}active{% endif %} px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
@@ -106,9 +233,7 @@
     {% endfor %}
   </div>
 
-  {# ---- HTTP Panel ---- #}
   <div class="scan-panel" data-panel="http">
-    {# Redirect chain #}
     {% if scan.redirects | length > 1 %}
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-3">Redirect Chain ({{ scan.redirects | length }} hops)</h3>
@@ -136,7 +261,6 @@
     </div>
     {% endif %}
 
-    {# Transactions #}
     <div class="nt-card p-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="nt-card-title">HTTP Transactions ({{ scan.transactions | length }})</h3>
@@ -187,9 +311,7 @@
     </div>
   </div>
 
-  {# ---- DNS / TLS Panel ---- #}
   <div class="scan-panel hidden" data-panel="dns">
-    {# ASN / Network #}
     {% if asn %}
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-3">Network</h3>
@@ -206,7 +328,6 @@
     </div>
     {% endif %}
 
-    {# TLS #}
     {% set tls = scan.tls %}
     {% if tls %}
     <div class="nt-card p-4 mb-4">
@@ -231,7 +352,6 @@
     </div>
     {% endif %}
 
-    {# WHOIS #}
     {% set w = scan.whois %}
     {% if w %}
     <div class="nt-card p-4 mb-4">
@@ -262,7 +382,6 @@
     </div>
     {% endif %}
 
-    {# DNS Records #}
     <div class="nt-card p-4">
       <h3 class="nt-card-title mb-3">DNS Records</h3>
       {% set dns = scan.dns %}
@@ -291,7 +410,6 @@
     </div>
   </div>
 
-  {# ---- Security Panel ---- #}
   <div class="scan-panel hidden" data-panel="security">
     {% set sec = scan.security %}
     {% if sec %}
@@ -333,7 +451,6 @@
     </div>
     {% endif %}
 
-    {# Cookies #}
     <div class="nt-card p-4">
       <h3 class="nt-card-title mb-3">Cookies ({{ scan.cookies | length }})</h3>
       {% if scan.cookies %}
@@ -373,7 +490,6 @@
     </div>
   </div>
 
-  {# ---- Technologies Panel ---- #}
   <div class="scan-panel hidden" data-panel="tech">
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-4">Detected Technologies ({{ scan.technologies | length }})</h3>
@@ -400,7 +516,6 @@
       {% endif %}
     </div>
 
-    {# Domains contacted #}
     <div class="nt-card p-4">
       <h3 class="nt-card-title mb-3">Domains Contacted ({{ scan.domains | length }})</h3>
       {% if scan.domains %}
@@ -428,24 +543,21 @@
     </div>
   </div>
 
-  {# ---- Page Panel ---- #}
   <div class="scan-panel hidden" data-panel="page">
-    {# Full screenshot — scrollable inline #}
     {% if scan.page.get('screenshot_url') %}
     <div class="nt-card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="nt-card-title">Screenshot</h3>
-        <button onclick="openLightbox()" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+        <button onclick="openLightbox('{{ scan.page.screenshot_url }}')" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
           Expand
         </button>
       </div>
-      <div class="overflow-y-auto rounded border border-gray-700 cursor-zoom-in" style="max-height:520px;" onclick="openLightbox()">
+      <div class="overflow-y-auto rounded border border-gray-700 cursor-zoom-in" style="max-height:520px;" onclick="openLightbox('{{ scan.page.screenshot_url }}')">
         <img src="{{ scan.page.screenshot_url }}" alt="full page screenshot" class="w-full block" />
       </div>
     </div>
     {% endif %}
 
-    {# Metadata #}
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-3">Page Metadata</h3>
       <dl class="space-y-2 text-sm">
@@ -458,14 +570,35 @@
       </dl>
     </div>
 
-    {# Links #}
+    {# Page text is attacker-controlled: escaped, never rendered as markup. Absent on
+       scans captured before text extraction existed. #}
+    {% if scan.visible_text %}
+    <div class="nt-card p-4 mb-4">
+      <details>
+        <summary class="nt-card-title cursor-pointer select-none">
+          Page Text ({{ scan.visible_text | length }} chars)
+        </summary>
+        <pre class="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap break-words
+                    text-xs text-gray-300 font-mono bg-gray-900/50 rounded p-3">{{ scan.visible_text }}</pre>
+      </details>
+    </div>
+    {% endif %}
+
     {% if scan.links %}
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-3">Outbound Links ({{ scan.links | length }})</h3>
       <div class="max-h-72 overflow-y-auto space-y-0.5">
+        {# Hrefs harvested from the scanned, possibly hostile page. Only http(s) may become
+           a real anchor: a `javascript:` or `data:` href would execute in *this* app's
+           origin, whose CSP allows 'unsafe-inline'. Anything else stays inert text. #}
         {% for link in scan.links[:200] %}
+        {% set scheme_ok = (link | lower).startswith('http://') or (link | lower).startswith('https://') %}
         <div class="text-xs font-mono text-gray-400 truncate hover:text-gray-200">
+          {% if scheme_ok %}
           <a href="{{ link }}" target="_blank" rel="noopener nofollow" class="hover:text-blue-400">{{ link }}</a>
+          {% else %}
+          <span class="text-gray-500" title="Non-HTTP scheme — not rendered as a link">{{ link }}</span>
+          {% endif %}
         </div>
         {% endfor %}
         {% if scan.links | length > 200 %}
@@ -475,7 +608,6 @@
     </div>
     {% endif %}
 
-    {# Console messages #}
     {% if scan.console %}
     <div class="nt-card p-4">
       <h3 class="nt-card-title mb-3">Console Messages ({{ scan.console | length }})</h3>
@@ -492,20 +624,87 @@
       </div>
     </div>
     {% endif %}
+
+    {% if scan.forms %}
+    <div class="nt-card mt-5">
+      <h3 class="nt-card-title mb-4">Forms ({{ scan.forms | length }})</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-gray-500 uppercase tracking-wide text-left">
+              <th class="pb-2 pr-4">Method</th>
+              <th class="pb-2 pr-4">Action</th>
+              <th class="pb-2 pr-4">Fields</th>
+              <th class="pb-2">Password</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in scan.forms %}
+            <tr class="border-t border-gray-800">
+              <td class="py-2 pr-4 font-mono text-gray-300">{{ f.method | upper }}</td>
+              <td class="py-2 pr-4 font-mono text-gray-400 break-all">{{ f.action or '(self)' }}</td>
+              <td class="py-2 pr-4 text-gray-400">{{ f.field_types | join(', ') }}</td>
+              <td class="py-2">
+                {% if f.has_password %}
+                <span class="px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-300
+                             border border-yellow-800/60">yes</span>
+                {% else %}<span class="text-gray-600">no</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="scan-panel hidden" data-panel="iocs">
+    {% if scan.iocs %}
+    <div class="nt-card">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="nt-card-title">Indicators ({{ scan.iocs | length }})</h3>
+        <button onclick="copyIocs()"
+                class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                       border border-gray-700 hover:bg-gray-700">Copy all</button>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">
+        Defanged for safe copying. Extracted from page text, advertised links, and
+        contacted hosts.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs" id="ioc-table">
+          <thead>
+            <tr class="text-gray-500 uppercase tracking-wide text-left">
+              <th class="pb-2 pr-4">Type</th><th class="pb-2">Indicator</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ioc in scan.iocs %}
+            <tr class="border-t border-gray-800">
+              <td class="py-2 pr-4 text-gray-500 font-mono">{{ ioc.type }}</td>
+              <td class="py-2 text-gray-300 font-mono break-all">{{ ioc.value }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="nt-card text-sm text-gray-500">No indicators extracted.</div>
+    {% endif %}
   </div>
 
 </div>
 
-{% if scan.page.get('screenshot_url') %}
-{# Lightbox modal — clicking anywhere outside the image closes it #}
+{% if scan.page.get('screenshot_url') or scan.screenshots %}
 <div id="shot-lightbox" class="fixed inset-0 z-50 hidden overflow-y-auto"
   style="background:rgba(0,0,0,0.85);"
   onclick="closeLightbox()"
   role="dialog" aria-modal="true" aria-label="Full screenshot">
-  {# Inner wrapper — stops click propagation so clicks ON the image don't close #}
+  {# Wrapper exists to stop propagation, so clicks ON the image don't close the modal. #}
   <div class="flex items-start justify-center min-h-full py-10 px-4">
     <div class="relative" style="max-width:1200px;width:100%;" onclick="event.stopPropagation()">
-      {# Close button #}
       <button onclick="closeLightbox()"
         class="absolute right-2 top-2 z-10 flex items-center justify-center w-8 h-8 rounded-full text-gray-300 hover:text-white hover:bg-gray-700 transition-colors focus:outline-none"
         title="Close (Esc)">
@@ -513,7 +712,9 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
         </svg>
       </button>
-      <img id="shot-full-img" src="{{ scan.page.screenshot_url }}" alt="Full page screenshot"
+      <img id="shot-full-img"
+        src="{{ scan.page.get('screenshot_url') or (scan.screenshots[0].url if scan.screenshots else '') }}"
+        alt="Full page screenshot"
         class="w-full rounded-lg border border-gray-700 block" />
       <p class="text-center text-xs text-gray-600 mt-2">Click outside or press Esc to close</p>
     </div>
@@ -523,7 +724,6 @@
 
 <script>
 (function () {
-  // Tab switching
   function activateTab(target) {
     document.querySelectorAll('.scan-tab').forEach(b => {
       const on = b.dataset.tab === target;
@@ -542,7 +742,6 @@
     btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
 
-  // Transaction filter
   const filter = document.getElementById('txn-filter');
   if (filter) {
     filter.addEventListener('input', () => {
@@ -554,11 +753,14 @@
   }
 })();
 
-// Lightbox
 const lightbox = document.getElementById('shot-lightbox');
 
-function openLightbox() {
+function openLightbox(src) {
   if (!lightbox) return;
+  if (src) {
+    const img = document.getElementById('shot-full-img');
+    if (img) img.src = src;
+  }
   lightbox.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -572,5 +774,11 @@ function closeLightbox() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeLightbox();
 });
+
+function copyIocs() {
+  const rows = document.querySelectorAll('#ioc-table tbody tr td:nth-child(2)');
+  const text = Array.from(rows).map(td => td.textContent.trim()).join('\n');
+  navigator.clipboard.writeText(text);
+}
 </script>
 {% endblock %}

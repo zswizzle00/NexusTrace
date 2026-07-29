@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+
+{% set headers = analysis.get('headers') or {} %}
+
+{% block title %}E-mail: {{ headers.get('subject') or analysis.get('id') }} | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <div class="mb-5 flex items-start gap-2 flex-wrap">
+    <a href="{{ url_for('email.email_analysis_form') }}" class="text-xs text-gray-500 hover:text-gray-300 transition-colors mr-2 mt-0.5">← New analysis</a>
+    <span class="text-gray-600">|</span>
+    <span class="text-gray-300 text-sm font-mono truncate max-w-2xl mt-0.5">{{ headers.get('subject') or '(no subject)' }}</span>
+    <span class="ml-auto text-xs text-gray-500 font-mono mt-0.5">{{ headers.get('from') or 'unknown sender' }}</span>
+  </div>
+
+  {% if analysis.get('status') == 'error' %}
+  <div class="mb-5 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+    Could not fully process this message{% if analysis.get('error') %}: {{ analysis.get('error') }}{% endif %}
+  </div>
+  {% endif %}
+
+  {% set v = analysis.get('verdict') or {} %}
+  {% set level = v.get('level') or 'unknown' %}
+  {% set score = v.get('score') %}
+  {% set signals = v.get('signals') or [] %}
+  {# .get() with a default, NEVER [level] - a record written by an older/newer
+     version, or one with a level this template doesn't know about, must not
+     raise. See app/services/email_rules.py for the level vocabulary. #}
+  {% set tone = {
+       'malicious':  ('bg-red-900/40', 'text-red-300', 'border-red-800/60'),
+       'suspicious': ('bg-yellow-900/40', 'text-yellow-300', 'border-yellow-800/60'),
+       'benign':     ('bg-green-900/40', 'text-green-300', 'border-green-800/60'),
+       'unknown':    ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')
+     }.get(level, ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')) %}
+  {% set labels = {
+       'attachment_known_malware': 'An attachment hash matched a known-malware verdict',
+       'dmarc_fail': 'DMARC alignment failed',
+       'display_name_impersonation': "Display name claims an identity the sender's domain contradicts",
+       'executable_attachment': 'Carries an executable attachment',
+       'sender_ip_blacklisted': 'Sending IP is listed on a DNS blocklist',
+       'url_display_mismatch': "A link's visible text names a different domain than its target",
+       'spf_fail': 'SPF authentication failed',
+       'reply_to_mismatch': "Reply-To domain differs from the sender's domain",
+       'young_sender_domain': "Sender's domain was registered within the last 30 days",
+       'dkim_fail': 'DKIM authentication failed',
+       'return_path_mismatch': "Return-Path domain differs from the sender's domain",
+       'archive_attachment': 'Carries an archive attachment',
+       'missing_message_id': 'Missing a Message-ID header',
+       'missing_mime_version': 'Missing a MIME-Version header',
+       'date_anomaly': 'Date header is implausibly far in the past or future',
+       'suspicious_mailer': 'Sent by a mailer commonly associated with bulk or spoofed mail',
+       'display_name_impersonation+reply_to_mismatch': 'Display-name impersonation plus a reply-to mismatch (classic BEC pattern)',
+       'display_name_impersonation+url_display_mismatch': 'Display-name impersonation plus a mismatched link target',
+       'executable_attachment+dmarc_fail': 'Executable attachment from a domain that failed DMARC',
+       'executable_attachment+young_sender_domain': 'Executable attachment from a newly registered domain',
+     } %}
+  <div class="nt-card p-5 mb-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span class="px-2.5 py-1 rounded text-sm font-semibold uppercase tracking-wide
+                   {{ tone[0] }} {{ tone[1] }} border {{ tone[2] }}">{{ level }}</span>
+      {% if score is not none %}
+      <span class="text-xs text-gray-500 font-mono">score {{ '%.2f' % score }}</span>
+      {% endif %}
+      <span class="text-xs text-gray-600">
+        Heuristic over message structure and reputation lookups — not a definitive judgement.
+      </span>
+    </div>
+    {% if signals %}
+    <ul class="mt-3 space-y-1">
+      {% for sig in signals %}
+      <li class="text-xs text-gray-300 flex items-start gap-2">
+        <span class="text-gray-600 mt-0.5">▸</span>
+        <span>{{ labels.get(sig, sig) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="mt-3 text-xs text-gray-500">No notable signals.</div>
+    {% endif %}
+  </div>
+
+  {% set auth = analysis.get('authentication') or {} %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Authentication</h3>
+    <div class="flex flex-wrap gap-2">
+      {% for label, key in [('SPF', 'spf'), ('DKIM', 'dkim'), ('DMARC', 'dmarc')] %}
+      {% set raw_val = auth.get(key) %}
+      {% set val = (raw_val or '').lower() %}
+      {% set atone = ('bg-green-900/40', 'text-green-300', 'border-green-800/60') if val == 'pass'
+                     else (('bg-red-900/40', 'text-red-300', 'border-red-800/60') if val in ['fail', 'softfail']
+                     else ('bg-gray-800/60', 'text-gray-400', 'border-gray-700')) %}
+      <span class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wide
+                   {{ atone[0] }} {{ atone[1] }} border {{ atone[2] }}">
+        {{ label }}: {{ raw_val or 'absent' }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% set spoofing = analysis.get('spoofing') or [] %}
+  {% set ambient = analysis.get('suspicious_headers') or [] %}
+  {% set spoof_labels = {
+       'reply_to_mismatch': 'Reply-To domain mismatch',
+       'display_name_impersonation': 'Display name impersonation',
+       'return_path_mismatch': 'Return-Path domain mismatch',
+     } %}
+  {% set ambient_labels = {
+       'missing_message_id': 'Missing Message-ID',
+       'missing_mime_version': 'Missing MIME-Version',
+       'date_anomaly': 'Date anomaly',
+       'suspicious_mailer': 'Suspicious mailer',
+     } %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Spoofing &amp; Header Signals</h3>
+    {% if spoofing or ambient %}
+    <div class="flex flex-wrap gap-2">
+      {% for s in spoofing %}
+      <span class="px-2.5 py-1 rounded-full text-xs bg-red-900/30 text-red-300 border border-red-800/60">{{ spoof_labels.get(s, s) }}</span>
+      {% endfor %}
+      {% for s in ambient %}
+      <span class="px-2.5 py-1 rounded-full text-xs bg-gray-800 text-gray-400 border border-gray-700">{{ ambient_labels.get(s, s) }}</span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">No spoofing or header anomalies detected.</p>
+    {% endif %}
+  </div>
+
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Headers</h3>
+    {% if headers %}
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      {% macro hkv(k, val) %}{% if val %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ val }}</dd></div>{% endif %}{% endmacro %}
+      {{ hkv('From', headers.get('from')) }}
+      {{ hkv('Display name', headers.get('from_display')) }}
+      {{ hkv('To', headers.get('to')) }}
+      {{ hkv('Subject', headers.get('subject')) }}
+      {{ hkv('Date', headers.get('date')) }}
+      {{ hkv('Message-ID', headers.get('message_id')) }}
+      {{ hkv('Reply-To', headers.get('reply_to')) }}
+      {{ hkv('Return-Path', headers.get('return_path')) }}
+      {{ hkv('X-Mailer', headers.get('x_mailer')) }}
+    </dl>
+    {% else %}
+    <p class="text-xs text-gray-500">No headers recovered.</p>
+    {% endif %}
+  </div>
+
+  {# enrichment.sender_domain is get_domain_info_quick's record with a whois result
+     grafted on at ['whois'] (see email_service._enrich). Absent when the domain failed
+     the SSRF guard or every lookup failed - both must render, not raise. #}
+  {% set enrichment = analysis.get('enrichment') or {} %}
+  {% set sdom = enrichment.get('sender_domain') or {} %}
+  {% if analysis.get('sender_domain') %}
+  {% set esec = sdom.get('email_security') or {} %}
+  {% set cert = sdom.get('ssl_info') or {} %}
+  {% set whois = sdom.get('whois') or {} %}
+  {% set registrar = whois.get('registrar') or {} %}
+  {% set issuer = cert.get('issuer') or {} %}
+  {% set created = whois.get('create_date') or whois.get('created') %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Sender Domain
+      <span class="ml-1 font-mono text-xs text-gray-400 normal-case">{{ analysis.get('sender_domain') }}</span>
+    </h3>
+    {% if sdom %}
+    <div class="flex flex-wrap gap-2 mb-3">
+      {% for label, records in [('SPF', esec.get('spf')), ('DKIM', esec.get('dkim')), ('DMARC', esec.get('dmarc'))] %}
+      {% set present = (records or []) | length > 0 %}
+      <span class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wide border
+                   {% if present %}bg-green-900/40 text-green-300 border-green-800/60
+                   {% else %}bg-gray-800/60 text-gray-400 border-gray-700{% endif %}">
+        {{ label }} record: {{ 'published' if present else 'none found' }}
+      </span>
+      {% endfor %}
+      <span class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wide border
+                   {% if cert %}bg-green-900/40 text-green-300 border-green-800/60
+                   {% else %}bg-gray-800/60 text-gray-400 border-gray-700{% endif %}">
+        TLS: {{ 'certificate served' if cert else 'no certificate' }}
+      </span>
+    </div>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+      {% macro dkv(k, val) %}{% if val %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ val }}</dd></div>{% endif %}{% endmacro %}
+      {{ dkv('Registered', created) }}
+      {{ dkv('Registrar', registrar.get('name')) }}
+      {{ dkv('Resolves to', sdom.get('ip_address')) }}
+      {{ dkv('Cert issuer', issuer.get('organizationName') or issuer.get('commonName')) }}
+      {{ dkv('Cert expires', cert.get('not_after')) }}
+    </dl>
+    {% if not created %}
+    <p class="mt-3 text-xs text-gray-500">No WHOIS creation date available (IP2WHOIS key absent, or the registry did not answer).</p>
+    {% endif %}
+    {% else %}
+    <p class="text-xs text-gray-500">
+      No domain enrichment. The domain did not resolve to a globally-routable
+      address, or every lookup failed — parsing and scoring are unaffected.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% set chain = analysis.get('received_chain') or [] %}
+  {% set ip_enrich = enrichment.get('ips') or {} %}
+  {% set dnsbl = enrichment.get('dnsbl') or {} %}
+  {% set public_ips = analysis.get('received_public_ips') or [] %}
+  {% set dnsbl_ip = public_ips[0] if public_ips else None %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Received Chain{% if chain %} ({{ chain | length }} hop{{ 's' if chain | length != 1 else '' }}){% endif %}</h3>
+    {% if chain %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4">From host</th>
+            <th class="pb-1.5 pr-4">By host</th>
+            <th class="pb-1.5 pr-4">IP</th>
+            <th class="pb-1.5 pr-4">Country</th>
+            <th class="pb-1.5 pr-4">ASN</th>
+            <th class="pb-1.5 pr-4">Abuse score</th>
+            <th class="pb-1.5">DNSBL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for hop in chain %}
+          {% set ip = hop.get('ip') if hop else None %}
+          {% set enr = (ip_enrich.get(ip) or {}) if (ip and ip_enrich) else {} %}
+          {% set vpn = (enr.get('vpnapi') or {}) if enr else {} %}
+          {% set abuse = (enr.get('abuseipdb') or {}) if enr else {} %}
+          {% set vpn_loc = (vpn.get('location') or {}) if vpn else {} %}
+          {% set vpn_net = (vpn.get('network') or {}) if vpn else {} %}
+          {% set abuse_score = abuse.get('abuse_confidence_score') if abuse else None %}
+          <tr class="border-b border-gray-800/40">
+            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full" title="{{ hop.get('from_host') or '' }}">{{ hop.get('from_host') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ hop.get('by_host') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-300">{{ ip or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_loc.get('country') or abuse.get('country_name') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_net.get('autonomous_system_number') or '—' }}</td>
+            <td class="py-1.5 pr-4 {% if abuse_score is not none and abuse_score > 25 %}text-red-400{% else %}text-gray-400{% endif %}">
+              {{ abuse_score if abuse_score is not none else '—' }}
+            </td>
+            <td class="py-1.5">
+              {% if ip and dnsbl_ip and ip == dnsbl_ip and dnsbl.get('listed') %}
+              <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">DNSBL listed</span>
+              {% else %}
+              <span class="text-gray-600">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">No Received headers recovered.</p>
+    {% endif %}
+  </div>
+
+  {% set attachments = analysis.get('attachments') or [] %}
+  {% set hashes = enrichment.get('hashes') or {} %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Attachments{% if attachments %} ({{ attachments | length }}){% endif %}</h3>
+    {% if attachments %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4">Filename</th>
+            <th class="pb-1.5 pr-4">Type</th>
+            <th class="pb-1.5 pr-4">Size</th>
+            <th class="pb-1.5 pr-4">Magic</th>
+            <th class="pb-1.5 pr-4">Flags</th>
+            <th class="pb-1.5 pr-4">SHA-256</th>
+            <th class="pb-1.5">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for att in attachments %}
+          {% set sha = att.get('sha256') if att else None %}
+          {% set hinfo = (hashes.get(sha) or {}) if (sha and hashes) else {} %}
+          {% set hsum = (hinfo.get('summary') or {}) if hinfo else {} %}
+          {% set sz = att.get('size_bytes') if att else None %}
+          <tr class="border-b border-gray-800/40">
+            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-0 w-full" title="{{ att.get('filename') or '' }}">{{ att.get('filename') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('content_type') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">
+              {% if sz is not none %}
+                {% if sz < 1024 %}{{ sz }} B
+                {% elif sz < 1048576 %}{{ '%.1f' | format(sz / 1024) }} KB
+                {% else %}{{ '%.2f' | format(sz / 1048576) }} MB{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('magic_type') or '—' }}</td>
+            <td class="py-1.5 pr-4">
+              {% if att.get('is_executable') %}<span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 mr-1">executable</span>{% endif %}
+              {% if att.get('is_archive') %}<span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">archive</span>{% endif %}
+              {% if not att.get('is_executable') and not att.get('is_archive') %}<span class="text-gray-600">—</span>{% endif %}
+            </td>
+            <td class="py-1.5 pr-4 text-gray-500 break-all">{{ sha or '—' }}</td>
+            <td class="py-1.5">
+              {# Pivot only when the value really is an MD5/SHA-1/SHA-256 digest: the
+                 record is read back off disk, so `sha` is not guaranteed to be a
+                 hexdigest. The link goes through url_for, never hand-built. #}
+              {% set shalow = (sha or '') | lower %}
+              {% set is_digest = shalow | length in [32, 40, 64]
+                                 and shalow | reject('in', '0123456789abcdef') | list | length == 0 %}
+              {% if is_digest %}
+              <a href="{{ url_for('home.analyze_deeplink', indicator=sha) }}" class="text-blue-400 hover:text-blue-300 transition-colors" style="text-decoration:none;">Analyze →</a>
+              {% endif %}
+              {% if hsum.get('is_malicious') %}
+              <span class="{% if is_digest %}ml-2 {% endif %}px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">malicious</span>
+              {% elif not is_digest %}
+              <span class="text-gray-600">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">No attachments.</p>
+    {% endif %}
+  </div>
+
+  {# Stored URLs are defanged, attacker-controlled text (anchor_text especially) and are
+     NEVER rendered as a live <a href>: the app's CSP carries 'unsafe-inline', so a
+     clickable harvested href is an XSS hole. #}
+  {% set urls = analysis.get('urls') or [] %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">URLs{% if urls %} ({{ urls | length }}){% endif %}</h3>
+    {% if urls %}
+    <div class="overflow-x-auto" style="max-height:24rem;overflow-y:auto;">
+      <table class="w-full text-xs font-mono">
+        <thead class="sticky top-0 bg-gray-900">
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4">URL (defanged)</th>
+            <th class="pb-1.5 pr-4">Anchor text</th>
+            <th class="pb-1.5">Mismatch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in urls %}
+          <tr class="border-b border-gray-800/40">
+            <td class="py-1.5 pr-4 text-gray-300 break-all">{{ (u.get('url') if u else None) or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400 break-all">{{ (u.get('anchor_text') if u else None) or '—' }}</td>
+            <td class="py-1.5">
+              {% if u and u.get('display_mismatch') %}
+              <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 font-semibold uppercase tracking-wide">mismatch</span>
+              {% else %}
+              <span class="text-gray-600">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">No URLs extracted.</p>
+    {% endif %}
+  </div>
+
+  {% set iocs = analysis.get('iocs') or [] %}
+  <div class="nt-card p-4">
+    {% if iocs %}
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="nt-card-title">Indicators ({{ iocs | length }})</h3>
+      <button onclick="copyEmailIocs()"
+              class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                     border border-gray-700 hover:bg-gray-700">Copy all</button>
+    </div>
+    <p class="text-xs text-gray-500 mb-3">
+      Defanged for safe copying. Extracted from the sender domain, Received-chain IPs, and body URLs.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs" id="email-ioc-table">
+        <thead>
+          <tr class="text-gray-500 uppercase tracking-wide text-left">
+            <th class="pb-2 pr-4">Type</th><th class="pb-2">Indicator</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ioc in iocs %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2 pr-4 text-gray-500 font-mono">{{ (ioc.get('type') if ioc else None) or '—' }}</td>
+            <td class="py-2 text-gray-300 font-mono break-all">{{ (ioc.get('value') if ioc else None) or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-sm text-gray-500">No indicators extracted.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function copyEmailIocs() {
+  var rows = document.querySelectorAll('#email-ioc-table tbody tr td:nth-child(2)');
+  var text = Array.from(rows).map(function (td) { return td.textContent.trim(); }).join('\n');
+  navigator.clipboard.writeText(text);
+}
+</script>
+{% endblock %}

@@ -4,7 +4,6 @@ import logging
 from ..utils.cache import timed_lru_cache
 from OTXv2 import OTXv2, IndicatorTypes
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 def setup_file_services(app):
@@ -21,16 +20,13 @@ def _sha256_of_file(file_path):
 
 def get_alienvault_analysis(file_hash):
     """Analyze a file hash using AlienVault OTX API."""
-    # Support multiple env var names for backwards compatibility
     otx_api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not otx_api_key:
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
     try:
         otx = OTXv2(otx_api_key)
-        # Query OTX for file hash (supports md5, sha1, sha256)
         result = otx.get_indicator_details(IndicatorTypes.FILE_HASH_MD5, file_hash)
-        # Try SHA1/SHA256 if MD5 fails
         if not result or 'general' not in result:
             result = otx.get_indicator_details(IndicatorTypes.FILE_HASH_SHA1, file_hash)
         if not result or 'general' not in result:
@@ -44,8 +40,8 @@ def get_alienvault_analysis(file_hash):
 def get_combined_file_analysis(file_path=None, file_hash=None):
     """Analyze a file or hash via AlienVault OTX hash reputation.
 
-    For an uploaded file we compute its SHA-256 and look the hash up (OTX is hash-based),
-    so the endpoint still works without any binary-analysis engine.
+    OTX is hash-based, so an uploaded file is hashed and looked up by SHA-256 - no
+    binary-analysis engine is needed.
     """
     if file_path and not file_hash:
         try:

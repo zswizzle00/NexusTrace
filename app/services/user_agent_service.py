@@ -6,7 +6,6 @@ class UserAgentParser:
 
     # Browser patterns - order matters (more specific first)
     BROWSER_PATTERNS = [
-        # Mobile browsers first
         ('Samsung Internet', r'SamsungBrowser/(\d+(?:\.\d+)*)'),
         ('UC Browser', r'UCBrowser/(\d+(?:\.\d+)*)'),
         ('Opera Mini', r'Opera Mini/(\d+(?:\.\d+)*)'),
@@ -31,7 +30,6 @@ class UserAgentParser:
         ('SeaMonkey', r'SeaMonkey/(\d+(?:\.\d+)*)'),
         ('Basilisk', r'Basilisk/(\d+(?:\.\d+)*)'),
         ('Tor Browser', r'Tor Browser'),
-        # Desktop browsers
         ('Edge', r'Edg(?:e|A|iOS)?/(\d+(?:\.\d+)*)'),
         ('Opera', r'(?:OPR|Opera)[/ ](\d+(?:\.\d+)*)'),
         ('Chrome', r'Chrome/(\d+(?:\.\d+)*)'),
@@ -52,7 +50,6 @@ class UserAgentParser:
 
     # OS patterns - order matters (specific distros/versions before generic)
     OS_PATTERNS = [
-        # Windows versions
         ('Windows 11', r'Windows NT 10\.0.*(?:Win64|WOW64)'),  # Win11 uses NT 10.0 but usually 64-bit
         ('Windows 10', r'Windows NT 10\.0'),
         ('Windows 8.1', r'Windows NT 6\.3'),
@@ -63,7 +60,6 @@ class UserAgentParser:
         ('Windows 2000', r'Windows NT 5\.0'),
         ('Windows Phone', r'Windows Phone(?: OS)? (\d+(?:\.\d+)*)'),
         ('Windows', r'Windows'),
-        # macOS versions
         ('macOS Sequoia', r'Mac OS X 15[._](\d+(?:[._]\d+)*)'),
         ('macOS Sonoma', r'Mac OS X 14[._](\d+(?:[._]\d+)*)'),
         ('macOS Ventura', r'Mac OS X 13[._](\d+(?:[._]\d+)*)'),
@@ -76,9 +72,7 @@ class UserAgentParser:
         ('OS X El Capitan', r'Mac OS X 10[._]11'),
         ('OS X Yosemite', r'Mac OS X 10[._]10'),
         ('Mac OS X', r'Mac OS X (\d+[._]\d+(?:[._]\d+)?)'),
-        # iOS versions
         ('iOS', r'(?:iPhone|iPad|iPod).*OS (\d+[._]\d+(?:[._]\d+)?)'),
-        # Android versions
         ('Android 14', r'Android 14'),
         ('Android 13', r'Android 13'),
         ('Android 12', r'Android 12'),
@@ -87,9 +81,8 @@ class UserAgentParser:
         ('Android 9', r'Android 9'),
         ('Android 8', r'Android 8'),
         ('Android', r'Android (\d+(?:\.\d+)*)'),
-        # Chrome OS
         ('Chrome OS', r'CrOS'),
-        # Linux distributions (specific before generic)
+        # Specific Linux distributions must stay ahead of the generic 'Linux' entry.
         ('Ubuntu', r'Ubuntu(?:/(\d+\.\d+))?'),
         ('Fedora', r'Fedora(?:/(\d+))?'),
         ('Debian', r'Debian'),
@@ -111,7 +104,6 @@ class UserAgentParser:
         ('OpenBSD', r'OpenBSD'),
         ('NetBSD', r'NetBSD'),
         ('Linux', r'Linux|X11'),
-        # Other
         ('BlackBerry', r'BlackBerry|BB10'),
         ('PlayStation', r'PlayStation'),
         ('Xbox', r'Xbox'),
@@ -123,9 +115,7 @@ class UserAgentParser:
         ('HarmonyOS', r'HarmonyOS'),
     ]
 
-    # Mobile device patterns
     MOBILE_DEVICE_PATTERNS = [
-        # Apple devices
         ('iPhone 15', r'iPhone16,[12]', 'Apple', 'Mobile'),
         ('iPhone 14', r'iPhone15,[23]', 'Apple', 'Mobile'),
         ('iPhone 14 Pro', r'iPhone15,[45]', 'Apple', 'Mobile'),
@@ -141,7 +131,6 @@ class UserAgentParser:
         ('iPad Mini', r'iPad[45],|iPad14,[12]', 'Apple', 'Tablet'),
         ('iPad', r'iPad', 'Apple', 'Tablet'),
         ('iPod', r'iPod', 'Apple', 'Mobile'),
-        # Samsung devices
         ('Galaxy S24', r'SM-S92[1-8]', 'Samsung', 'Mobile'),
         ('Galaxy S23', r'SM-S91[1-8]', 'Samsung', 'Mobile'),
         ('Galaxy S22', r'SM-S90[1-8]', 'Samsung', 'Mobile'),
@@ -153,7 +142,6 @@ class UserAgentParser:
         ('Galaxy Note', r'SM-N9', 'Samsung', 'Mobile'),
         ('Galaxy Tab', r'SM-T|SM-X', 'Samsung', 'Tablet'),
         ('Galaxy', r'Galaxy|SM-G', 'Samsung', 'Mobile'),
-        # Google devices
         ('Pixel 8', r'Pixel 8', 'Google', 'Mobile'),
         ('Pixel 7', r'Pixel 7', 'Google', 'Mobile'),
         ('Pixel 6', r'Pixel 6', 'Google', 'Mobile'),
@@ -161,13 +149,11 @@ class UserAgentParser:
         ('Pixel 4', r'Pixel 4', 'Google', 'Mobile'),
         ('Pixel', r'Pixel', 'Google', 'Mobile'),
         ('Nexus', r'Nexus', 'Google', 'Mobile'),
-        # OnePlus
         ('OnePlus 12', r'OnePlus.*12|CPH25', 'OnePlus', 'Mobile'),
         ('OnePlus 11', r'OnePlus.*11|CPH24', 'OnePlus', 'Mobile'),
         ('OnePlus 10', r'OnePlus.*10|NE2', 'OnePlus', 'Mobile'),
         ('OnePlus 9', r'OnePlus.*9|LE2', 'OnePlus', 'Mobile'),
         ('OnePlus', r'OnePlus|ONEPLUS', 'OnePlus', 'Mobile'),
-        # Xiaomi
         ('Xiaomi 14', r'2311[A-Z]', 'Xiaomi', 'Mobile'),
         ('Xiaomi 13', r'2210[A-Z]|2304[A-Z]', 'Xiaomi', 'Mobile'),
         ('Redmi Note', r'Redmi Note', 'Xiaomi', 'Mobile'),
@@ -175,13 +161,11 @@ class UserAgentParser:
         ('Mi ', r'Mi \d|MI \d', 'Xiaomi', 'Mobile'),
         ('POCO', r'POCO', 'Xiaomi', 'Mobile'),
         ('Xiaomi', r'Xiaomi', 'Xiaomi', 'Mobile'),
-        # Huawei
         ('Huawei P', r'(?:HUAWEI )?P\d0', 'Huawei', 'Mobile'),
         ('Huawei Mate', r'(?:HUAWEI )?Mate', 'Huawei', 'Mobile'),
         ('Huawei Nova', r'(?:HUAWEI )?Nova', 'Huawei', 'Mobile'),
         ('Honor', r'Honor', 'Honor', 'Mobile'),
         ('Huawei', r'Huawei|HUAWEI', 'Huawei', 'Mobile'),
-        # Other brands
         ('Sony Xperia', r'Xperia|SO-\d', 'Sony', 'Mobile'),
         ('LG', r'LG-|LM-', 'LG', 'Mobile'),
         ('Motorola', r'moto|Motorola|XT\d', 'Motorola', 'Mobile'),
@@ -198,7 +182,6 @@ class UserAgentParser:
         ('Surface', r'Surface', 'Microsoft', 'Tablet'),
     ]
 
-    # Bot/crawler patterns
     BOT_PATTERNS = [
         ('Googlebot', r'Googlebot', 'Google'),
         ('Bingbot', r'bingbot', 'Microsoft'),
@@ -236,7 +219,6 @@ class UserAgentParser:
         ('Bot', r'[Bb]ot|[Cc]rawler|[Ss]pider', 'Generic Bot'),
     ]
 
-    # Architecture patterns
     ARCH_PATTERNS = [
         ('x86_64', r'x86_64|x64|Win64|WOW64|amd64'),
         ('x86', r'i[3-6]86|x86'),
@@ -246,9 +228,7 @@ class UserAgentParser:
 
     @staticmethod
     def parse(user_agent: str) -> Dict[str, Any]:
-        """
-        Parse a user agent string and return comprehensive structured information.
-        """
+        """Parse a user agent string into structured browser/OS/device information."""
         if not user_agent or not user_agent.strip():
             return UserAgentParser._empty_result()
 
@@ -267,7 +247,6 @@ class UserAgentParser:
             'engine': {'name': 'N/A', 'version': 'N/A'},
         }
 
-        # Check for bots first
         for bot_name, pattern, operator in UserAgentParser.BOT_PATTERNS:
             if re.search(pattern, ua, re.IGNORECASE):
                 result['is_bot'] = True
@@ -277,7 +256,6 @@ class UserAgentParser:
                 result['browser'] = {'name': bot_name, 'version': 'N/A'}
                 break
 
-        # Parse rendering engine
         engine_patterns = [
             ('Blink', r'Chrome/(\d+)'),
             ('Gecko', r'Gecko/(\d+)'),
@@ -292,7 +270,6 @@ class UserAgentParser:
                 result['engine'] = {'name': engine, 'version': match.group(1)}
                 break
 
-        # Parse browser
         if not result['is_bot']:
             for browser, pattern in UserAgentParser.BROWSER_PATTERNS:
                 match = re.search(pattern, ua)
@@ -302,7 +279,6 @@ class UserAgentParser:
                         result['browser']['version'] = match.group(1)
                     break
 
-        # Parse OS
         for os_name, pattern in UserAgentParser.OS_PATTERNS:
             match = re.search(pattern, ua, re.IGNORECASE)
             if match:
@@ -312,13 +288,11 @@ class UserAgentParser:
                     result['os']['version'] = version
                 break
 
-        # Parse architecture
         for arch, pattern in UserAgentParser.ARCH_PATTERNS:
             if re.search(pattern, ua, re.IGNORECASE):
                 result['architecture'] = arch
                 break
 
-        # Parse device (mobile/tablet)
         if not result['is_bot']:
             for model, pattern, brand, device_type in UserAgentParser.MOBILE_DEVICE_PATTERNS:
                 if re.search(pattern, ua, re.IGNORECASE):
@@ -328,7 +302,6 @@ class UserAgentParser:
                     result['is_desktop'] = False
                     break
 
-        # If still desktop, determine type based on OS
         if result['is_desktop'] and not result['is_bot']:
             os_name = result['os']['name']
             if 'Windows' in os_name:
@@ -344,7 +317,7 @@ class UserAgentParser:
             elif os_name in ['FreeBSD', 'OpenBSD', 'NetBSD']:
                 result['device'] = {'type': 'Desktop', 'brand': 'PC', 'model': f'{os_name} Workstation'}
 
-        # Additional mobile detection fallback
+        # Keyword fallback for devices no MOBILE_DEVICE_PATTERNS entry matched.
         if not result['is_mobile'] and not result['is_tablet'] and not result['is_bot']:
             mobile_keywords = ['Mobile', 'Android', 'webOS', 'BlackBerry', 'Opera Mini', 'IEMobile']
             tablet_keywords = ['Tablet', 'iPad']
@@ -380,7 +353,5 @@ class UserAgentParser:
 
 
 def parse_user_agent(user_agent: str) -> Dict[str, Any]:
-    """
-    Parse a user agent string and return structured information.
-    """
+    """Parse a user agent string and return structured information."""
     return UserAgentParser.parse(user_agent)

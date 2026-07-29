@@ -4,20 +4,18 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
-from app.services.hash_service import get_hash_info_quick
+from app.services.hash_service import get_hash_info_quick, has_reputation_record, unknown_hash_report
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data, get_ipapi_data
 from app.services.domain_service import get_domain_info
 from app.services.url_service import analyze_url_quick
 from app.services.user_agent_service import parse_user_agent
 from app.services.azure_error_service import get_azure_error_info
-import os
 from dotenv import load_dotenv
 from app.services.event_service import get_event_info
 from urllib.parse import urlparse
 from app.utils.validators import is_valid_ip, is_valid_domain
 from app.utils.parsers import parse_alienvault_otx, parse_shodan, parse_abuseipdb
 
-# Load environment variables
 load_dotenv()
 
 home_bp = Blueprint('home', __name__)
@@ -35,7 +33,7 @@ def ip_search():
         if not ip:
             error = 'IP address is required.'
         else:
-            # For demo, just echo the IP. Replace with real lookup as needed.
+            # Stub: echoes the IP back. Real lookup goes through /analyze.
             result = {'ip': ip, 'message': f'Search results for {ip} would appear here.'}
     return render_template('ip_search.html', error=error, result=result)
 
@@ -48,7 +46,6 @@ def domain_search():
         if not indicator:
             error = 'Domain or URL is required.'
         else:
-            # Redirect to the appropriate analysis endpoint
             if indicator.lower().startswith(('http://', 'https://')):
                 return redirect(url_for('domain.analyze_domain', indicator=indicator))
             else:
@@ -79,8 +76,6 @@ def _run_analysis(indicator):
     """Core analysis logic shared by the POST /analyze form and GET /i/<indicator> deep-link route."""
     result_data = {}
     card_count = 0
-
-    # Determine indicator type
     indicator_type = None
 
     normalized_ip = is_valid_ip(indicator)
@@ -121,15 +116,14 @@ def _run_analysis(indicator):
         alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
-        has_meaningful_data = (
-            (hash_info and hash_info.get('summary', {}).get('is_malicious')) or
-            (hash_info and hash_info.get('sources', {}).get('virustotal', {}).get('status') == 'found') or
-            (hash_info and hash_info.get('sources', {}).get('malwarebazaar', {}).get('status') == 'found') or
-            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
-        )
-
-        if not has_meaningful_data:
-            return render_template('no_results.html', indicator=indicator, error_type='hash')
+        if not has_reputation_record(result_data['hash_info'], alienvault_raw):
+            # "Nobody has seen it" is a finding, not an error - a freshly staged
+            # dropper looks exactly like this, so keep the hash on screen.
+            return render_template('hash_analysis.html',
+                                   indicator=indicator,
+                                   indicator_type=indicator_type,
+                                   unknown_hash=unknown_hash_report(
+                                       indicator, result_data['hash_info'], alienvault_raw))
 
         card_count = sum(1 for k in ['alienvault', 'hash_info'] if result_data.get(k))
         return render_template('hash_analysis.html',
@@ -252,12 +246,10 @@ def _run_analysis(indicator):
                               card_count=card_count,
                               **result_data)
     elif indicator_type in ('url', 'domain'):
-        # Both domains and full URLs go through the URL scanner for full Playwright analysis.
-        # No ad-hoc scheme prepending here - url_guard.normalize() owns scheme
-        # defaulting (bare hosts default to http://), so this and /url_scan
-        # treat the same input identically (round 1 review, Finding 10: this
-        # used to default to https here but http in normalize(), so the same
-        # bare domain scanned differently depending on entry point).
+        # Both domains and full URLs go through the URL scanner. Do NOT prepend a
+        # scheme here: url_guard.normalize() owns scheme defaulting, and a second
+        # rule here made the same bare domain scan differently via /analyze than
+        # via /url_scan.
         from app.services.scan_service import run_scan, save_scan
         from app.utils.url_guard import is_scannable
         if not is_scannable(indicator):
@@ -278,15 +270,8 @@ def analyze():
 
 @home_bp.route('/i/<path:indicator>', methods=['GET'])
 def analyze_deeplink(indicator):
-    """Deep-link route: GET /i/<indicator> runs the same analysis as the POST form.
-
-    Examples:
-        /i/8.8.8.8
-        /i/google.com
-        /i/d41d8cd98f00b204e9800998ecf8427e
-        /i/AADSTS50034
-        /i/https%3A%2F%2Fexample.com%2Fpath   (URL-encode full URLs)
-    """
+    """Runs the same analysis as the POST form. Full URLs must be percent-encoded
+    (``/i/https%3A%2F%2Fexample.com%2Fpath``)."""
     from urllib.parse import unquote
     indicator = unquote(indicator).strip()
     if not indicator:
@@ -296,12 +281,14 @@ def analyze_deeplink(indicator):
 
 @home_bp.route('/no_results')
 def no_results():
-    """Route for displaying no results page when accessed directly."""
+    """The no-results page when reached directly rather than via a redirect."""
     indicator = request.args.get('indicator', 'Unknown Indicator')
     error_type = request.args.get('error_type', None)
     return render_template('no_results.html', indicator=indicator, error_type=error_type)
 
 @home_bp.route('/favicon.ico')
 def favicon():
-    return send_from_directory(os.path.join(current_app.root_path, 'static'),
-                             'favicon.ico', mimetype='image/vnd.microsoft.icon') 
+    # static_folder, not root_path/'static': the app package has no static dir.
+    return send_from_directory(current_app.static_folder,
+                               'favicon_io/favicon.ico',
+                               mimetype='image/vnd.microsoft.icon')

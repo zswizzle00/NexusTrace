@@ -4,17 +4,13 @@ from functools import lru_cache, wraps
 import threading
 import importlib
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Cache configuration
-CACHE_TTL = 1800  # 30 minutes cache TTL
-MAX_CACHE_SIZE = 1000  # Maximum number of cached items
+CACHE_TTL = 1800  # 30 minutes
+MAX_CACHE_SIZE = 1000
 
-# Thread safety lock for cache operations
 _cache_lock = threading.Lock()
 
-# Flag to prevent multiple cache threads
 _cache_thread_started = False
 _cache_thread_lock = threading.Lock()
 
@@ -25,10 +21,8 @@ def setup_cache(app):
 
 
 def timed_lru_cache(seconds: int, maxsize: int = MAX_CACHE_SIZE):
-    """
-    Cache decorator with TTL and size limit.
-    Thread-safe implementation with proper locking.
-    """
+    """Thread-safe cache decorator with TTL and size limit. The TTL is
+    per-function, not per-key: one expiry flushes the whole function's cache."""
     def wrapper_decorator(func):
         func = lru_cache(maxsize=maxsize)(func)
         func.lifetime = seconds
@@ -43,7 +37,6 @@ def timed_lru_cache(seconds: int, maxsize: int = MAX_CACHE_SIZE):
                     func.expiration = time.time() + func.lifetime
             return func(*args, **kwargs)
 
-        # Expose cache_clear with thread safety
         original_cache_clear = func.cache_clear
 
         def thread_safe_cache_clear():
@@ -71,7 +64,6 @@ def clear_caches():
             azure_error_service = importlib.import_module('app.services.azure_error_service')
 
             functions = [
-                # ip_service
                 ip_service.check_abuseipdb,
                 ip_service.get_ipinfo_data,
                 ip_service.get_shodan_info,
@@ -80,7 +72,6 @@ def clear_caches():
                 ip_service.get_vpn_data,
                 ip_service.get_ip2location_data,
                 ip_service.get_ipapi_data,
-                # domain_service
                 domain_service.get_whois_info,
                 domain_service.get_dns_records,
                 domain_service.get_ssl_info,
@@ -90,17 +81,13 @@ def clear_caches():
                 domain_service.get_talos_reputation,
                 domain_service.get_domain_info,
                 domain_service.get_domain_info_quick,
-                # hash_service
                 hash_service.get_virustotal_report,
                 hash_service.get_malwarebazaar_report,
                 hash_service.get_threatfox_iocs,
                 hash_service.get_hash_info,
-                # url_service
                 url_service.get_favicon_hash,
                 url_service.get_tech_stack,
-                # file_service
                 file_service.get_combined_file_analysis,
-                # event/azure services
                 event_service.get_event_info,
                 azure_error_service.get_azure_error_info,
             ]

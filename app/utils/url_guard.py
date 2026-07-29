@@ -3,28 +3,18 @@
 ``validate_target`` is the single choke point every scanner fetch path must call.
 It rejects anything that is not a globally-routable http(s) target: disallowed
 schemes, blocked hostnames, IP literals outside the global ranges, and hostnames
-that *resolve* into those ranges at validation time.
+that *resolve* into those ranges at validation time. Checking once is not enough —
+Chromium follows redirects and loads subresources on its own, so the guard runs
+per request (see ``scan_service._install_fetch_guard``).
 
-Two design notes:
-
-* **The resolver is injectable.** Tests pass a fake so no case touches the
-  network, and ``caching_resolver`` lets one scan memoize its lookups — a page
-  makes many requests to the same handful of hosts and re-resolving each one
-  would add a DNS round-trip per subresource.
-* **Checking once is not enough.** This module replaces a pre-flight-only check.
-  Chromium follows redirects and loads subresources on its own, so the guard has
-  to be called per request (see ``scan_service._install_fetch_guard``), not once
-  against the URL a user typed.
-
-**What the resolved-address check does and does not provide.** Validation and the
-actual fetch are separate events with separate DNS resolutions: this module
-resolves a host and rejects it if *any* answer is non-routable, but it cannot pin
-Chromium's later, independent resolution to the address it just checked. That
-narrows the window for DNS-rebinding attacks (an attacker must win the race
-between this check and the browser's own lookup) but does not close it. Closing
-it requires resolve-and-pin at the network layer (e.g. Chromium
+**What the resolved-address check does NOT provide.** Validation and the actual
+fetch are separate events with separate DNS resolutions: this module rejects a
+host if *any* answer is non-routable, but it cannot pin Chromium's later,
+independent resolution to the address it just checked. That narrows the
+DNS-rebinding window (an attacker must win the race) but does not close it.
+Closing it requires resolve-and-pin at the network layer (e.g. Chromium
 ``--host-resolver-rules``) or egress restriction on the scanner host/container;
-this module cannot provide either from a stdlib-only leaf position.
+neither is available to a stdlib-only leaf module.
 """
 
 import ipaddress
@@ -37,23 +27,20 @@ from urllib.parse import urlsplit, urlunsplit
 _ALLOWED_SCHEMES = frozenset({'http', 'https'})
 _DEFAULT_PORTS = {'http': 80, 'https': 443}
 
-# Hostnames that must never be fetched regardless of what they resolve to.
-# Compared after stripping a trailing dot (a fully-qualified 'localhost.' is the
-# same DNS name as 'localhost').
+# Never fetched regardless of what they resolve to. Matched after stripping a
+# trailing dot ('localhost.' is the same DNS name as 'localhost').
 _BLOCKED_HOSTNAMES = frozenset({'localhost', 'metadata', 'metadata.google.internal'})
-# Suffixes that only ever name internal infrastructure.
 _BLOCKED_SUFFIXES = ('.localhost', '.internal', '.local')
 
 # NAT64's well-known prefix embeds an arbitrary IPv4 destination in its low 32
-# bits; a NAT64 gateway translates a request to such an address into a request to
-# the embedded IPv4 address, so the embedded address is what must be judged.
+# bits; a NAT64 gateway translates the request to that IPv4 address, so the
+# embedded address is what must be judged.
 _NAT64_WELL_KNOWN_PREFIX = ipaddress.IPv6Network('64:ff9b::/96')
 # Deprecated IPv6 site-local range (RFC 3879) — ``is_global`` does not exclude it.
 _IPV6_SITE_LOCAL = ipaddress.IPv6Network('fec0::/10')
 
-# Matches the text immediately after "scheme:" when it is a bare port and
-# nothing else - i.e. the input was actually "host:port", not a real scheme.
-# Digits only, optionally followed by the start of a path/query/fragment.
+# Text after "scheme:" that is a bare port and nothing else — i.e. the input was
+# really "host:port", not a scheme.
 _PORT_ONLY_RE = re.compile(r'^\d+(?:[/?#].*)?$')
 
 Resolver = Callable[[str], Iterable[str]]
@@ -78,14 +65,10 @@ def _default_resolver(host: str) -> list[str]:
 
 
 def caching_resolver(resolver: Resolver | None = None) -> Resolver:
-    """Wrap ``resolver`` so each host is resolved at most once *on success*.
-
-    Scope the returned callable to a single scan: it is a cache with no
-    invalidation, which is exactly what we want for the duration of one page load
-    and exactly what we do not want to share between scans. Failures are
-    deliberately NOT memoized — a transient DNS error (timeout, SERVFAIL) on the
-    first subresource must not permanently mark the host unfetchable for the rest
-    of the scan.
+    """Wrap ``resolver`` so each host is resolved at most once *on success*. Scope
+    the result to a single scan — it is a cache with no invalidation. Failures are
+    deliberately not memoized, so a transient DNS error on the first subresource
+    does not mark the host unfetchable for the rest of the scan.
     """
     inner = resolver if resolver is not None else _default_resolver
     memo: dict[str, list[str]] = {}
@@ -101,11 +84,11 @@ def caching_resolver(resolver: Resolver | None = None) -> Resolver:
 def _has_ambiguous_authority(netloc: str) -> bool:
     """True if ``netloc`` contains a character that makes host parsing ambiguous.
 
-    A backslash, ASCII whitespace, or a control character in the authority lets
-    ``urlsplit``'s userinfo/host split disagree with the WHATWG parser Chromium
-    uses (which treats ``\\`` as ``/`` for special schemes, terminating the
-    authority before ``@`` is even considered). Rather than emulate WHATWG
-    parsing here, reject the ambiguous input outright.
+    Parser differential: a backslash, ASCII whitespace, or control character makes
+    ``urlsplit``'s userinfo/host split disagree with Chromium's WHATWG parser,
+    which treats ``\\`` as ``/`` and ends the authority before ``@`` — so
+    ``http://127.0.0.1\\@example.com/`` is 127.0.0.1 to Chromium and example.com to
+    ``urlsplit``. Reject rather than emulate WHATWG parsing here.
     """
     for ch in netloc:
         if ch == '\\' or ord(ch) <= 0x20 or ord(ch) == 0x7f:
@@ -116,33 +99,24 @@ def _has_ambiguous_authority(netloc: str) -> bool:
 def normalize(raw: str) -> NormalizedTarget:
     """Canonicalize a URL: lowercase scheme+host, strip credentials and fragment,
     drop default ports, default a bare host to ``http://``, ensure a path, and
-    IDNA/ASCII-encode the host.
-
-    Raises :class:`UnsafeURLError` if the input cannot be unambiguously parsed
-    (an ambiguous authority, an invalid or non-http(s) scheme, an invalid port,
-    or a host that cannot be IDNA encoded) — otherwise this function performs no
-    further *safety* checks; call :func:`validate_target` for that.
+    IDNA-encode the host. Raises :class:`UnsafeURLError` on input that cannot be
+    unambiguously parsed; performs no *safety* checks — see :func:`validate_target`.
     """
     stripped = (raw or '').strip()
     parts = urlsplit(stripped)
 
     # Classify by shape, not by a scheme allowlist/registry:
     if '://' in stripped:
-        # A real scheme (http(s) or otherwise) - downstream (validate_target)
-        # decides whether it's allowed. No rewrite.
-        pass
+        pass  # real scheme; validate_target decides whether it's allowed
     elif stripped.startswith('//'):
-        # Protocol-relative.
         stripped = 'http:' + stripped
         parts = urlsplit(stripped)
     elif parts.scheme:
-        # urlsplit found a "scheme:" prefix with no '://'. Schemes may contain
-        # '.', so 'example.com:8080/x' parses with scheme 'example.com' - the
-        # only way to tell that apart from a real opaque scheme like
-        # 'mailto:test@example.com' or 'javascript:x@evil.com' is to look at
-        # what follows the colon: a bare port (digits only, up to the next
-        # '/', '?', '#', or end) means this was 'host:port'; anything else is
-        # a real, non-http(s) scheme that must be rejected, not rewritten.
+        # "scheme:" with no '://'. Schemes may contain '.', so 'example.com:8080/x'
+        # parses with scheme 'example.com'. What follows the colon disambiguates:
+        # a bare port means it was 'host:port'; anything else is a real opaque
+        # scheme ('mailto:', 'javascript:x@evil.com') that must be rejected, not
+        # rewritten to http.
         after_colon = stripped[len(parts.scheme) + 1:]
         if _PORT_ONLY_RE.match(after_colon):
             stripped = 'http://' + stripped
@@ -150,20 +124,17 @@ def normalize(raw: str) -> NormalizedTarget:
         else:
             raise UnsafeURLError(f'scheme {parts.scheme.lower()!r} is not allowed')
     else:
-        # No scheme at all - bare host.
-        stripped = 'http://' + stripped
+        stripped = 'http://' + stripped  # bare host
         parts = urlsplit(stripped)
 
     if _has_ambiguous_authority(parts.netloc):
         raise UnsafeURLError(f'ambiguous authority in {raw!r}')
 
     scheme = parts.scheme.lower()
-    # .hostname drops any user:pass@ and lowercases for us.
-    host = (parts.hostname or '').lower()
+    host = (parts.hostname or '').lower()  # .hostname drops any user:pass@
     if host and _parse_ip_literal(host) is None:
-        # IDNA/ASCII-encode so this module's host matches what Chromium and
-        # getaddrinfo actually resolve (e.g. fullwidth digits, unicode labels).
-        # IP literals (including bracketed IPv6) are left as-is.
+        # IDNA-encode so this module's host matches what Chromium and getaddrinfo
+        # actually resolve (e.g. fullwidth digits). IP literals are left as-is.
         try:
             host = host.encode('idna').decode('ascii')
         except UnicodeError as exc:
@@ -183,26 +154,21 @@ def normalize(raw: str) -> NormalizedTarget:
 
 
 def _is_blocked_hostname(host: str) -> bool:
-    # A trailing dot (a fully-qualified DNS name) must not bypass the denylist -
-    # 'localhost.' and 'localhost' are the same name to a resolver and to
-    # Chromium. Compare on the bare name only; the canonical .url keeps the dot.
+    # A trailing dot must not bypass the denylist — 'localhost.' and 'localhost'
+    # are one name to a resolver. The canonical .url keeps the dot.
     bare = host.rstrip('.')
     return bare in _BLOCKED_HOSTNAMES or bare.endswith(_BLOCKED_SUFFIXES)
 
 
 def _blocked_ip(ip) -> bool:
-    """True if ``ip`` must not be treated as a safe fetch target.
-
-    ``is_global`` alone is not sufficient: it does not exclude multicast, the
-    IETF-reserved ranges, the deprecated IPv6 site-local range, or NAT64's
-    well-known prefix (handled separately below, by judging the IPv4 address it
-    embeds rather than the IPv6 wrapper).
-    """
+    """True if ``ip`` must not be treated as a safe fetch target. ``is_global``
+    alone excludes neither multicast, the IETF-reserved ranges, the deprecated IPv6
+    site-local range, nor NAT64's prefix; each branch below closed a real bypass, so
+    do not simplify them away."""
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        # ::ffff:127.0.0.1 - judge the embedded v4 address.
-        ip = ip.ipv4_mapped
+        ip = ip.ipv4_mapped  # ::ffff:127.0.0.1 — judge the embedded v4 address
     elif isinstance(ip, ipaddress.IPv6Address) and ip in _NAT64_WELL_KNOWN_PREFIX:
-        # 64:ff9b::7f00:1 - a NAT64 gateway would translate this to 127.0.0.1.
+        # 64:ff9b::7f00:1 — a NAT64 gateway would translate this to 127.0.0.1.
         ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     elif isinstance(ip, ipaddress.IPv6Address) and ip in _IPV6_SITE_LOCAL:
         return True
@@ -219,11 +185,7 @@ def _parse_ip_literal(host: str):
 
 def validate_target(raw: str, *, resolver: Resolver | None = None) -> NormalizedTarget:
     """Normalize ``raw`` and raise :class:`UnsafeURLError` if it must not be fetched.
-
-    Raises **only** ``UnsafeURLError`` for any ``str`` input — malformed URLs,
-    unresolvable hosts, and unexpected resolver errors are all normalized to this
-    one type so callers can rely on a single ``except`` clause.
-    """
+    Raises **only** that type for any ``str`` input, so callers need one ``except``."""
     try:
         target = normalize(raw)
 
@@ -250,9 +212,8 @@ def validate_target(raw: str, *, resolver: Resolver | None = None) -> Normalized
         if not addresses:
             raise UnsafeURLError(f'no addresses resolved for {host!r}')
 
-        # One non-global answer poisons the whole host, for this resolution.
-        # This is complete over the answers seen in this call, not over time -
-        # see the module docstring for why it is not a full rebinding defense.
+        # One non-global answer poisons the whole host, for this resolution only
+        # — see the module docstring on why this is not a full rebinding defense.
         for address in addresses:
             try:
                 ip = ipaddress.ip_address(address)
@@ -265,16 +226,14 @@ def validate_target(raw: str, *, resolver: Resolver | None = None) -> Normalized
     except UnsafeURLError:
         raise
     except Exception as exc:
-        # Anything else (a urlsplit ValueError on an unbalanced IPv6 bracket, an
-        # unexpected resolver exception, ...) must still fail closed as the typed
-        # error, not escape as whatever exception happened to be raised.
+        # Fail closed as the typed error rather than escaping as whatever was
+        # raised (e.g. urlsplit's ValueError on an unbalanced IPv6 bracket).
         raise UnsafeURLError(f'could not validate {raw!r}: {exc}') from exc
 
 
 def is_scannable(url: str, *, resolver: Resolver | None = None) -> bool:
-    """Non-raising form of :func:`validate_target`. Same contract as the
-    ``scan_service.is_scannable`` this replaces, so existing callers are unchanged.
-    Never raises, for any input, including non-``str``."""
+    """Non-raising form of :func:`validate_target`. Never raises, for any input,
+    including non-``str``."""
     if not url or not isinstance(url, str):
         return False
     try:

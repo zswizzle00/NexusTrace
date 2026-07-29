@@ -7,12 +7,109 @@
 <div class="w-full py-10">
     <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Hash Analysis</h2>
 
-    <!-- Search Form at Top -->
     <div class="mb-10 w-full">
         {{ search_form('Enter MD5, SHA1, or SHA256 hash...') }}
     </div>
 
-    {# --- Verdict summary strip (hash) --- #}
+    {% if error %}
+    <div class="bg-red-900/40 border border-red-800/60 text-red-300 rounded-lg px-4 py-3 mb-6 text-sm">{{ error }}</div>
+    {% endif %}
+
+    {% if unknown_hash %}
+    {% set state_labels = {
+         'no_record':   ('No record',   'text-gray-300'),
+         'skipped':     ('Not queried', 'text-gray-500'),
+         'unavailable': ('Unavailable', 'text-yellow-300'),
+         'found':       ('Record found','text-red-300')
+       } %}
+
+    <div class="verdict-bar is-suspicious shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div class="flex items-center gap-3 min-w-0">
+            <span id="unknown-hash-value"
+                  class="font-mono text-lg md:text-xl font-bold text-gray-100 break-all">{{ unknown_hash.hash }}</span>
+            <button onclick="copyUnknownHash()"
+                    class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                           border border-gray-700 hover:bg-gray-700 whitespace-nowrap">Copy</button>
+            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap
+                         bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">unknown</span>
+        </div>
+        <div class="ml-auto flex flex-wrap items-center divide-x divide-gray-600 text-sm">
+            {% if unknown_hash.type %}<span class="px-4 text-gray-400">Type <span class="text-gray-100">{{ unknown_hash.type }}</span></span>{% endif %}
+            <span class="px-4 text-gray-400">No record <span class="text-gray-100">{{ unknown_hash.counts.no_record }}</span></span>
+            {% if unknown_hash.counts.unavailable %}<span class="px-4 text-gray-400">Unavailable <span class="text-yellow-300">{{ unknown_hash.counts.unavailable }}</span></span>{% endif %}
+            {% if unknown_hash.counts.skipped %}<span class="px-4 text-gray-400">Not queried <span class="text-gray-100">{{ unknown_hash.counts.skipped }}</span></span>{% endif %}
+        </div>
+    </div>
+
+    <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2">
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col">
+            <h3 class="text-xl font-bold text-yellow-300 mb-4">Unknown is not clean</h3>
+            <p class="text-gray-300 text-sm mb-3">
+                {% if unknown_hash.counts.no_record %}
+                No source that answered has a record of this file. That is an absence of
+                evidence, not evidence of absence &mdash; it does not mean the file is safe.
+                {% else %}
+                No source answered for this file &mdash; every lookup below was skipped or
+                unavailable. Treat this as no information at all, not as a clean result.
+                {% endif %}
+            </p>
+            <p class="text-gray-400 text-sm mb-3">
+                A freshly staged dropper is unknown to every reputation feed by design: it has
+                only just been built or served, so nobody has submitted it yet. In that context
+                an unknown hash is weakly suspicious and worth pivoting on, especially when it
+                came from a live scan of an untrusted page.
+            </p>
+            <p class="text-gray-500 text-sm">
+                Re-check later &mdash; reputation for a genuinely new sample often appears within
+                hours of first submission. Detonating the sample in a sandbox is the next step
+                that will actually produce evidence.
+            </p>
+        </div>
+
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-400 mb-4">Sources</h3>
+            <table class="w-full text-sm">
+                <tbody>
+                    {% for source in unknown_hash.sources %}
+                    {% set label, colour = state_labels.get(source.state, ('Unknown', 'text-gray-400')) %}
+                    <tr class="border-b border-gray-800">
+                        <td class="py-2 pr-4 text-gray-300">{{ source.name }}</td>
+                        <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
+                        <td class="py-2 pr-4 text-gray-500 text-xs">
+                            {% if source.state == 'skipped' %}
+                                {{ source.key_env }} not configured
+                            {% elif source.state == 'unavailable' %}
+                                query failed or timed out
+                            {% endif %}
+                        </td>
+                        <td class="py-2">
+                            {% if source.url %}
+                            <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer"
+                               class="text-blue-400 hover:underline text-xs whitespace-nowrap">Search &rarr;</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if unknown_hash.reference_links %}
+            <div class="mt-6">
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Look it up elsewhere</h4>
+                <div class="flex flex-wrap gap-2">
+                    {% for name, link in unknown_hash.reference_links.items() %}
+                    <a href="{{ link }}" target="_blank" rel="noopener noreferrer"
+                       class="px-3 py-1 rounded text-xs bg-gray-800 text-gray-300
+                              border border-gray-700 hover:bg-gray-700">{{ name | replace('_', ' ') | title }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+
     {% if hash_info and hash_info.summary %}
       {% set is_mal = hash_info.summary.is_malicious | default(false, true) %}
       <div class="verdict-bar {{ 'is-malicious' if is_mal else 'is-clean' }} shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -28,13 +125,11 @@
       </div>
     {% endif %}
 
-    <!-- Results Grid -->
     {% set card_count = (1 if alienvault else 0) + (1 if hash_info else 0) + (1 if result else 0) %}
 
     {% if card_count > 0 %}
     <div class="w-full grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
 
-        {# --- Hash Info Summary Card (from new hash_service) --- #}
         {% if hash_info and hash_info.summary %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
@@ -66,7 +161,6 @@
                 {% endif %}
             </table>
 
-            <!-- Source links -->
             <div class="flex flex-wrap gap-2 mt-2">
                 {% if hash_info.sources.virustotal and hash_info.sources.virustotal.status == 'found' %}
                 <a href="https://www.virustotal.com/gui/file/{{ hash_info.hash }}" target="_blank" class="btn btn-sm bg-blue-900 text-blue-300 px-3 py-1 rounded text-xs hover:bg-blue-800">
@@ -82,7 +176,6 @@
         </div>
         {% endif %}
 
-        {# --- VirusTotal Card --- #}
         {% if hash_info and hash_info.sources.virustotal and hash_info.sources.virustotal.status == 'found' %}
         {% set vt = hash_info.sources.virustotal %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
@@ -122,7 +215,6 @@
         </div>
         {% endif %}
 
-        {# --- MalwareBazaar Card --- #}
         {% if hash_info and hash_info.sources.malwarebazaar and hash_info.sources.malwarebazaar.status == 'found' %}
         {% set mb = hash_info.sources.malwarebazaar %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
@@ -160,7 +252,6 @@
         </div>
         {% endif %}
 
-        {# --- ThreatFox Card --- #}
         {% if hash_info and hash_info.sources.threatfox and hash_info.sources.threatfox.status == 'found' %}
         {% set tf = hash_info.sources.threatfox %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
@@ -191,7 +282,6 @@
         </div>
         {% endif %}
 
-        {# --- AlienVault OTX Card --- #}
         {% if alienvault %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h3 class="text-xl font-bold text-blue-400 mb-4">AlienVault OTX</h3>
@@ -221,7 +311,6 @@
         </div>
         {% endif %}
 
-        {# --- Basic Hash Info (fallback) --- #}
         {% if result and not hash_info %}
         <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
             <h3 class="text-xl font-bold text-blue-400 mb-4">Basic Hash Information</h3>
@@ -247,7 +336,6 @@
 
     </div>
     {% else %}
-    <!-- No Results State -->
     <div class="text-center py-12">
         <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -257,7 +345,8 @@
     </div>
     {% endif %}
 
-    <!-- Return to Home -->
+    {% endif %}
+
     <div class="flex justify-center mt-12">
         <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,6 +360,9 @@
 
 {% block scripts %}
 <script>
-    // Add any necessary JavaScript here
+function copyUnknownHash() {
+  var el = document.getElementById('unknown-hash-value');
+  if (el) navigator.clipboard.writeText(el.textContent.trim());
+}
 </script>
 {% endblock %}

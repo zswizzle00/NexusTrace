@@ -14,13 +14,11 @@
                 </p>
             </div>
 
-            <!-- Single IP Search Form -->
             <div>
                 <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Single IP Lookup</h3>
                 {{ search_form('Enter IPv4 or IPv6 address') }}
             </div>
 
-            <!-- Divider -->
             <div class="relative">
                 <div class="absolute inset-0 flex items-center">
                     <div class="w-full border-t border-gray-600"></div>
@@ -30,7 +28,6 @@
                 </div>
             </div>
 
-            <!-- Bulk IP Analysis -->
             <div class="bulk-analysis">
                 <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Bulk IP Analysis</h3>
                 <p class="text-gray-400 text-center mb-6">Upload a CSV, XLSX, or TXT file with IP addresses (one per line or in the first column) to analyze multiple IPs and download results as CSV.</p>
@@ -38,7 +35,6 @@
                 <form id="bulkIpForm" enctype="multipart/form-data" class="space-y-6">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                    <!-- File Upload Area -->
                     <div class="flex flex-col items-center">
                         <label for="ipFile" class="w-full max-w-md cursor-pointer">
                             <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-gray-700/50 transition-all duration-200">
@@ -52,7 +48,6 @@
                         <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
                     </div>
 
-                    <!-- Progress Bar (hidden by default) -->
                     <div id="progressContainer" class="hidden w-full max-w-md mx-auto">
                         <div class="flex justify-between text-sm text-gray-400 mb-2">
                             <span>Processing IPs...</span>
@@ -63,7 +58,6 @@
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
                     <div class="flex justify-center">
                         <button type="submit" id="submitBtn" class="btn btn-primary text-lg py-4 px-8 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,7 +68,6 @@
                     </div>
                 </form>
 
-                <!-- Error/Success Messages -->
                 <div id="messageArea" class="hidden mt-6 p-4 rounded-lg text-center max-w-md mx-auto"></div>
             </div>
         </div>
@@ -96,7 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressText = document.getElementById('progressText');
     const messageArea = document.getElementById('messageArea');
 
-    // File selection handler
     fileInput.addEventListener('change', function() {
         if (this.files.length > 0) {
             fileLabel.textContent = this.files[0].name;
@@ -109,7 +101,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Drag and drop handlers
     dropZone.addEventListener('dragover', function(e) {
         e.preventDefault();
         this.classList.add('border-blue-500', 'bg-gray-700/50');
@@ -133,7 +124,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Form submission
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -142,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Show progress
         progressContainer.classList.remove('hidden');
         submitBtn.disabled = true;
         btnText.textContent = 'Processing...';
@@ -170,7 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 updateProgress(100);
 
-                // Download the CSV
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -190,7 +178,6 @@ document.addEventListener('DOMContentLoaded', function() {
             clearInterval(progressInterval);
             showMessage('Network error. Please try again.', 'error');
         } finally {
-            // Reset UI
             setTimeout(() => {
                 progressContainer.classList.add('hidden');
                 progressBar.style.width = '0%';

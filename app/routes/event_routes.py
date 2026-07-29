@@ -12,13 +12,11 @@ def event_section():
 def search_event():
     event_id = request.form.get('event_id', '').strip()
     
-    # Validate event ID format (should be a number)
     if not event_id.isdigit():
         return jsonify({
             'error': 'Invalid event ID format. Please enter a valid event ID number.'
         }), 400
     
-    # Get event information from the service
     event_info = get_event_info(event_id)
     
     return jsonify(event_info) 

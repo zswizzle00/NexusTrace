@@ -14,10 +14,8 @@
     
     <title>{% block title %}NexusTrace{% endblock %}</title>
 
-    <!-- CSRF Token for AJAX requests -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <!-- Favicon and App Icons -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon_io/favicon.ico') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_io/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon_io/favicon-16x16.png') }}">
@@ -32,13 +30,12 @@
     <link rel="apple-touch-icon" sizes="57x57" href="{{ url_for('static', filename='favicon_io/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='favicon_io/site.webmanifest') }}">
     
-    <!-- Pre-built Tailwind CSS (compiled offline; no runtime compiler). Regenerate via tailwind.config.js -->
+    <!-- Compiled offline; there is no runtime compiler. Regenerate via tailwind.config.js. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}?v={{ asset_v }}">
     <!-- Preload the primary font weight so first paint isn't blocked on a late font fetch -->
     <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='fonts/inter-latin-400-normal.woff2') }}">
-    <!-- App-specific component styles (self-hosted @font-face for Inter lives here) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ asset_v }}">
-    <!-- App shell & component styles (moved out of an inline style block; loaded last so it wins the cascade) -->
+    <!-- Must stay last: app.css relies on winning the cascade. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ asset_v }}">
 </head>
 <body class="flex flex-col min-h-screen">
@@ -54,21 +51,19 @@
                     <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
                 </a>
                 <nav aria-label="Primary" class="desktop-nav">
-                    <!-- Analyze group: core indicator lookups -->
                     <div class="nav-group">
                         <a href="/ip_search" class="nav-link{% if request.path == '/ip_search' %} active{% endif %}">IP</a>
                         <a href="/url_scan" class="nav-link{% if request.path.startswith('/url_scan') %} active{% endif %}">URL Scan</a>
                         <a href="/hash_analysis" class="nav-link{% if request.path == '/hash_analysis' %} active{% endif %}">Hash</a>
+                        <a href="/email_analysis" class="nav-link{% if request.path.startswith('/email_analysis') %} active{% endif %}">E-mail</a>
                         <a href="/user_agent_search" class="nav-link{% if request.path == '/user_agent_search' %} active{% endif %}">User Agent</a>
                     </div>
                     <div class="nav-sep" role="separator" aria-hidden="true"></div>
-                    <!-- Investigate group: log & error analysis -->
                     <div class="nav-group">
                         <a href="/ad_event_search" class="nav-link{% if request.path == '/ad_event_search' %} active{% endif %}">Events</a>
                         <a href="/azure_error_search" class="nav-link{% if request.path == '/azure_error_search' %} active{% endif %}">Azure Errors</a>
                     </div>
                     <div class="nav-sep" role="separator" aria-hidden="true"></div>
-                    <!-- Tools group -->
                     <div class="nav-group">
                         <a href="/cyberchef" class="nav-link{% if request.path.startswith('/cyberchef') %} active{% endif %}">CyberChef</a>
                         <div class="relative group">
@@ -118,10 +113,9 @@
                                 </div>
                             </div>
                         </div>
-                    </div><!-- end tools nav-group -->
+                    </div>
                 </nav>
 
-                <!-- Hamburger toggle (shown below the desktop-nav breakpoint) -->
                 <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobile-nav">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -129,11 +123,11 @@
                 </button>
             </div>
 
-            <!-- Mobile navigation panel (toggled by the hamburger) -->
             <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
                 <a href="/cyberchef" class="mobile-nav-link">CyberChef</a>
                 <a href="/user_agent_search" class="mobile-nav-link">User Agent Search</a>
                 <a href="/hash_analysis" class="mobile-nav-link">Hash Search</a>
+                <a href="/email_analysis" class="mobile-nav-link">E-mail Analysis</a>
                 <a href="/url_scan" class="mobile-nav-link">URL Scan</a>
                 <a href="/ip_search" class="mobile-nav-link">IP Search</a>
                 <a href="/ad_event_search" class="mobile-nav-link">Windows Event Search</a>
@@ -174,10 +168,8 @@
         }
     </script>
     <script>
-    // Accessible nav dropdowns (disclosure pattern).
-    // The menus open/close visually via CSS :hover / :focus-within; this script keeps the
-    // ARIA state in sync, marks decorative icons hidden, and adds Escape-to-close so the
-    // menus are usable by keyboard and screen-reader users.
+    // The nav menus open/close visually via CSS :hover / :focus-within; this only keeps the
+    // ARIA state in sync and adds Escape-to-close for keyboard and screen-reader users.
     document.addEventListener('DOMContentLoaded', function () {
         const groups = document.querySelectorAll('.main-header .group');
 
@@ -202,7 +194,8 @@
             });
         });
 
-        // Close any open menu on a link click (so it doesn't linger over the next view).
+        // Drop and re-add .group to force a CSS-hover menu closed, so it doesn't linger
+        // over the next view after a link click.
         document.querySelectorAll('.dropdown-menu a').forEach(function (link) {
             link.addEventListener('click', function () {
                 const group = link.closest('.group');
@@ -213,7 +206,6 @@
             });
         });
 
-        // Escape closes the open menu and returns focus to its trigger.
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             const active = document.activeElement;
@@ -224,7 +216,6 @@
             if (active.blur) active.blur();
         });
 
-        // Mobile hamburger menu: toggle the vertical nav panel below the desktop breakpoint.
         const navToggle = document.getElementById('nav-toggle');
         const mobileNav = document.getElementById('mobile-nav');
         if (navToggle && mobileNav) {
@@ -248,7 +239,6 @@
         }
     });
     </script>
-    <!-- Mobile-specific JavaScript -->
     <script src="{{ url_for('static', filename='js/mobile.js') }}?v={{ asset_v }}"></script>
     {% block scripts %}{% endblock %}
 </body>

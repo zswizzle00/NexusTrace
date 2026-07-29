@@ -5,7 +5,6 @@
 {% block content %}
 <div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
     <div class="w-full max-w-7xl mx-auto px-2 py-8 md:py-16">
-        <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
                 Azure Error Analysis
@@ -18,11 +17,9 @@
             </p>
         </div>
 
-        <!-- Results -->
         <div class="space-y-6">
             {% if azure_error_info %}
                 <div class="card p-8 space-y-6">
-                    <!-- Error Header -->
                     <div class="border-b border-gray-700 pb-4">
                         <h2 class="text-2xl font-bold text-white mb-2">
                             {{ azure_error_info.title or azure_error_info.error_code }}
@@ -41,7 +38,6 @@
                         </div>
                     </div>
 
-                    <!-- Description -->
                     {% if azure_error_info.description %}
                         <div>
                             <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
@@ -49,7 +45,6 @@
                         </div>
                     {% endif %}
 
-                    <!-- Solutions -->
                     {% if azure_error_info.solutions and azure_error_info.solutions|length > 0 %}
                         <div>
                             <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
@@ -61,7 +56,6 @@
                         </div>
                     {% endif %}
 
-                    <!-- Additional Information -->
                     {% if azure_error_info.additional_info %}
                         <div>
                             <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
@@ -69,7 +63,6 @@
                         </div>
                     {% endif %}
 
-                    <!-- External Links -->
                     <div class="border-t border-gray-700 pt-4">
                         <div class="flex flex-wrap gap-4">
                             <a href="https://login.microsoftonline.com/error" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
@@ -94,7 +87,6 @@
             {% endif %}
         </div>
 
-        <!-- Back to Search -->
         <div class="text-center mt-8">
             <a href="/" class="btn btn-primary">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

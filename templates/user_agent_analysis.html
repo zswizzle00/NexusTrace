@@ -6,7 +6,6 @@
 <div class="w-full py-10 tailwind-tables">
     <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">User Agent Analysis</h2>
 
-    <!-- Search Form at Top -->
     <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
         <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -23,7 +22,6 @@
     {% if user_agent %}
     <div class="w-full max-w-4xl mx-auto">
         <div class="grid gap-6 grid-cols-1 md:grid-cols-2">
-            <!-- Browser Info -->
             <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,7 +38,6 @@
                 </table>
             </div>
 
-            <!-- OS Info -->
             <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,7 +54,6 @@
                 </table>
             </div>
 
-            <!-- Device Info -->
             <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +72,6 @@
                 </table>
             </div>
 
-            <!-- Device Type Flags -->
             <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +108,6 @@
             </div>
         </div>
 
-        <!-- Raw Data -->
         <div class="mt-6">
             <details class="bg-gray-900 rounded-2xl shadow-lg p-6">
                 <summary class="cursor-pointer text-blue-400 font-semibold">Show Raw Data</summary>
@@ -132,7 +126,6 @@
         </div>
     </div>
     {% else %}
-    <!-- No Results State -->
     <div class="text-center py-12">
         <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
@@ -142,7 +135,6 @@
     </div>
     {% endif %}
 
-    <!-- Return to Home -->
     <div class="flex justify-center mt-12">
         <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

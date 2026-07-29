@@ -81,3 +81,27 @@ that I could not answer yes to.
 **Prevention rule.** Separate regenerable scratch (briefs, diffs) from findings that
 are the record (reviews, decisions, deferred items). Keep scratch ignored; commit the
 findings. Write the durable record as the work happens, not at the end.
+
+---
+
+## 2026-07-29 — Fixing a bypass instance is not fixing the bypass class
+
+**Failure mode.** The iframe `nav_state` Critical was fixed with
+`request.frame.parent_frame is None`. That check names a *symptom* of "is this the page
+I drive" rather than the property itself, and a `window.open` popup's main frame satisfies
+it too. The fix shipped, was reviewed, and left a second working path to the identical
+outcome — falsifying the report's DNS/TLS/ASN/PTR/WHOIS and the `cross_domain_redirect`
+verdict signal. The correct gate, `request.frame is page.main_frame`, was no harder to
+write; it just required asking what the check was actually for.
+
+**Detection signal.** The question was already written down in `tasks/todo.md` as an open
+re-review item ("a popup's main frame also has `parent_frame is None` — same class as the
+iframe Critical") and sat unanswered across sessions while the branch kept growing.
+
+**Prevention rule.** When fixing a bypass, enumerate every way the precondition can be
+satisfied before writing the guard, and prefer an identity/allowlist check over a
+negative-property check ("not a subframe") — negative checks are true for classes you
+haven't thought of. When a review leaves an open question of the form "can X do this too?",
+answer it before the branch moves on; it is cheaper than re-opening hardened code later.
+Empirically: the answer was yes, and proving it took one afternoon of running Chromium
+rather than reasoning about it.

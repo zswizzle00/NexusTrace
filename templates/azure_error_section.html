@@ -19,12 +19,10 @@
                 </p>
             </div>
 
-            <!-- Search Form -->
             <div class="unified-search">
                 {{ search_form('Enter Azure Error Code (e.g., AADSTS50058 or 50058)', button_label='Search', name='error_code', form_id='azureErrorForm', input_id='errorCodeInput') }}
             </div>
 
-            <!-- Results Section -->
             <div id="resultsSection" class="hidden">
                 <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
                     <div id="loadingSpinner" class="hidden text-center py-8">
@@ -38,7 +36,6 @@
                     </div>
                     
                     <div id="resultsContent" class="hidden space-y-6">
-                        <!-- Error Code Header -->
                         <div class="border-b border-gray-700 pb-4">
                             <h2 id="errorTitle" class="text-2xl font-bold text-white mb-2"></h2>
                             <div class="flex flex-wrap gap-4 text-sm">
@@ -47,25 +44,21 @@
                             </div>
                         </div>
                         
-                        <!-- Description -->
                         <div id="descriptionSection" class="hidden">
                             <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
                             <p id="errorDescription" class="text-gray-300 leading-relaxed"></p>
                         </div>
                         
-                        <!-- Solutions -->
                         <div id="solutionsSection" class="hidden">
                             <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
                             <ul id="solutionsList" class="list-disc list-inside space-y-2 text-gray-300"></ul>
                         </div>
                         
-                        <!-- Additional Information -->
                         <div id="additionalInfoSection" class="hidden">
                             <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
                             <p id="additionalInfo" class="text-gray-300 leading-relaxed"></p>
                         </div>
                         
-                        <!-- External Links -->
                         <div class="border-t border-gray-700 pt-4">
                             <div class="flex flex-wrap gap-4">
                                 <a href="https://login.microsoftonline.com/error" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
@@ -94,17 +87,14 @@ document.getElementById('azureErrorForm').addEventListener('submit', function(e)
     const resultsContent = document.getElementById('resultsContent');
     const errorText = document.getElementById('errorText');
     
-    // Show results section and loading spinner
     resultsSection.classList.remove('hidden');
     loadingSpinner.classList.remove('hidden');
     errorMessage.classList.add('hidden');
     resultsContent.classList.add('hidden');
     
-    // Create form data
     const formData = new FormData();
     formData.append('error_code', errorCode);
 
-    // Make API request with CSRF token in header
     fetch('/api/azure_error/search', {
         method: 'POST',
         headers: {
@@ -117,11 +107,9 @@ document.getElementById('azureErrorForm').addEventListener('submit', function(e)
         loadingSpinner.classList.add('hidden');
         
         if (data.error) {
-            // Show error message
             errorMessage.classList.remove('hidden');
             errorText.textContent = data.error;
         } else {
-            // Show results
             displayResults(data);
         }
     })
@@ -145,12 +133,10 @@ function displayResults(data) {
     const additionalInfoSection = document.getElementById('additionalInfoSection');
     const additionalInfo = document.getElementById('additionalInfo');
     
-    // Set title and metadata
     errorTitle.textContent = data.title || data.error_code;
     errorType.textContent = data.error_type || 'Unknown';
     errorSeverity.textContent = data.severity || 'Unknown';
     
-    // Set description
     if (data.description) {
         descriptionSection.classList.remove('hidden');
         errorDescription.textContent = data.description;
@@ -158,7 +144,6 @@ function displayResults(data) {
         descriptionSection.classList.add('hidden');
     }
     
-    // Set solutions
     if (data.solutions && data.solutions.length > 0) {
         solutionsSection.classList.remove('hidden');
         solutionsList.innerHTML = '';
@@ -171,7 +156,6 @@ function displayResults(data) {
         solutionsSection.classList.add('hidden');
     }
     
-    // Set additional information
     if (data.additional_info) {
         additionalInfoSection.classList.remove('hidden');
         additionalInfo.textContent = data.additional_info;
@@ -179,7 +163,6 @@ function displayResults(data) {
         additionalInfoSection.classList.add('hidden');
     }
     
-    // Show results
     resultsContent.classList.remove('hidden');
 }
 </script>

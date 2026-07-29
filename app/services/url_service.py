@@ -16,16 +16,15 @@ from datetime import timedelta
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 
 def _is_safe_host(hostname):
     """Return True only if every resolved address for hostname is globally routable.
 
-    Prevents SSRF: a user-supplied URL whose hostname resolves to a private,
-    loopback, or link-local address (including cloud metadata endpoints like
-    169.254.169.254) would let the server fetch internal resources.
+    Prevents SSRF: a user-supplied hostname resolving to a private, loopback, or
+    link-local address (including metadata endpoints like 169.254.169.254) would let
+    the server fetch internal resources.
     """
     if not hostname:
         return False
@@ -42,7 +41,6 @@ def _is_safe_host(hostname):
     except (socket.gaierror, ValueError):
         return False
 
-# Initialize rate limiters
 urlscan_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 builtwith_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
@@ -53,16 +51,10 @@ def setup_url_services(app):
 
 
 def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
-    """
-    Submit a URL to urlscan.io for analysis.
+    """Submit a URL to urlscan.io for analysis.
 
-    Args:
-        url: The URL to scan
-        wait_for_result: If True, poll for results. If False, just return scan link.
-        max_polls: Maximum number of times to poll (each poll waits 5 seconds)
-
-    Returns:
-        dict with scan results or scan link
+    Without `wait_for_result` this returns the scan link immediately; with it, polls
+    up to `max_polls` times waiting 5 seconds between attempts.
     """
     api_key = os.getenv('URLSCAN_API_KEY')
     if not api_key:
@@ -82,7 +74,6 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
     try:
         urlscan_limiter.acquire()
 
-        # Submit URL for scanning
         response = requests.post(
             'https://urlscan.io/api/v1/scan/',
             headers=headers,
@@ -98,12 +89,11 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
         result = response.json()
 
         scan_id = result.get('uuid')
-        scan_url = result.get('result')  # Direct link to results
+        scan_url = result.get('result')
 
         if not scan_id:
             return None
 
-        # If not waiting for results, return the scan link immediately
         if not wait_for_result:
             return {
                 'status': 'submitted',
@@ -113,7 +103,6 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
                 'message': 'Scan submitted. Results will be available shortly.'
             }
 
-        # Poll for results (limited polling for deep scan)
         for i in range(max_polls):
             time.sleep(5)
             try:
@@ -129,7 +118,6 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
             except Exception as e:
                 logger.debug(f"URLscan result polling attempt failed: {e}")
 
-        # Return partial result with link if polling didn't complete
         return {
             'status': 'pending',
             'scan_id': scan_id,
@@ -200,16 +188,9 @@ def get_tech_stack(url):
 
 
 def analyze_url(url, deep_scan=False):
-    """
-    Analyze a URL for various security and technical aspects.
-
-    Args:
-        url: The URL to analyze
-        deep_scan: If True, wait for URLscan results (favicon, tech, screenshot).
-                   If False, return quickly with essential info only.
-    """
+    """Analyze a URL for security and technical aspects. `deep_scan` waits for
+    URLscan results (favicon, tech, screenshot) instead of returning early."""
     try:
-        # Configure retry strategy
         session = requests.Session()
         retry_strategy = Retry(
             total=2,
@@ -220,17 +201,14 @@ def analyze_url(url, deep_scan=False):
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
-        # Parse URL
         parsed_url = urlparse(url)
 
-        # SSRF guard: reject URLs whose hostname resolves to private/internal addresses
+        # SSRF guard: reject hostnames resolving to private/internal addresses.
         if not _is_safe_host(parsed_url.hostname or ''):
             return {'error': 'URL host resolves to a private or reserved address', 'url': url}
 
-        # Get response with headers
         response = session.get(url, timeout=TIMEOUT_MEDIUM, allow_redirects=True)
 
-        # Analyze redirect chain
         redirect_chain = []
         if response.history:
             for resp in response.history:
@@ -240,7 +218,6 @@ def analyze_url(url, deep_scan=False):
                     'headers': dict(resp.headers)
                 })
 
-        # Get final response info
         final_response = {
             'url': response.url,
             'status_code': response.status_code,
@@ -249,7 +226,6 @@ def analyze_url(url, deep_scan=False):
             'redirect_chain': redirect_chain
         }
 
-        # Check security headers
         security_headers = {
             'Strict-Transport-Security': response.headers.get('Strict-Transport-Security', 'Not Set'),
             'X-Frame-Options': response.headers.get('X-Frame-Options', 'Not Set'),
@@ -260,7 +236,6 @@ def analyze_url(url, deep_scan=False):
             'Permissions-Policy': response.headers.get('Permissions-Policy', 'Not Set'),
         }
 
-        # Parse content if it's HTML
         meta_tags = []
         title = ''
         og_twitter = {'opengraph': {}, 'twitter': {}}
@@ -271,7 +246,6 @@ def analyze_url(url, deep_scan=False):
             title = soup.title.string if soup.title else ''
             og_twitter = parse_opengraph_twitter(soup)
 
-        # Prepare result structure
         result = {
             'url_analysis': {
                 'parsed_url': {
@@ -285,7 +259,7 @@ def analyze_url(url, deep_scan=False):
                 'response': final_response,
                 'security_headers': security_headers,
                 'technologies': {},
-                'meta_tags': meta_tags[:20],  # Limit to 20 tags
+                'meta_tags': meta_tags[:20],
                 'title': title,
                 'urlscan_analysis': None,
                 'screenshot_url': None,
@@ -298,7 +272,6 @@ def analyze_url(url, deep_scan=False):
             }
         }
 
-        # Quick scan: Run fast lookups in parallel
         if not deep_scan:
             with ThreadPoolExecutor(max_workers=3) as executor:
                 futures = {
@@ -321,7 +294,6 @@ def analyze_url(url, deep_scan=False):
 
             return result
 
-        # Deep scan: Run all lookups including URLscan polling
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 executor.submit(get_favicon_hash, url): 'favicon',

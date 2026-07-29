@@ -35,6 +35,12 @@ dependencies = [
     "Flask-WTF==1.2.1",
     "flask-talisman==1.1.0",
     "playwright>=1.61.0",
+    # Public Suffix List for validators.registrable_domain(). Pinned exactly on
+    # purpose: the trailing date IS the bundled PSL snapshot date, so the pin is
+    # the staleness signal. Refreshing the list = bump this pin, then
+    # `uv lock && uv export --no-dev --no-hashes -o requirements.txt` (Docker
+    # installs from requirements.txt, not from this file).
+    "publicsuffixlist==1.0.2.20260726",
 ]
 
 # No [build-system] table on purpose: NexusTrace is a deployable application, not an

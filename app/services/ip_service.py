@@ -13,10 +13,8 @@ import json
 import re
 import ipaddress
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiters
 alienvault_limiter = RateLimiter(max_requests=4, time_window=timedelta(seconds=1))
 vpnapi_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 abuseipdb_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
@@ -27,13 +25,11 @@ shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
 ip2location_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
-# Initialize API clients
 shodan_key = os.getenv('SHODAN_KEY')
 if not shodan_key:
     logger.warning("SHODAN_KEY not configured")
 shodan_api = shodan.Shodan(shodan_key) if shodan_key else None
 
-# Try to import geoip2 for MMDB support
 try:
     import geoip2.database
     MMDB_AVAILABLE = True
@@ -41,7 +37,6 @@ except ImportError:
     MMDB_AVAILABLE = False
     logger.warning("geoip2 library not available. MMDB database support disabled.")
 
-# Initialize MMDB reader if available
 mmdb_reader = None
 if MMDB_AVAILABLE:
     mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))
@@ -57,7 +52,7 @@ if MMDB_AVAILABLE:
 
 def setup_ip_services(app):
     """Setup IP-related services."""
-    pass  # Add any necessary setup code here
+    pass
 
 @timed_lru_cache(seconds=1800)
 def check_abuseipdb(ip_address):
@@ -142,7 +137,6 @@ def get_shodan_info(ip_address):
         # Shodan library handles IPv6 natively, no manual encoding needed
         host = shodan_api.host(ip_address)
         def flatten_dict(d):
-            # Only keep primitives, serialize nested objects
             return {k: (json.dumps(v, indent=2) if isinstance(v, (dict, list)) else v) for k, v in d.items()}
 
         shodan_data = {
@@ -168,7 +162,6 @@ def get_shodan_info(ip_address):
             'data': [],
         }
 
-        # Process ports and services
         for item in host.get('data', []):
             port_info = flatten_dict({
                 'port': item.get('port'),
@@ -193,10 +186,8 @@ def get_shodan_info(ip_address):
                 })
                 shodan_data['services'].append(service_info)
 
-            # Add to data array (flattened)
             shodan_data['data'].append(flatten_dict(item))
 
-        # Process vulnerabilities
         if 'vulns' in host:
             for vuln in host['vulns']:
                 vuln_info = host['vulns'][vuln]
@@ -225,7 +216,7 @@ def get_proxycheck_data(ip_address):
             'asn': 1,
             'key': proxycheck_key
         }
-        # URL encode the IP address to handle IPv6 addresses properly
+        # Manual quoting is needed here because the IP goes in the path, not params.
         encoded_ip = quote(ip_address)
         url = f'https://proxycheck.io/v2/{encoded_ip}'
         response = requests.get(url, params=params, timeout=TIMEOUT_MEDIUM)
@@ -253,8 +244,8 @@ def get_proxycheck_data(ip_address):
 def otx_indicator_type(indicator):
     """Return the OTX endpoint segment for an indicator: 'IPv4', 'IPv6', or 'domain'.
 
-    Previously an IPv4-only regex was used, so IPv6 addresses fell through to the
-    'domain' endpoint and never returned any OTX data.
+    Must not be narrowed to an IPv4 regex: IPv6 addresses would fall through to the
+    'domain' endpoint and never return OTX data.
     """
     try:
         return 'IPv6' if ipaddress.ip_address(indicator).version == 6 else 'IPv4'
@@ -264,9 +255,9 @@ def otx_indicator_type(indicator):
 def proxycheck_ip_data(data, ip_address):
     """Pull the per-IP block out of a ProxyCheck.io response.
 
-    ProxyCheck keys the result by the IP, but can return an IPv6 address in a
-    normalized (compressed) form that differs from the queried string, so an exact
-    `data[ip]` lookup silently misses. Fall back to matching by address equality.
+    ProxyCheck keys the result by IP but may normalize (compress) an IPv6 address so
+    it differs from the queried string, making an exact `data[ip]` lookup silently
+    miss - hence the fallback to address equality.
     """
     if not isinstance(data, dict):
         return {}
@@ -288,13 +279,11 @@ def proxycheck_ip_data(data, ip_address):
 @timed_lru_cache(seconds=1800)
 def get_alienvault_data(indicator):
     """Get data from AlienVault OTX API"""
-    # Support multiple env var names for backwards compatibility
     api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not api_key:
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
         return None
 
-    # Pick the correct OTX endpoint (IPv4 / IPv6 / domain).
     endpoint_type = otx_indicator_type(indicator)
 
     base_url = f'https://otx.alienvault.com/api/v1/indicators/{endpoint_type}/{indicator}'
@@ -303,12 +292,10 @@ def get_alienvault_data(indicator):
     try:
         alienvault_limiter.acquire()
 
-        # Get general information
         response = requests.get(f'{base_url}/general', headers=headers, timeout=TIMEOUT_MEDIUM)
         response.raise_for_status()
         general_data = response.json()
 
-        # Get geo information
         geo_data = {}
         try:
             alienvault_limiter.acquire()
@@ -318,7 +305,6 @@ def get_alienvault_data(indicator):
         except requests.exceptions.RequestException as e:
             logger.debug(f"AlienVault OTX error for section geo: {e}")
 
-        # Get malware information
         malware_data = {}
         try:
             alienvault_limiter.acquire()
@@ -328,7 +314,6 @@ def get_alienvault_data(indicator):
         except requests.exceptions.RequestException as e:
             logger.debug(f"AlienVault OTX error for section malware: {e}")
 
-        # Get passive DNS information
         passive_dns_data = {}
         try:
             alienvault_limiter.acquire()
@@ -338,7 +323,6 @@ def get_alienvault_data(indicator):
         except requests.exceptions.RequestException as e:
             logger.debug(f"AlienVault OTX error for section passive_dns: {e}")
 
-        # Combine all data
         return {
             'general': general_data,
             'geo': geo_data,
@@ -361,7 +345,6 @@ def get_vpn_data(ip_address):
 
     with vpnapi_limiter:
         try:
-            # URL encode the IP address to handle IPv6 addresses properly
             encoded_ip = quote(ip_address)
             response = requests.get(
                 f'https://vpnapi.io/api/{encoded_ip}?key={api_key}',
@@ -390,16 +373,13 @@ def process_ip_batch(ip_addresses):
 def process_single_ip(ip):
     """Process a single IP address with all its checks."""
     try:
-        # Get VPN API data
         vpn_data = get_vpn_data(ip)
         if not vpn_data or 'error' in vpn_data:
             return None
 
-        # Get other data sources
         abuse_data = check_abuseipdb(ip)
         ipinfo_data = get_ipinfo_data(ip)
-        
-        # Get WHOIS data if domain is available
+
         whois_data = None
         if ipinfo_data and ipinfo_data.get('hostname'):
             from .domain_service import get_whois_info
@@ -407,23 +387,19 @@ def process_single_ip(ip):
 
         return {
             'ip': ip,
-            # Security
             'vpn': vpn_data.get('security', {}).get('vpn'),
             'proxy': vpn_data.get('security', {}).get('proxy'),
             'tor': vpn_data.get('security', {}).get('tor'),
             'relay': vpn_data.get('security', {}).get('relay'),
-            # Location
             'city': vpn_data.get('location', {}).get('city'),
             'region': vpn_data.get('location', {}).get('region'),
             'country': vpn_data.get('location', {}).get('country'),
             'continent': vpn_data.get('location', {}).get('continent'),
             'latitude': vpn_data.get('location', {}).get('latitude'),
             'longitude': vpn_data.get('location', {}).get('longitude'),
-            # Network
             'network': vpn_data.get('network', {}).get('network'),
             'asn': vpn_data.get('network', {}).get('autonomous_system_number'),
             'asn_org': vpn_data.get('network', {}).get('autonomous_system_organization'),
-            # Abuse
             'abuse_score': abuse_data.get('abuse_confidence_score') if abuse_data else None,
             'abuse_total_reports': abuse_data.get('total_reports') if abuse_data else None,
             'abuse_distinct_users': abuse_data.get('distinct_users') if abuse_data else None,
@@ -432,13 +408,11 @@ def process_single_ip(ip):
             'abuse_isp': abuse_data.get('isp') if abuse_data else None,
             'abuse_domain': abuse_data.get('domain') if abuse_data else None,
             'abuse_whitelisted': abuse_data.get('is_whitelisted') if abuse_data else None,
-            # IPinfo
             'ipinfo_hostname': ipinfo_data.get('hostname') if ipinfo_data else None,
             'ipinfo_org': ipinfo_data.get('org') if ipinfo_data else None,
             'ipinfo_city': ipinfo_data.get('city') if ipinfo_data else None,
             'ipinfo_region': ipinfo_data.get('region') if ipinfo_data else None,
             'ipinfo_country': ipinfo_data.get('country') if ipinfo_data else None,
-            # WHOIS
             'whois_domain': whois_data.get('domain') if whois_data else None,
             'whois_registrar': whois_data.get('registrar', {}).get('name') if whois_data and whois_data.get('registrar') else None,
             'whois_status': whois_data.get('status') if whois_data else None,

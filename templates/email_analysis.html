@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}E-mail Analysis | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">E-mail Analysis</h1>
+    <p class="text-sm text-gray-400">
+      Upload an .eml file or paste raw message source (headers and body). NexusTrace checks
+      authentication, spoofing signals, extracts indicators, and gives a heuristic verdict.
+    </p>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mb-4 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+      {{ message }}
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('email.email_analysis_submit') }}" enctype="multipart/form-data" class="nt-card p-5 mb-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="flex flex-col lg:flex-row gap-5">
+
+      <div class="flex-1 min-w-0">
+        <label class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+          Upload .eml file
+        </label>
+        <label for="email-file" style="cursor:pointer;display:block;">
+          <div id="email-dropzone"
+               class="rounded border border-gray-700 p-5 text-center hover:border-blue-500 transition-colors"
+               style="border-style:dashed;">
+            <p class="text-gray-300 text-sm mb-1" id="email-file-label">Click to select or drag and drop</p>
+            <p class="text-gray-500 text-xs">.eml or raw RFC 822 source</p>
+          </div>
+        </label>
+        <input type="file" id="email-file" name="file" accept=".eml,message/rfc822,text/plain" class="hidden">
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <label for="email-raw" class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+          Or paste message source
+        </label>
+        <textarea id="email-raw" name="raw" rows="8" spellcheck="false"
+          placeholder="From: sender@example.com&#10;Subject: ...&#10;&#10;message body"
+          class="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2.5 text-gray-100 placeholder-gray-600 focus:outline-none focus:border-blue-500 text-xs font-mono"
+          style="height:160px;"></textarea>
+      </div>
+
+    </div>
+
+    <div class="flex items-center gap-3 mt-4">
+      <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+        Analyze
+      </button>
+      <span class="text-xs text-gray-500">
+        Only parsed findings are stored — never the raw message, body, or attachment bytes.
+      </span>
+    </div>
+  </form>
+
+  {% if recent %}
+  <div class="nt-card p-4">
+    <h3 class="nt-card-title mb-3">Recent Analyses</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4">Time</th>
+            <th class="pb-1.5 pr-4">From</th>
+            <th class="pb-1.5 pr-4">Subject</th>
+            <th class="pb-1.5">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in recent %}
+          {% set level = item.get('level') or 'unknown' %}
+          {% set tone = {
+               'malicious':  ('bg-red-900/40', 'text-red-300', 'border-red-800/60'),
+               'suspicious': ('bg-yellow-900/40', 'text-yellow-300', 'border-yellow-800/60'),
+               'benign':     ('bg-green-900/40', 'text-green-300', 'border-green-800/60'),
+               'unknown':    ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')
+             }.get(level, ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')) %}
+          <tr class="border-b border-gray-800/50 hover:bg-gray-700 transition-colors"
+              style="cursor:pointer;" onclick="window.location='{{ url_for('email.email_analysis_result', analysis_id=item.get('id')) }}'">
+            <td class="py-1.5 pr-4 text-gray-500">{{ item.get('created_at') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-0 w-full">
+              <a href="{{ url_for('email.email_analysis_result', analysis_id=item.get('id')) }}"
+                 class="hover:text-blue-400 transition-colors" style="text-decoration:none;color:inherit;">
+                {{ item.get('from') or '—' }}
+              </a>
+            </td>
+            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full">{{ item.get('subject') or '—' }}</td>
+            <td class="py-1.5">
+              <span class="px-2 py-0.5 rounded text-xs {{ tone[0] }} {{ tone[1] }} border {{ tone[2] }}">{{ level }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="nt-card p-4 text-sm text-gray-500">No analyses yet.</div>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  var fileInput = document.getElementById('email-file');
+  var label = document.getElementById('email-file-label');
+  var zone = document.getElementById('email-dropzone');
+  if (!fileInput || !label || !zone) return;
+
+  function updateLabel() {
+    label.textContent = fileInput.files.length ? fileInput.files[0].name : 'Click to select or drag and drop';
+  }
+  fileInput.addEventListener('change', updateLabel);
+
+  ['dragover', 'dragenter'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zone.style.borderColor = '#3b82f6';
+    });
+  });
+  ['dragleave', 'dragend'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zone.style.borderColor = '';
+    });
+  });
+  zone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      updateLabel();
+    }
+  });
+})();
+</script>
+{% endblock %}

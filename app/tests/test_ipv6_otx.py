@@ -1,13 +1,10 @@
-"""Regression tests: IPv6 handling in the IP lookup services (NexusTrace bug report).
+"""Regression tests: IPv6 handling in the IP lookup services. Pure, no network.
 
-1. otx_indicator_type(): an IPv4-only regex used to send IPv6 addresses to the OTX
-   'domain' endpoint, so IPv6 lookups returned no data (appeared "broken") while IPv4
-   worked. It now routes IPv4 / IPv6 / domain correctly.
-2. proxycheck_ip_data(): ProxyCheck keys its response by IP, but can return an IPv6 in a
-   normalized (compressed) form that differs from the queried string; an exact key lookup
-   silently missed. It now matches by address equality.
-
-Run: uv run python app/tests/test_ipv6_otx.py
+Two shipped bugs, both silent:
+1. otx_indicator_type() had an IPv4-only regex, so IPv6 went to OTX's 'domain'
+   endpoint and returned no data while IPv4 worked.
+2. proxycheck_ip_data() looked its per-IP block up by exact key, so a response
+   that compressed the queried IPv6 differently missed entirely.
 """
 import os
 import sys
@@ -20,8 +17,8 @@ OTX_CASES = {
     # The two IPv6 addresses from the original bug report
     '2a0a:d683:d986:4b89:ebea:518e:3b4f:b4b6': 'IPv6',
     '2a0a:d683:d90c:506c:7488:4a66:490c:d371': 'IPv6',
-    '2001:4860:4860::8888': 'IPv6',   # compressed IPv6
-    '::1': 'IPv6',                     # loopback
+    '2001:4860:4860::8888': 'IPv6',   # compressed form
+    '::1': 'IPv6',
     '8.8.8.8': 'IPv4',
     '1.1.1.1': 'IPv4',
     'github.com': 'domain',

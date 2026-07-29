@@ -1,12 +1,8 @@
 """SSRF / target-safety tests for app/utils/url_guard.py.
 
-The resolver is injected, so none of these cases touch the network. Cases marked
-"NEW" are ones the previous scan_service.is_scannable() did not catch. Cases
-marked "R1" are regression cases added after a security review of the first
-implementation found real defects (see task-1-review.md); each is paired with
-the finding number it covers.
-
-Run: uv run python app/tests/test_url_guard.py
+The resolver is injected, so no case touches the network. Per-case note strings
+tag their origin: "NEW" = missed by the old scan_service.is_scannable(), "R1"/"R2"
+= a real defect found by security review, kept as a regression case.
 """
 import os
 import sys
@@ -61,53 +57,45 @@ GUARD_CASES = [
     ('http://nxdomain.test/', {}, False, 'DNS failure'),
     ('http://empty.test/', {'empty.test': []}, False, 'resolves to nothing'),
 
-    # R1 Finding 1 (Critical): backslash in the authority is a parser-differential
-    # SSRF bypass - urlsplit splits userinfo at the last '@', giving host
-    # 'example.com', while Chromium's WHATWG parser treats '\' as '/' and
-    # terminates the authority at 127.0.0.1. Must be rejected outright.
+    # Parser-differential bypass: urlsplit reads host 'example.com' (userinfo split
+    # at the last '@'), but Chromium treats '\' as '/' and stops at 127.0.0.1.
     ('http://127.0.0.1\\@example.com/', {'example.com': PUBLIC}, False,
      'R1 Finding1: backslash-ambiguous authority must be rejected, not parsed as example.com'),
     ('http://localhost\\@example.com/', {'example.com': PUBLIC}, False,
      'R1 Finding1: backslash-ambiguous authority, localhost variant'),
 
-    # R1 Finding 2 (Critical): malformed input must yield UnsafeURLError / False,
-    # never an uncaught ValueError/UnicodeError. resolver_mapping is irrelevant -
-    # these must fail during parsing/normalization, before any resolution.
+    # Malformed input must yield UnsafeURLError/False, never an uncaught
+    # ValueError/UnicodeError - so these fail in parsing, before any resolution.
     ('http://[::1/', {}, False, 'R1 Finding2: unbalanced IPv6 bracket must not crash (bare ValueError from urlsplit)'),
     ('http://a..b/', {}, False, 'R1 Finding2: empty DNS label must not crash (UnicodeError from IDNA)'),
     ('http://' + 'a' * 64 + '.com/', {}, False, 'R1 Finding2: over-long DNS label must not crash (UnicodeError from IDNA)'),
 
-    # R1 Finding 3 (Important): a trailing dot must not bypass the hostname
-    # denylist. Resolver maps the fqdn to a PUBLIC address so the only thing
-    # that can be blocking it is the denylist, not DNS failure.
+    # Trailing dot must not bypass the denylist. The resolver maps the fqdn to a
+    # PUBLIC address, so only the denylist can be what blocks it - not DNS failure.
     ('http://localhost./', {'localhost.': PUBLIC}, False,
      'R1 Finding3: trailing dot must not bypass the localhost denylist even though it resolves globally'),
     ('http://metadata.google.internal./', {'metadata.google.internal.': PUBLIC}, False,
      'R1 Finding3: trailing dot must not bypass the metadata denylist even though it resolves globally'),
 
-    # R1 Finding 4 (Important): IDNA/UTS-46 mapping must run before the IP-literal
-    # and denylist checks so a lookalike unicode host is judged as what it really
-    # is. No resolver mapping needed - IDNA turns this into an IP literal.
+    # IDNA/UTS-46 mapping must run before the IP-literal and denylist checks: no
+    # resolver mapping is needed because IDNA turns this into a loopback literal.
     ('http://１２７．０．０．１/', {}, False,
      'R1 Finding4: fullwidth-digit IDN must IDNA-normalize to the loopback literal 127.0.0.1'),
 
-    # R1 Finding 5 (Important): a bare host:port (no scheme) must default to
-    # http://, matching the old scan_service.is_scannable behavior, not be
-    # misparsed as scheme='example.com'.
+    # A bare host:port must default to http://, not be misparsed as a scheme.
     ('example.com:8080/x', {'example.com': PUBLIC}, True,
      'R1 Finding5: bare host:port must default to http://, not be read as a scheme'),
 
-    # R1 Finding 7 (promoted minor): is_global does not exclude multicast, IPv6
-    # site-local, or NAT64's well-known prefix (which embeds an IPv4 target).
+    # ipaddress.is_global does NOT exclude multicast, IPv6 site-local, or NAT64's
+    # well-known prefix (which embeds an IPv4 target), so the guard must itself.
     ('http://224.0.0.1/', {}, False, 'R1 Finding7: IPv4 multicast literal'),
     ('http://[ff02::1]/', {}, False, 'R1 Finding7: IPv6 multicast literal'),
     ('http://[fec0::1]/', {}, False, 'R1 Finding7: deprecated IPv6 site-local literal'),
     ('http://[64:ff9b::7f00:1]/', {}, False,
      'R1 Finding7: NAT64 well-known-prefix literal embedding 127.0.0.1'),
 
-    # R2 (Medium): the round-1 host:port fix made 'scheme:junk@host' shapes -
-    # opaque, non-http(s) schemes with no '://' - silently reinterpret as http
-    # and get accepted. They must be rejected like ftp://, not rewritten.
+    # The host:port fix above made opaque 'scheme:junk@host' shapes (no '://')
+    # silently reinterpret as http. They must be rejected like ftp://, not rewritten.
     ('mailto:test@example.com', {}, False,
      'R2: opaque non-http scheme (mailto:), not host:port - must be rejected, not rewritten to http'),
     ('javascript:x@evil.com', {}, False,
@@ -116,8 +104,8 @@ GUARD_CASES = [
      'R2: opaque non-http scheme (gopher:) must be rejected, not rewritten to http'),
     ('data:text/html,x', {}, False,
      'R2: opaque non-http scheme (data:) must be rejected, not rewritten to http'),
-    # Regression: 'host:port' must still be recognized as bare host+port, not an
-    # opaque scheme - localhost:3000/x parses fine but is then denylist-blocked.
+    # ...while 'host:port' must still parse as host+port: blocked by the denylist,
+    # not by scheme rejection.
     ('localhost:3000/x', {}, False,
      'R2: host:port shape must still parse as bare host+port (then denylist-blocked, not scheme-rejected)'),
     ('example.com:8080', {'example.com': PUBLIC}, True,
@@ -135,14 +123,12 @@ NORMALIZE_CASES = [
     ('http://example.com/x#frag', 'http://example.com/x', 'http', 'example.com', 80),
     ('example.com/x', 'http://example.com/x', 'http', 'example.com', 80),
     ('//example.com/x', 'http://example.com/x', 'http', 'example.com', 80),
-    # R1 Finding 5: host:port must be recognized as host+port, not scheme.
     ('example.com:8080/x', 'http://example.com:8080/x', 'http', 'example.com', 8080),
-    # R1 Finding 4: a genuine unicode hostname must come out IDNA/punycode-encoded
-    # so .host matches what Chromium and getaddrinfo actually use on the wire.
+    # Unicode hosts come out punycode-encoded so .host matches what Chromium and
+    # getaddrinfo actually put on the wire.
     ('http://café.example/', 'http://xn--caf-dma.example/', 'http', 'xn--caf-dma.example', 80),
-    # R2: host:port shape must still parse as bare host+port even when the host
-    # part itself is a blocked name (denylist is validate_target's job, not
-    # normalize's) and when there is no path at all.
+    # normalize() does not apply the denylist (that is validate_target's job), so a
+    # blocked name still normalizes cleanly here.
     ('localhost:3000/x', 'http://localhost:3000/x', 'http', 'localhost', 3000),
     ('example.com:8080', 'http://example.com:8080/', 'http', 'example.com', 8080),
 ]
@@ -158,9 +144,8 @@ def main():
             failures.append(
                 f'is_scannable({url!r}) -> {got_safe}, expected {expect_safe}  [{note}]'
             )
-        # validate_target must agree with is_scannable and raise the typed error
-        # (and ONLY the typed error - anything else propagating out of this call
-        # is itself a failure, uncaught, which is exactly the point).
+        # validate_target must agree with is_scannable and raise ONLY the typed
+        # error - anything else propagates out of main() uncaught, by design.
         try:
             validate_target(url, resolver=resolve)
             raised = False
@@ -196,8 +181,8 @@ def main():
     if calls != ['example.com', 'other.com']:
         failures.append(f'caching_resolver made calls {calls!r}, expected one per host')
 
-    # R1 Finding 8: a caching resolver must NOT memoize a transient failure - the
-    # host must be retried on the next call, not permanently blocked.
+    # A transient DNS failure must not be memoized, or the host stays permanently
+    # blocked for the rest of the scan.
     flaky_calls = []
 
     def flaky(host):
@@ -221,8 +206,8 @@ def main():
     if flaky_calls != ['flaky.test', 'flaky.test']:
         failures.append(f'caching_resolver(flaky) made calls {flaky_calls!r}, expected one retry per call')
 
-    # R1 Finding 2: is_scannable must never raise, for any input, including
-    # non-str values (validate_target's contract only covers str input).
+    # is_scannable must never raise on any input; validate_target's contract only
+    # covers str, so non-str values are is_scannable's problem alone.
     for value in (None, 123, 3.14, [], {}, b'http://example.com/'):
         try:
             got = is_scannable(value)
