@@ -142,32 +142,6 @@
             </span>
           </div>
         {% endif %}
-        {% if abuse_score is defined and abuse_score > 0 %}
-          <div class="nt-verdict__stat">
-            <span class="nt-verdict__stat-label">Abuse Score</span>
-            <span class="nt-verdict__stat-value {{ 'is-danger' if abuse_score >= 50 else ('is-warn' if abuse_score >= 25 else 'is-good') }}">{{ abuse_score }}%</span>
-          </div>
-        {% endif %}
-        {% if pulses > 0 %}
-          <div class="nt-verdict__stat">
-            <span class="nt-verdict__stat-label">OTX Pulses</span>
-            <span class="nt-verdict__stat-value {{ 'is-danger' if pulses >= 3 else 'is-warn' }}">{{ pulses }}</span>
-          </div>
-        {% endif %}
-        {% if is_tor or is_vpn or is_proxy %}
-          <div class="nt-verdict__stat">
-            <span class="nt-verdict__stat-label">Anonymizer</span>
-            <span class="nt-verdict__stat-value {{ 'is-danger' if is_tor else 'is-warn' }}">
-              {% if is_tor %}Tor{% elif is_vpn %}VPN{% elif is_proxy %}Proxy{% endif %}
-            </span>
-          </div>
-        {% endif %}
-        <div class="nt-verdict__stat">
-          <span class="nt-verdict__stat-label">Reputation Sources</span>
-          <span class="nt-verdict__stat-value {{ '' if rep_answered else 'is-warn' }}">
-            {{ rep_answered | join(' · ') if rep_answered else 'None answered' }}
-          </span>
-        </div>
       </div>
     </section>
   {% endif %}
