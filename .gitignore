@@ -58,3 +58,7 @@ tools/
 data/scans/
 data/screenshots/
 data/analyses/
+# data/submissions/ holds proposed abuse.ch submissions (indicators, analyst names,
+# operator decisions). data/quarantine/ holds live malware samples awaiting approval.
+data/submissions/
+data/quarantine/

@@ -1,0 +1,214 @@
+{# abuse.ch submission forms, shared by scan_result / email_result / file_analysis.
+
+   Every pre-filled value originates in a scanned page, an e-mail, or an uploaded
+   file. It is rendered escaped into form *values* and into a |tojson blob that
+   JavaScript assigns with `.value =`; nothing here is ever `|safe`, and no
+   indicator becomes a live anchor.
+
+   Neither form transmits anything. Both POST to a route that writes a pending
+   record an operator must approve before it is published. #}
+
+{% set nt_input = 'w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500' %}
+{% set nt_label = 'text-xs text-gray-500 uppercase tracking-wide' %}
+
+{% macro _pending_notice() %}
+<p class="text-xs text-yellow-300 mt-3">
+  Submitting <strong>queues</strong> this for review. Nothing is sent to abuse.ch now —
+  an operator approves and publishes queued items separately.
+</p>
+{% endmacro %}
+
+{% macro _shared_fields(prefill, uid) %}
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+    <div>
+      <label class="{{ nt_label }}" for="{{ uid }}-malware">Malware family</label>
+      <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-malware" name="malware"
+             value="unknown" placeholder="win.zloader" required>
+      <p class="text-xs text-gray-600 mt-1">Malpedia name, e.g. <span class="font-mono">win.zloader</span>.</p>
+    </div>
+    <div>
+      <label class="{{ nt_label }}" for="{{ uid }}-confidence">Confidence (0–100)</label>
+      <input class="{{ nt_input }} mt-1" type="number" id="{{ uid }}-confidence"
+             name="confidence_level" value="50" min="0" max="100" step="1">
+    </div>
+    <div>
+      <label class="{{ nt_label }}" for="{{ uid }}-tags">Tags (comma separated)</label>
+      <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-tags" name="tags"
+             placeholder="phishing, credential-theft">
+    </div>
+    <div>
+      <label class="{{ nt_label }}" for="{{ uid }}-reference">Reference URL (optional)</label>
+      <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-reference"
+             name="reference" placeholder="https://…">
+    </div>
+    <div class="sm:col-span-2">
+      <label class="{{ nt_label }}" for="{{ uid }}-comment">Comment (optional)</label>
+      <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-comment"
+             name="comment" value="{{ prefill.comment or '' }}">
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro _anonymous_field(uid) %}
+  {# `anonymous_choice` is always submitted so an unchecked box can mean "not
+     anonymous". Without it, absence would be indistinguishable from the default. #}
+  <input type="hidden" name="anonymous_choice" value="1">
+  <label class="text-xs text-gray-400 flex items-center gap-2 mt-4" for="{{ uid }}-anon">
+    <input type="checkbox" id="{{ uid }}-anon" name="anonymous" value="yes" checked
+           style="width:14px;height:14px;">
+    Submit anonymously
+  </label>
+{% endmacro %}
+
+
+{% macro ioc_form(prefill, uid) %}
+{% if prefill and submissions_enabled() %}
+{% set groups = prefill.groups %}
+{% set first = groups[0] %}
+<div class="nt-card p-4 mb-5">
+  <details>
+    <summary class="nt-card-title cursor-pointer select-none">Report indicators to abuse.ch</summary>
+
+    {{ _pending_notice() }}
+
+    <form method="POST" action="{{ url_for('submission.submit_queue') }}" class="mt-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="source_analysis" value="{{ prefill.source_analysis or '' }}">
+
+      {% if groups | length > 1 %}
+      <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-xs text-gray-500 uppercase tracking-wide">Pre-fill with</span>
+        {% for g in groups %}
+        <button type="button" data-group="{{ loop.index0 }}"
+                class="{{ uid }}-pick px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                       border border-gray-700 hover:bg-gray-700">
+          {{ g.label }} ({{ g.indicators | length }})
+        </button>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <label class="{{ nt_label }}" for="{{ uid }}-indicators">Indicators (one per line)</label>
+      <textarea class="{{ nt_input }} mt-1 font-mono" id="{{ uid }}-indicators" name="indicators"
+                rows="6" style="resize:vertical;" required>{{ first.indicators | join('\n') }}</textarea>
+      <p class="text-xs text-gray-600 mt-1" id="{{ uid }}-hint">{{ first.hint or '' }}</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+        <div>
+          <label class="{{ nt_label }}" for="{{ uid }}-ioc-type">IOC type</label>
+          <select class="{{ nt_input }} mt-1" id="{{ uid }}-ioc-type" name="ioc_type">
+            {% for t in ['url', 'domain', 'ip:port', 'md5_hash', 'sha1_hash', 'sha256_hash', 'email'] %}
+            <option value="{{ t }}" {% if t == first.ioc_type %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="{{ nt_label }}" for="{{ uid }}-threat-type">Threat type</label>
+          <select class="{{ nt_input }} mt-1" id="{{ uid }}-threat-type" name="threat_type">
+            {% for t in ['payload_delivery', 'payload', 'botnet_cc', 'unknown'] %}
+            <option value="{{ t }}" {% if t == first.threat_type %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {{ _shared_fields(prefill, uid) }}
+      {{ _anonymous_field(uid) }}
+
+      <div class="flex items-center gap-3 mt-4">
+        <button type="submit"
+                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+          Queue for review
+        </button>
+        <span class="text-xs text-gray-500">Queued items are held locally until an operator approves them.</span>
+      </div>
+    </form>
+  </details>
+</div>
+
+{% if groups | length > 1 %}
+<script>
+(function () {
+  var groups = {{ groups | tojson }};
+  var box = document.getElementById('{{ uid }}-indicators');
+  var iocType = document.getElementById('{{ uid }}-ioc-type');
+  var threatType = document.getElementById('{{ uid }}-threat-type');
+  var hint = document.getElementById('{{ uid }}-hint');
+  document.querySelectorAll('.{{ uid }}-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var g = groups[parseInt(btn.dataset.group, 10)];
+      if (!g || !box) return;
+      box.value = g.indicators.join('\n');
+      if (iocType) iocType.value = g.ioc_type;
+      if (threatType) threatType.value = g.threat_type;
+      if (hint) hint.textContent = g.hint || '';
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endif %}
+{% endmacro %}
+
+
+{% macro sample_form(prefill, uid) %}
+{% if submissions_enabled() %}
+{% set delivery_default = (prefill.get('delivery_method') if prefill else none) or 'email_attachment' %}
+{% set context_default = (prefill.get('comment') if prefill else none) or '' %}
+<div class="nt-card p-4 mb-5">
+  <details>
+    <summary class="nt-card-title cursor-pointer select-none">Submit this sample to MalwareBazaar</summary>
+
+    <p class="text-xs text-gray-500 mt-3">
+      NexusTrace never retains sample bytes — the upload above was deleted after analysis.
+      Re-attach the file here to queue it for publication.
+    </p>
+    {{ _pending_notice() }}
+
+    <form method="POST" action="{{ url_for('submission.submit_sample') }}"
+          enctype="multipart/form-data" class="mt-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="{{ nt_label }}" for="{{ uid }}-sample">Re-attach the sample</label>
+      <input class="{{ nt_input }} mt-1" type="file" id="{{ uid }}-sample" name="sample" required>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <div>
+          <label class="{{ nt_label }}" for="{{ uid }}-delivery">Delivery method</label>
+          <select class="{{ nt_input }} mt-1" id="{{ uid }}-delivery" name="delivery_method">
+            {% for m in ['email_attachment', 'email_link', 'web_download', 'web_drive-by', 'multiple', 'other'] %}
+            <option value="{{ m }}" {% if m == delivery_default %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="{{ nt_label }}" for="{{ uid }}-stags">Tags (comma separated)</label>
+          <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-stags" name="tags"
+                 placeholder="loader, qakbot">
+        </div>
+        <div>
+          <label class="{{ nt_label }}" for="{{ uid }}-srefs">Reference URLs (one per line)</label>
+          <textarea class="{{ nt_input }} mt-1 font-mono" id="{{ uid }}-srefs" name="references"
+                    rows="2" style="resize:vertical;" placeholder="https://…"></textarea>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="{{ nt_label }}" for="{{ uid }}-scontext">Context (optional)</label>
+          <input class="{{ nt_input }} mt-1" type="text" id="{{ uid }}-scontext" name="context"
+                 value="{{ context_default }}">
+        </div>
+      </div>
+
+      {{ _anonymous_field(uid) }}
+
+      <div class="flex items-center gap-3 mt-4">
+        <button type="submit"
+                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+          Queue sample for review
+        </button>
+        <span class="text-xs text-gray-500">Bytes are stored locally in the queue only once you submit this form.</span>
+      </div>
+    </form>
+  </details>
+</div>
+{% endif %}
+{% endmacro %}

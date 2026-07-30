@@ -2,11 +2,13 @@
 """NexusTrace - retention / purge tool for stored analyst data.
 
 Trims real analyst data (scanned URLs, sender addresses, subjects, Received-chain
-IPs) to a retention window:
+IPs, queued abuse.ch submissions) to a retention window:
 
     data/scans/<uuid>.json
     data/screenshots/<uuid>.png, data/screenshots/<uuid>-<stage>.png
     data/analyses/<uuid>.json
+    data/submissions/<uuid>.json
+    data/quarantine/<sha256>-<submission-uuid>.bin        queued abuse.ch sample bytes
 
 Usage:
     python3 scripts/purge_data.py                        # dry run, 30-day retention
@@ -23,41 +25,90 @@ neither make itself immortal nor make anything else deletable.
 A scan's screenshots are always removed together with its record, so --store scans
 still deletes the screenshots belonging to the records it purges. Screenshots with
 no scan record ("orphaned") are reported, and are purged on age only when the
-screenshots store is in scope.
+screenshots store is in scope. Quarantined samples travel with their submission
+record the same way.
+
+Submissions are a live review queue, not only aged data, so they carry one extra
+rule on top of ageing: a submission still awaiting an operator decision (``pending``
+or ``approved``) is never purged, and neither are its quarantined bytes, however old
+they are. Purging those would silently gut a submission awaiting approval, or leave
+an approval that can no longer be honoured. They are reported instead. ``sent``,
+``rejected`` and ``failed`` records age out normally - a month-old failed send is
+not a live decision, and holding its sample indefinitely is a liability, so the
+retry it forfeits is the intended trade.
+
+``status`` is the only thing ever read out of a record, it can only keep a file and
+never condemn one, and a record that will not parse counts as awaiting a decision -
+so the "content cannot make anything deletable" invariant above still holds, and age
+still comes from mtime alone.
+
+A quarantine filename carries the id of the submission that owns it, which is what
+links the two stores; a sample with no matching record is an orphan and is
+age-purged like an orphaned screenshot. When the submissions store is missing
+entirely nothing can be attributed, so nothing in quarantine is treated as orphaned.
 
 An operator tool: deliberately not wired into the app, a cron, the Dockerfile, or
 start.sh.
 """
 import argparse
+import json
 import os
 import re
 import stat
 import sys
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_MAX_AGE_DAYS = 30
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
-STORES = ('scans', 'screenshots', 'analyses')
+STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine')
 
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 RECORD_RE = re.compile(rf'^({_UUID})\.json$')
 SHOT_RE = re.compile(rf'^({_UUID})(?:-([A-Za-z0-9_-]{{1,32}}))?\.png$')
+# submissions.py names a quarantined sample <sha256>-<submission-uuid>.bin. The
+# digest is not captured: the submission id is what links the file to its record,
+# and it is the only group collect() keeps. Its own pattern rather than a loosened
+# shared one, so adding this store does not widen what the other stores accept.
+SAMPLE_RE = re.compile(rf'^[0-9a-f]{{64}}-({_UUID})\.bin$')
 
-Entry = namedtuple('Entry', 'path uuid size mtime')
+# A submission in any other state - or in no state this script recognises - is still
+# waiting for an operator and is kept regardless of age.
+DECIDED_STATUSES = frozenset({'sent', 'rejected', 'failed'})
+
+# `key` is what links a file to the record that owns it: the record's own UUID for
+# the four uuid-named stores, and the owning submission's UUID for quarantine.
+Entry = namedtuple('Entry', 'path key size mtime')
 
 
-def _fmt_bytes(n):
+def fmt_bytes(n):
     for unit in ('B', 'KB', 'MB', 'GB'):
         if n < 1024 or unit == 'GB':
             return f'{n:.0f} {unit}' if unit == 'B' else f'{n:.1f} {unit}'
         n /= 1024.0
 
 
-def _fmt_time(ts):
+def fmt_time(ts):
     return datetime.fromtimestamp(ts, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def awaiting_decision(path):
+    """True when this submission record still needs an operator - which is the only
+    thing that survives being read out of a record here.
+
+    Fails safe in every direction: an unreadable record, an unparseable one, and one
+    carrying a status this script has never heard of all count as awaiting a
+    decision, so the failure mode is retention rather than deletion.
+    """
+    try:
+        text = path.read_text(encoding='utf-8', errors='replace')
+        record = json.loads(text)
+        status = str(record.get('status', '')).strip().lower()
+    except (OSError, ValueError, AttributeError):
+        return True
+    return status not in DECIDED_STATUSES
 
 
 def collect(directory, pattern):
@@ -101,11 +152,11 @@ def report_store(name, directory, doomed, retained, unexpected, notes, apply, li
     verb = 'deleted' if apply else 'would delete'
     d_bytes = sum(e.size for e in doomed)
     r_bytes = sum(e.size for e in retained)
-    print(f'  {verb:<13} {len(doomed):>5} files  {_fmt_bytes(d_bytes):>10}')
-    print(f'  {"retained":<13} {len(retained):>5} files  {_fmt_bytes(r_bytes):>10}', end='')
+    print(f'  {verb:<13} {len(doomed):>5} files  {fmt_bytes(d_bytes):>10}')
+    print(f'  {"retained":<13} {len(retained):>5} files  {fmt_bytes(r_bytes):>10}', end='')
     if retained:
         mtimes = [e.mtime for e in retained]
-        print(f'  oldest {_fmt_time(min(mtimes))}  newest {_fmt_time(max(mtimes))}')
+        print(f'  oldest {fmt_time(min(mtimes))}  newest {fmt_time(max(mtimes))}')
     else:
         print()
     for note in notes:
@@ -113,7 +164,7 @@ def report_store(name, directory, doomed, retained, unexpected, notes, apply, li
 
     shown = doomed if list_all else doomed[:20]
     for entry in shown:
-        print(f'    - {entry.path.name}  {_fmt_bytes(entry.size)}  {_fmt_time(entry.mtime)}')
+        print(f'    - {entry.path.name}  {fmt_bytes(entry.size)}  {fmt_time(entry.mtime)}')
     if len(doomed) > len(shown):
         print(f'    ... and {len(doomed) - len(shown)} more (use --list)')
 
@@ -162,19 +213,18 @@ def main():
     scans, scans_unexpected = collect(dirs['scans'], RECORD_RE)
     shots, shots_unexpected = collect(dirs['screenshots'], SHOT_RE)
     analyses, analyses_unexpected = collect(dirs['analyses'], RECORD_RE)
+    subs, subs_unexpected = collect(dirs['submissions'], RECORD_RE)
+    samples, samples_unexpected = collect(dirs['quarantine'], SAMPLE_RE)
 
-    shots_by_uuid = defaultdict(list)
-    for entry in shots:
-        shots_by_uuid[entry.uuid].append(entry)
-    record_uuids = {entry.uuid for entry in scans}
+    record_uuids = {entry.key for entry in scans}
 
     doomed_scans = [e for e in scans if e.mtime < cutoff] if 'scans' in stores else []
-    doomed_scan_ids = {e.uuid for e in doomed_scans}
-    retained_scans = [e for e in scans if e.uuid not in doomed_scan_ids]
+    doomed_scan_ids = {e.key for e in doomed_scans}
+    retained_scans = [e for e in scans if e.key not in doomed_scan_ids]
 
     # Screenshots travel with their record; orphans are age-purged on their own.
-    doomed_shots = [e for e in shots if e.uuid in doomed_scan_ids]
-    orphans = [e for e in shots if e.uuid not in record_uuids]
+    doomed_shots = [e for e in shots if e.key in doomed_scan_ids]
+    orphans = [e for e in shots if e.key not in record_uuids]
     if 'screenshots' in stores:
         doomed_shots += [e for e in orphans if e.mtime < cutoff]
     doomed_shot_paths = {e.path for e in doomed_shots}
@@ -182,13 +232,46 @@ def main():
     retained_orphans = [e for e in orphans if e.path not in doomed_shot_paths]
 
     doomed_analyses = [e for e in analyses if e.mtime < cutoff] if 'analyses' in stores else []
-    doomed_analysis_ids = {e.uuid for e in doomed_analyses}
-    retained_analyses = [e for e in analyses if e.uuid not in doomed_analysis_ids]
+    doomed_analysis_ids = {e.key for e in doomed_analyses}
+    retained_analyses = [e for e in analyses if e.key not in doomed_analysis_ids]
+
+    submission_uuids = {e.key for e in subs}
+    undecided = {e.key for e in subs if awaiting_decision(e.path)}
+
+    doomed_subs = ([e for e in subs if e.mtime < cutoff and e.key not in undecided]
+                   if 'submissions' in stores else [])
+    held_subs = [e for e in subs if e.mtime < cutoff and e.key in undecided]
+    doomed_sub_ids = {e.key for e in doomed_subs}
+    retained_subs = [e for e in subs if e.key not in doomed_sub_ids]
+
+    # A quarantine directory with no submissions store to read against is
+    # unattributable, so nothing in it is treated as orphaned.
+    submissions_present = dirs['submissions'].is_dir()
+    sample_orphans = ([e for e in samples if e.key not in submission_uuids]
+                      if submissions_present else [])
+    nominated = [e for e in samples if e.key in doomed_sub_ids]
+    if 'quarantine' in stores:
+        nominated += [e for e in samples
+                      if e.mtime < cutoff and e.key in submission_uuids]
+        nominated += [e for e in sample_orphans if e.mtime < cutoff]
+
+    # The single choke point for the awaiting-decision rule: bytes a submission still
+    # needs are never deleted, no matter which branch above nominated them.
+    doomed_samples, doomed_sample_paths = [], set()
+    for entry in nominated:
+        if entry.key in undecided or entry.path in doomed_sample_paths:
+            continue
+        doomed_sample_paths.add(entry.path)
+        doomed_samples.append(entry)
+    held_samples = [e for e in samples if e.key in undecided]
+    retained_samples = [e for e in samples if e.path not in doomed_sample_paths]
+    retained_sample_orphans = [e for e in sample_orphans
+                               if e.path not in doomed_sample_paths]
 
     mode = 'APPLY - files will be deleted' if args.apply else 'DRY RUN - nothing will be deleted'
     print(f'NexusTrace data purge  [{mode}]')
     print(f'  data directory : {data_dir}')
-    print(f'  retention      : {args.max_age_days:g} days (cutoff {_fmt_time(cutoff)})')
+    print(f'  retention      : {args.max_age_days:g} days (cutoff {fmt_time(cutoff)})')
     print(f'  stores         : {", ".join(sorted(stores))}')
 
     shot_notes = []
@@ -201,18 +284,46 @@ def main():
     if doomed_scan_ids and 'screenshots' not in stores:
         shot_notes.append('screenshots of purged scan records are removed with their record')
 
+    sub_notes = []
+    if held_subs:
+        names = ', '.join(e.path.name for e in held_subs[:5])
+        sub_notes.append(f'past retention but awaiting a decision (kept): '
+                         f'{len(held_subs)} - {names}'
+                         + (' ...' if len(held_subs) > 5 else ''))
+    if doomed_sub_ids and 'quarantine' not in stores:
+        sub_notes.append('quarantined samples of purged submissions are removed with '
+                         'their record')
+
+    sample_notes = []
+    if samples and not submissions_present:
+        sample_notes.append('submissions store absent - nothing here can be attributed, '
+                            'so nothing is treated as orphaned')
+    if held_samples:
+        sample_notes.append('held for a submission awaiting a decision (never purged): '
+                            f'{len(held_samples)}')
+    if sample_orphans and 'quarantine' in stores:
+        sample_notes.append(f'orphaned (no submission record): {len(sample_orphans)}, '
+                            f'{len(retained_sample_orphans)} still within retention')
+    elif sample_orphans:
+        sample_notes.append(f'orphaned (no submission record): {len(sample_orphans)} '
+                            '(quarantine store not in scope, none age-purged)')
+
     report_store('scans      ', dirs['scans'], doomed_scans, retained_scans,
                  scans_unexpected, [], args.apply, args.list_all)
     report_store('screenshots', dirs['screenshots'], doomed_shots, retained_shots,
                  shots_unexpected, shot_notes, args.apply, args.list_all)
     report_store('analyses   ', dirs['analyses'], doomed_analyses, retained_analyses,
                  analyses_unexpected, [], args.apply, args.list_all)
+    report_store('submissions', dirs['submissions'], doomed_subs, retained_subs,
+                 subs_unexpected, sub_notes, args.apply, args.list_all)
+    report_store('quarantine ', dirs['quarantine'], doomed_samples, retained_samples,
+                 samples_unexpected, sample_notes, args.apply, args.list_all)
 
-    total = doomed_scans + doomed_shots + doomed_analyses
+    total = doomed_scans + doomed_shots + doomed_analyses + doomed_subs + doomed_samples
     total_bytes = sum(e.size for e in total)
     print()
     if not args.apply:
-        print(f'Dry run: {len(total)} files ({_fmt_bytes(total_bytes)}) would be deleted. '
+        print(f'Dry run: {len(total)} files ({fmt_bytes(total_bytes)}) would be deleted. '
               'Re-run with --yes to apply.')
         return 0
 
@@ -220,7 +331,9 @@ def main():
     freed = 0
     for entries, store_dir in ((doomed_scans, dirs['scans']),
                                (doomed_shots, dirs['screenshots']),
-                               (doomed_analyses, dirs['analyses'])):
+                               (doomed_analyses, dirs['analyses']),
+                               (doomed_subs, dirs['submissions']),
+                               (doomed_samples, dirs['quarantine'])):
         for entry in entries:
             try:
                 remove(entry.path, store_dir)
@@ -228,7 +341,7 @@ def main():
             except Exception as exc:
                 failures += 1
                 print(f'FAILED to delete {entry.path}: {exc}', file=sys.stderr)
-    print(f'Deleted {len(total) - failures} files ({_fmt_bytes(freed)}).')
+    print(f'Deleted {len(total) - failures} files ({fmt_bytes(freed)}).')
     if failures:
         print(f'{failures} deletion(s) failed.', file=sys.stderr)
         return 1

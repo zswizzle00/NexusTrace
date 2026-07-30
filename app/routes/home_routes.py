@@ -16,6 +16,14 @@ from urllib.parse import urlparse
 from app.utils.validators import is_valid_ip, is_valid_domain
 from app.utils.parsers import parse_alienvault_otx, parse_shodan, parse_abuseipdb
 
+try:
+    from app.services.abusech import threatfox_lookup, urlhaus_host
+except ImportError:
+    # The module is optional at import time; without it the two abuse.ch sources are
+    # simply absent from the fan-out and their cards never reach the template.
+    threatfox_lookup = None
+    urlhaus_host = None
+
 load_dotenv()
 
 home_bp = Blueprint('home', __name__)
@@ -56,6 +64,13 @@ def domain_search():
 def hash_analysis_form():
     return render_template('hash_analysis.html')
 
+@home_bp.route('/file_analysis', methods=['GET'])
+def file_analysis_form():
+    # submit_url must point at the HTML route; the template defaults to the JSON
+    # endpoint, which would hand the analyst a raw record instead of a page.
+    return render_template('file_analysis.html',
+                           submit_url=url_for('file.analyze_file_page'))
+
 def _run_parallel(tasks, max_workers, label):
     """Run a dict of {key: zero-arg callable} in parallel.
     Returns {key: result_or_None}; individual failures are logged at WARNING."""
@@ -70,6 +85,13 @@ def _run_parallel(tasks, max_workers, label):
                 logger.warning(f"{label} lookup {key} failed: {e}")
                 results[key] = None
     return results
+
+
+def _abusech_found(envelope):
+    """True only when an abuse.ch envelope carries an actual record. `no_record`,
+    `skipped` and `unavailable` are answers, not data, so they must not keep a
+    page alive on their own."""
+    return isinstance(envelope, dict) and envelope.get('state') == 'found'
 
 
 def _run_analysis(indicator):
@@ -205,7 +227,7 @@ def _run_analysis(indicator):
                               indicator_type=indicator_type,
                               **result_data)
     elif indicator_type == 'ip':
-        raw = _run_parallel({
+        tasks = {
             'ipinfo':        lambda: get_ipinfo_data(indicator),
             'ip2location':   lambda: get_ip2location_data(indicator),
             'vpnapi':        lambda: get_vpn_data(indicator),
@@ -214,7 +236,12 @@ def _run_analysis(indicator):
             'shodan_raw':    lambda: get_shodan_info(indicator),
             'abuseipdb_raw': lambda: check_abuseipdb(indicator),
             'alienvault_raw': lambda: get_alienvault_data(indicator),
-        }, max_workers=8, label='IP')
+        }
+        if threatfox_lookup is not None:
+            tasks['threatfox'] = lambda: threatfox_lookup(indicator)
+        if urlhaus_host is not None:
+            tasks['urlhaus'] = lambda: urlhaus_host(indicator)
+        raw = _run_parallel(tasks, max_workers=len(tasks), label='IP')
         result_data['ipinfo'] = raw.get('ipinfo') or None
         result_data['ip2location'] = raw.get('ip2location') or None
         result_data['vpnapi'] = raw.get('vpnapi') or None
@@ -226,6 +253,8 @@ def _run_analysis(indicator):
         result_data['abuseipdb'] = parse_abuseipdb(abuseipdb_raw) if abuseipdb_raw else None
         alienvault_raw = raw.get('alienvault_raw')
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
+        result_data['threatfox'] = raw.get('threatfox') or None
+        result_data['urlhaus'] = raw.get('urlhaus') or None
 
         has_meaningful_data = (
             (result_data['ipinfo'] and (result_data['ipinfo'].get('country') or result_data['ipinfo'].get('asn'))) or
@@ -233,13 +262,15 @@ def _run_analysis(indicator):
             (result_data['vpnapi'] and result_data['vpnapi'].get('location', {}).get('city')) or
             (result_data['shodan'] and result_data['shodan'].get('summary', {}).get('organization')) or
             (result_data['abuseipdb'] and result_data['abuseipdb'].get('summary', {}).get('risk_score') is not None) or
-            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
+            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0) or
+            _abusech_found(result_data['threatfox']) or
+            _abusech_found(result_data['urlhaus'])
         )
 
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='ip')
 
-        card_count = sum(1 for k in ['ipinfo', 'ip2location', 'ipapi', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault'] if result_data.get(k))
+        card_count = sum(1 for k in ['ipinfo', 'ip2location', 'ipapi', 'vpnapi', 'proxycheck', 'shodan', 'abuseipdb', 'alienvault', 'threatfox', 'urlhaus'] if result_data.get(k))
         return render_template('analyze_result.html',
                               indicator=indicator,
                               indicator_type=indicator_type,

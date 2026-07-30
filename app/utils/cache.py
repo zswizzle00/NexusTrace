@@ -62,6 +62,7 @@ def clear_caches():
             file_service = importlib.import_module('app.services.file_service')
             event_service = importlib.import_module('app.services.event_service')
             azure_error_service = importlib.import_module('app.services.azure_error_service')
+            abusech = importlib.import_module('app.services.abusech')
 
             functions = [
                 ip_service.check_abuseipdb,
@@ -85,6 +86,13 @@ def clear_caches():
                 hash_service.get_malwarebazaar_report,
                 hash_service.get_threatfox_iocs,
                 hash_service.get_hash_info,
+                abusech.threatfox_lookup,
+                abusech.threatfox_hash,
+                abusech.urlhaus_host,
+                abusech.urlhaus_url,
+                abusech.urlhaus_payload,
+                abusech.malwarebazaar_hash,
+                abusech.hunting_fplist,
                 url_service.get_favicon_hash,
                 url_service.get_tech_stack,
                 file_service.get_combined_file_analysis,

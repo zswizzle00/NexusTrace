@@ -7,7 +7,6 @@ word-boundary anchored**, so ``'chase' in 'purchase'`` cannot make an ordinary
 sender look like phishing.
 """
 
-import hashlib
 import ipaddress
 import logging
 import re
@@ -16,6 +15,7 @@ from email import message_from_bytes, policy
 from email.utils import parseaddr, parsedate_to_datetime
 from html.parser import HTMLParser
 
+from .file_inspect import file_digests, is_archive, is_executable, sniff_magic
 from .validators import registrable_domain
 
 logger = logging.getLogger(__name__)
@@ -534,36 +534,6 @@ def extract_urls(msg, limit=200):
     return results
 
 
-# Byte-prefix comparison, not a libmagic binding, so this adds no dependency.
-_MAGIC_SIGNATURES = (
-    (b'MZ', 'PE'),
-    (b'\x7fELF', 'ELF'),
-    (b'%PDF', 'PDF'),
-    (b'PK\x03\x04', 'ZIP'),
-    (b'Rar!\x1a\x07', 'RAR'),
-    (b'7z\xbc\xaf\x27\x1c', '7Z'),
-    (b'\xd0\xcf\x11\xe0', 'OLE'),
-    (b'\xca\xfe\xba\xbe', 'MACHO'),
-    (b'\xcf\xfa\xed\xfe', 'MACHO'),
-    (b'\xfe\xed\xfa\xce', 'MACHO'),
-    (b'\x1f\x8b', 'GZIP'),
-)
-
-_EXECUTABLE_EXTS = frozenset(
-    'exe com scr pif bat cmd ps1 vbs vbe js jse wsf wsh hta jar msi dll lnk'.split()
-)
-_ARCHIVE_EXTS = frozenset('zip rar 7z tar gz cab iso img'.split())
-_EXECUTABLE_MAGIC = frozenset({'PE', 'ELF', 'MACHO'})
-_ARCHIVE_MAGIC = frozenset({'ZIP', 'RAR', '7Z', 'GZIP'})
-
-
-def _sniff_magic(payload):
-    for signature, name in _MAGIC_SIGNATURES:
-        if payload.startswith(signature):
-            return name
-    return None
-
-
 def attachment_metadata(msg, limit=MAX_ATTACHMENTS):
     """Per-attachment metadata and digests. **Returns metadata only — never
     bytes**: each payload is hashed and goes out of scope immediately, so no code
@@ -590,17 +560,17 @@ def attachment_metadata(msg, limit=MAX_ATTACHMENTS):
         if payload is None:
             continue
         name = str(filename or '(unnamed)')[:255]
-        extension = name.rsplit('.', 1)[-1].lower().strip('. ') if '.' in name else ''
-        magic = _sniff_magic(payload)
+        magic = sniff_magic(payload)
+        digests = file_digests(payload)
         results.append({
             'filename': name,
             'content_type': content_type or None,
             'size_bytes': len(payload),
-            'md5': hashlib.md5(payload).hexdigest(),
-            'sha256': hashlib.sha256(payload).hexdigest(),
+            'md5': digests['md5'],
+            'sha256': digests['sha256'],
             'magic_type': magic,
-            'is_executable': magic in _EXECUTABLE_MAGIC or extension in _EXECUTABLE_EXTS,
-            'is_archive': magic in _ARCHIVE_MAGIC or extension in _ARCHIVE_EXTS,
+            'is_executable': is_executable(magic, name),
+            'is_archive': is_archive(magic, name),
         })
     if seen > limit:
         logger.warning(
