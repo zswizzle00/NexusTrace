@@ -1,4 +1,4 @@
-"""Pins app/utils/iocs.py — IOC extraction and defanging. Pure, no network."""
+"""Pins app/utils/iocs.py - IOC extraction and defanging. Pure, no network."""
 import os
 import sys
 

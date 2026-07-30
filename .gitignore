@@ -62,3 +62,6 @@ data/analyses/
 # operator decisions). data/quarantine/ holds live malware samples awaiting approval.
 data/submissions/
 data/quarantine/
+# data/activity/ is the request log. It records client IPs, countries and the paths
+# that were looked up, so it carries the same sensitivity as the analysis records.
+data/activity/

@@ -71,7 +71,7 @@ class EmailParseError(ValueError):
 
 def parse_message(raw):
     """Parse raw message bytes. Raises :class:`EmailParseError` only when nothing
-    usable can be recovered — a message with headers and no body is valid."""
+    usable can be recovered - a message with headers and no body is valid."""
     if isinstance(raw, str):
         raw = raw.encode('utf-8', 'replace')
     if not raw or not raw.strip():
@@ -272,7 +272,7 @@ def find_suspicious_headers(msg, now=None):
     return signals
 
 
-# Address literals inside a Received header. Deliberately loose — every candidate
+# Address literals inside a Received header. Deliberately loose - every candidate
 # is validated with :mod:`ipaddress`, which is the real filter. Both shapes occur
 # in the wild: a bracketed literal (IPv6 must be bracketed; Postfix writes the
 # RFC 5321 `IPv6:` prefix) and a bare dotted quad in a parenthesised comment.
@@ -318,11 +318,11 @@ def _hop_address(collapsed):
 
 
 def received_chain(msg, limit=MAX_RECEIVED_HOPS):
-    """Received hops, **oldest first** — index 0 is closest to the originator, which
+    """Received hops, **oldest first** - index 0 is closest to the originator, which
     is the hop that injected the message and the one an analyst wants.
 
     Bounded by ``limit`` (oldest kept). A malformed header degrades that one hop,
-    not the whole chain — losing every hop would silently take out IP enrichment,
+    not the whole chain - losing every hop would silently take out IP enrichment,
     the DNSBL lookup, and ``sender_ip_blacklisted`` with it.
     """
     try:
@@ -388,7 +388,7 @@ _URL_TRAILING = '.,;:!?)\'"]>'
 class _AnchorCollector(HTMLParser):
     """Collect ``(href, anchor_text)`` pairs from an HTML body.
 
-    **Replaces a regex on purpose — do not go back.** A ``(.*?)</a>`` pairing
+    **Replaces a regex on purpose - do not go back.** A ``(.*?)</a>`` pairing
     backtracks catastrophically on unclosed anchors (the normal shape of phishing
     HTML): ~7.8x growth per input doubling, so an 86 KB body became minutes of
     GIL-held CPU on an unauthenticated route, stalling all gunicorn threads.
@@ -441,7 +441,7 @@ class _AnchorCollector(HTMLParser):
 
 
 def _anchor_pairs(html_text):
-    """``(href, text)`` for each anchor in ``html_text``. Never raises — a parse
+    """``(href, text)`` for each anchor in ``html_text``. Never raises - a parse
     error yields the pairs collected so far rather than losing the whole body."""
     collector = _AnchorCollector()
     try:
@@ -498,7 +498,7 @@ def _display_mismatch(url, anchor_text):
 
 def extract_urls(msg, limit=200):
     """URLs from hrefs and plaintext, with display-vs-target mismatch flagged.
-    Returns **live** URLs — the caller defangs for storage and display."""
+    Returns **live** URLs - the caller defangs for storage and display."""
     results = []
     seen = set()
 
@@ -535,7 +535,7 @@ def extract_urls(msg, limit=200):
 
 
 def attachment_metadata(msg, limit=MAX_ATTACHMENTS):
-    """Per-attachment metadata and digests. **Returns metadata only — never
+    """Per-attachment metadata and digests. **Returns metadata only - never
     bytes**: each payload is hashed and goes out of scope immediately, so no code
     path can persist or serve attachment content."""
     results = []

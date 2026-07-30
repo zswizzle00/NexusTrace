@@ -527,7 +527,7 @@ def get_ip2location_data(ip_address):
 def get_ipapi_data(ip_address):
     """Get geolocation and network data from IP-API.com (free, no key required).
 
-    Uses HTTP (not HTTPS) — required for the free tier.
+    Uses HTTP (not HTTPS) - required for the free tier.
     Non-commercial use only per IP-API.com terms.
     """
     try:

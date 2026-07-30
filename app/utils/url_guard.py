@@ -3,7 +3,7 @@
 ``validate_target`` is the single choke point every scanner fetch path must call.
 It rejects anything that is not a globally-routable http(s) target: disallowed
 schemes, blocked hostnames, IP literals outside the global ranges, and hostnames
-that *resolve* into those ranges at validation time. Checking once is not enough —
+that *resolve* into those ranges at validation time. Checking once is not enough -
 Chromium follows redirects and loads subresources on its own, so the guard runs
 per request (see ``scan_service._install_fetch_guard``).
 
@@ -36,10 +36,10 @@ _BLOCKED_SUFFIXES = ('.localhost', '.internal', '.local')
 # bits; a NAT64 gateway translates the request to that IPv4 address, so the
 # embedded address is what must be judged.
 _NAT64_WELL_KNOWN_PREFIX = ipaddress.IPv6Network('64:ff9b::/96')
-# Deprecated IPv6 site-local range (RFC 3879) — ``is_global`` does not exclude it.
+# Deprecated IPv6 site-local range (RFC 3879) - ``is_global`` does not exclude it.
 _IPV6_SITE_LOCAL = ipaddress.IPv6Network('fec0::/10')
 
-# Text after "scheme:" that is a bare port and nothing else — i.e. the input was
+# Text after "scheme:" that is a bare port and nothing else - i.e. the input was
 # really "host:port", not a scheme.
 _PORT_ONLY_RE = re.compile(r'^\d+(?:[/?#].*)?$')
 
@@ -66,7 +66,7 @@ def _default_resolver(host: str) -> list[str]:
 
 def caching_resolver(resolver: Resolver | None = None) -> Resolver:
     """Wrap ``resolver`` so each host is resolved at most once *on success*. Scope
-    the result to a single scan — it is a cache with no invalidation. Failures are
+    the result to a single scan - it is a cache with no invalidation. Failures are
     deliberately not memoized, so a transient DNS error on the first subresource
     does not mark the host unfetchable for the rest of the scan.
     """
@@ -86,7 +86,7 @@ def _has_ambiguous_authority(netloc: str) -> bool:
 
     Parser differential: a backslash, ASCII whitespace, or control character makes
     ``urlsplit``'s userinfo/host split disagree with Chromium's WHATWG parser,
-    which treats ``\\`` as ``/`` and ends the authority before ``@`` — so
+    which treats ``\\`` as ``/`` and ends the authority before ``@`` - so
     ``http://127.0.0.1\\@example.com/`` is 127.0.0.1 to Chromium and example.com to
     ``urlsplit``. Reject rather than emulate WHATWG parsing here.
     """
@@ -100,7 +100,7 @@ def normalize(raw: str) -> NormalizedTarget:
     """Canonicalize a URL: lowercase scheme+host, strip credentials and fragment,
     drop default ports, default a bare host to ``http://``, ensure a path, and
     IDNA-encode the host. Raises :class:`UnsafeURLError` on input that cannot be
-    unambiguously parsed; performs no *safety* checks — see :func:`validate_target`.
+    unambiguously parsed; performs no *safety* checks - see :func:`validate_target`.
     """
     stripped = (raw or '').strip()
     parts = urlsplit(stripped)
@@ -154,7 +154,7 @@ def normalize(raw: str) -> NormalizedTarget:
 
 
 def _is_blocked_hostname(host: str) -> bool:
-    # A trailing dot must not bypass the denylist — 'localhost.' and 'localhost'
+    # A trailing dot must not bypass the denylist - 'localhost.' and 'localhost'
     # are one name to a resolver. The canonical .url keeps the dot.
     bare = host.rstrip('.')
     return bare in _BLOCKED_HOSTNAMES or bare.endswith(_BLOCKED_SUFFIXES)
@@ -166,9 +166,9 @@ def _blocked_ip(ip) -> bool:
     site-local range, nor NAT64's prefix; each branch below closed a real bypass, so
     do not simplify them away."""
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped  # ::ffff:127.0.0.1 — judge the embedded v4 address
+        ip = ip.ipv4_mapped  # ::ffff:127.0.0.1 - judge the embedded v4 address
     elif isinstance(ip, ipaddress.IPv6Address) and ip in _NAT64_WELL_KNOWN_PREFIX:
-        # 64:ff9b::7f00:1 — a NAT64 gateway would translate this to 127.0.0.1.
+        # 64:ff9b::7f00:1 - a NAT64 gateway would translate this to 127.0.0.1.
         ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     elif isinstance(ip, ipaddress.IPv6Address) and ip in _IPV6_SITE_LOCAL:
         return True
@@ -213,7 +213,7 @@ def validate_target(raw: str, *, resolver: Resolver | None = None) -> Normalized
             raise UnsafeURLError(f'no addresses resolved for {host!r}')
 
         # One non-global answer poisons the whole host, for this resolution only
-        # — see the module docstring on why this is not a full rebinding defense.
+        # - see the module docstring on why this is not a full rebinding defense.
         for address in addresses:
             try:
                 ip = ipaddress.ip_address(address)

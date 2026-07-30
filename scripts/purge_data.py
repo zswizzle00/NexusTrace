@@ -63,7 +63,7 @@ from pathlib import Path
 DEFAULT_MAX_AGE_DAYS = 30
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
-STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine')
+STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'activity')
 
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 RECORD_RE = re.compile(rf'^({_UUID})\.json$')
@@ -73,6 +73,10 @@ SHOT_RE = re.compile(rf'^({_UUID})(?:-([A-Za-z0-9_-]{{1,32}}))?\.png$')
 # and it is the only group collect() keeps. Its own pattern rather than a loosened
 # shared one, so adding this store does not widen what the other stores accept.
 SAMPLE_RE = re.compile(rf'^[0-9a-f]{{64}}-({_UUID})\.bin$')
+# activity.py writes one JSONL file per UTC day. Its own pattern for the same reason as
+# SAMPLE_RE: a date is not a UUID, and loosening RECORD_RE to fit would widen what every
+# other store accepts. The day is the capture group, so it doubles as the entry key.
+ACTIVITY_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})\.jsonl$')
 
 # A submission in any other state - or in no state this script recognises - is still
 # waiting for an operator and is kept regardless of age.
@@ -215,6 +219,7 @@ def main():
     analyses, analyses_unexpected = collect(dirs['analyses'], RECORD_RE)
     subs, subs_unexpected = collect(dirs['submissions'], RECORD_RE)
     samples, samples_unexpected = collect(dirs['quarantine'], SAMPLE_RE)
+    activity, activity_unexpected = collect(dirs['activity'], ACTIVITY_RE)
 
     record_uuids = {entry.key for entry in scans}
 
@@ -230,6 +235,13 @@ def main():
     doomed_shot_paths = {e.path for e in doomed_shots}
     retained_shots = [e for e in shots if e.path not in doomed_shot_paths]
     retained_orphans = [e for e in orphans if e.path not in doomed_shot_paths]
+
+    # The request log has no owning record, so it ages purely on mtime. The per-day cap in
+    # activity.py bounds a single file, not the directory, so without this the store grows
+    # without limit.
+    doomed_activity = [e for e in activity if e.mtime < cutoff] if 'activity' in stores else []
+    doomed_activity_paths = {e.path for e in doomed_activity}
+    retained_activity = [e for e in activity if e.path not in doomed_activity_paths]
 
     doomed_analyses = [e for e in analyses if e.mtime < cutoff] if 'analyses' in stores else []
     doomed_analysis_ids = {e.key for e in doomed_analyses}
@@ -318,8 +330,11 @@ def main():
                  subs_unexpected, sub_notes, args.apply, args.list_all)
     report_store('quarantine ', dirs['quarantine'], doomed_samples, retained_samples,
                  samples_unexpected, sample_notes, args.apply, args.list_all)
+    report_store('activity   ', dirs['activity'], doomed_activity, retained_activity,
+                 activity_unexpected, [], args.apply, args.list_all)
 
-    total = doomed_scans + doomed_shots + doomed_analyses + doomed_subs + doomed_samples
+    total = (doomed_scans + doomed_shots + doomed_analyses + doomed_subs + doomed_samples
+             + doomed_activity)
     total_bytes = sum(e.size for e in total)
     print()
     if not args.apply:
@@ -333,7 +348,8 @@ def main():
                                (doomed_shots, dirs['screenshots']),
                                (doomed_analyses, dirs['analyses']),
                                (doomed_subs, dirs['submissions']),
-                               (doomed_samples, dirs['quarantine'])):
+                               (doomed_samples, dirs['quarantine']),
+                               (doomed_activity, dirs['activity'])):
         for entry in entries:
             try:
                 remove(entry.path, store_dir)

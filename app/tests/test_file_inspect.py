@@ -1,4 +1,4 @@
-"""Pins app/utils/file_inspect.py — magic sniffing, strings, entropy, embedded
+"""Pins app/utils/file_inspect.py - magic sniffing, strings, entropy, embedded
 executables, digests. Pure, no network, no fixture files."""
 import os
 import sys
@@ -40,7 +40,7 @@ LEGACY_MAGIC_CASES = [
     (b'\x1f\x8b', 'GZIP'),
 ]
 
-# (sample_bytes, expected_name) — realistic headers, one per format in the table.
+# (sample_bytes, expected_name) - realistic headers, one per format in the table.
 MAGIC_CASES = [
     (b'MZ\x90\x00\x03\x00\x00\x00', 'PE'),
     (b'\x7fELF\x02\x01\x01\x00', 'ELF'),
@@ -79,7 +79,7 @@ MAGIC_CASES = [
     (b'hello world, plain text\n', None),
 ]
 
-# (magic_type, filename, expect_executable, expect_archive) — the classification
+# (magic_type, filename, expect_executable, expect_archive) - the classification
 # semantics attachment_metadata relied on, including that the widened signature
 # table does NOT reclassify anything.
 CLASSIFY_CASES = [
@@ -369,7 +369,7 @@ def check_non_bytes(failures):
 
 
 def check_no_payload_retention(failures):
-    """No helper may hand back the buffer it was given — the attachment path
+    """No helper may hand back the buffer it was given - the attachment path
     guarantees content cannot reach storage or a response."""
     secret = b'MZ' + b'SENSITIVE-PAYLOAD-CONTENT' * 8
     for name, result in (

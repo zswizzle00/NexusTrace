@@ -1,4 +1,4 @@
-"""URL scanner service — headless Chromium scan with DNS/TLS/ASN/tech enrichment."""
+"""URL scanner service - headless Chromium scan with DNS/TLS/ASN/tech enrichment."""
 import hashlib
 import json
 import logging
@@ -157,12 +157,12 @@ def reverse_ptr(ip: str) -> list:
 
 def lookup_asn(ip: str) -> dict | None:
     try:
-        # Team Cymru DNS-based ASN lookup — no API key needed
+        # Team Cymru DNS-based ASN lookup - no API key needed
         parts = ip.split('.')
         if len(parts) == 4:
             query = '.'.join(reversed(parts)) + '.origin.asn.cymru.com'
         else:
-            # IPv6 — skip for now
+            # IPv6 - skip for now
             return None
         res = dns.resolver.Resolver()
         res.lifetime = 4

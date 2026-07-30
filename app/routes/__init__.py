@@ -14,6 +14,7 @@ from .enrichment_routes import enrichment_bp
 from .scan_routes import scan_bp
 from .email_routes import email_bp
 from .submission_routes import submission_bp
+from .admin_routes import admin_bp
 
 def register_routes(app):
     """Register all route blueprints with the Flask application."""
@@ -33,6 +34,7 @@ def register_routes(app):
     app.register_blueprint(scan_bp)
     app.register_blueprint(email_bp)
     app.register_blueprint(submission_bp)
+    app.register_blueprint(admin_bp)
 
     register_cyberchef_routes(app)
     app.register_blueprint(cyberchef_api)

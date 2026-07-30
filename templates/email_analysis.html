@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_use_notice.html" import use_notice %}
 
 {% block title %}E-mail Analysis | NexusTrace{% endblock %}
 
@@ -15,7 +16,9 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
-    <div class="mb-4 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+    <div class="mb-4 px-4 py-3 rounded text-sm
+      {% if category == 'error' %}bg-red-900/30 text-red-300 border border-red-800
+      {% else %}bg-blue-900/30 text-blue-300 border border-blue-800{% endif %}">
       {{ message }}
     </div>
     {% endfor %}
@@ -53,13 +56,12 @@
 
     </div>
 
+    <div class="mt-4">{{ use_notice('email') }}</div>
+
     <div class="flex items-center gap-3 mt-4">
       <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
         Analyze
       </button>
-      <span class="text-xs text-gray-500">
-        Only parsed findings are stored — never the raw message, body, or attachment bytes.
-      </span>
     </div>
   </form>
 
@@ -87,14 +89,14 @@
              }.get(level, ('bg-gray-800/60', 'text-gray-300', 'border-gray-700')) %}
           <tr class="border-b border-gray-800/50 hover:bg-gray-700 transition-colors"
               style="cursor:pointer;" onclick="window.location='{{ url_for('email.email_analysis_result', analysis_id=item.get('id')) }}'">
-            <td class="py-1.5 pr-4 text-gray-500">{{ item.get('created_at') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ item.get('created_at') or '-' }}</td>
             <td class="py-1.5 pr-4 text-gray-300 truncate max-w-0 w-full">
               <a href="{{ url_for('email.email_analysis_result', analysis_id=item.get('id')) }}"
                  class="hover:text-blue-400 transition-colors" style="text-decoration:none;color:inherit;">
-                {{ item.get('from') or '—' }}
+                {{ item.get('from') or '-' }}
               </a>
             </td>
-            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full">{{ item.get('subject') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full">{{ item.get('subject') or '-' }}</td>
             <td class="py-1.5">
               <span class="px-2 py-0.5 rounded text-xs {{ tone[0] }} {{ tone[1] }} border {{ tone[2] }}">{{ level }}</span>
             </td>

@@ -65,7 +65,7 @@ html, body {
 
 /* Base Styles - Blueprint / Grid aesthetic
    Flat dark backdrop with a static dot lattice. No drift, no glow, no gradient.
-   The dot grid is rendered via a single radial-gradient on background-image —
+   The dot grid is rendered via a single radial-gradient on background-image -
    it is a STATIC pattern, not an animated effect. */
 body {
     font-family: 'Inter', sans-serif;
@@ -193,7 +193,7 @@ body {
 .nav-link {
     position: relative;
     white-space: nowrap;
-    font-size: 0.8125rem;   /* 13px — compact but legible */
+    font-size: 0.8125rem;   /* 13px - compact but legible */
     font-weight: 500;
     letter-spacing: 0.01em;
     color: #7a90a8;          /* blue-tinted gray: muted but not neutral */
@@ -618,7 +618,7 @@ body {
 .app-container { position: relative; z-index: 1; }
 
 /* ==========================================================================
-   HOMEPAGE — Hero / search / chips
+   HOMEPAGE - Hero / search / chips
    ========================================================================== */
 
 /* Hero - blueprint style. Position + spacing only, no decorative background. */
@@ -815,7 +815,7 @@ body {
 }
 
 /* ==========================================================================
-   RESULTS PAGE — verdict hero, cards, badges, gauges
+   RESULTS PAGE - verdict hero, cards, badges, gauges
    ========================================================================== */
 
 .nt-results-title {
@@ -1267,7 +1267,7 @@ body {
 }
 .nt-card__external-link svg { opacity: 0.75; }
 
-/* ---------- AbuseIPDB reports table — comment column truncation ---------- */
+/* ---------- AbuseIPDB reports table - comment column truncation ---------- */
 .nt-reports-table { table-layout: fixed; width: 100%; }
 /* DATE col: YYYY-MM-DD = 10 chars */
 .nt-reports-table th:nth-child(1),
@@ -1283,7 +1283,7 @@ body {
     color: #cbd5e1;
 }
 
-/* Key/value rows inside cards — replace the cramped <table> look */
+/* Key/value rows inside cards - replace the cramped <table> look */
 .nt-kv {
     display: grid;
     grid-template-columns: minmax(6.5rem, auto) 1fr;

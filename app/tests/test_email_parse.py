@@ -1,4 +1,4 @@
-"""Pins app/utils/email_parse.py — pure e-mail parsing and detection.
+"""Pins app/utils/email_parse.py - pure e-mail parsing and detection.
 
 No network, no server, no fixture files: every case is an inline message string.
 """

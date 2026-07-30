@@ -1,4 +1,4 @@
-"""Pins app/services/email_rules.py — pure weighted scoring, no network.
+"""Pins app/services/email_rules.py - pure weighted scoring, no network.
 
 Covers the benign rows as deliberately as the malicious ones. The forwarded-mail
 row matters most: forwarding breaks SPF routinely, and an engine that calls every
@@ -21,7 +21,7 @@ AMBIENT = ['missing_message_id', 'missing_mime_version', 'date_anomaly', 'suspic
 
 
 def recent_date(days_ago):
-    """Relative, never a literal — a hard-coded date is a time bomb."""
+    """Relative, never a literal - a hard-coded date is a time bomb."""
     return (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime('%Y-%m-%d')
 
 

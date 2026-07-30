@@ -123,6 +123,16 @@ def create_app():
 
     app.csrf = csrf
 
+    # Request activity log. There is no authentication on the browser routes and the
+    # deployment is publicly reachable through a Cloudflare Tunnel, so this is the only
+    # record of who used the app and what they did. Imported and installed defensively:
+    # visibility is worth having, but never at the cost of serving traffic.
+    try:
+        from app.utils import activity
+        activity.install(app)
+    except Exception:
+        logger.exception('Activity logging is disabled: install failed')
+
     # Static files are served with a 1-year cache, so templates append
     # ?v={{ asset_v }}; the version changes on any CSS/JS edit and forces a fresh
     # fetch in both the browser and the service worker.

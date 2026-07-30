@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Activity | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-10">
+  <div class="mb-8 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-100 mb-1">Activity</h1>
+      <p class="text-sm text-gray-400">Read-only request log. Client IP and country come from the Cloudflare edge, not the tunnel.</p>
+    </div>
+    {% if authorized %}
+    <form method="POST" action="/admin/logout">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-300">Sign out</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="mb-4 px-4 py-3 rounded text-sm
+        {% if category == 'error' %}bg-red-900/40 text-red-300 border border-red-800
+        {% else %}bg-blue-900/40 text-blue-300 border border-blue-800{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if not authorized %}
+  <form method="POST" action="/admin" class="nt-card p-6" style="max-width:28rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label for="admin-token" class="block text-xs text-gray-500 uppercase tracking-wide mb-2">Admin token</label>
+    <input type="password" name="token" id="admin-token" autocomplete="current-password" spellcheck="false"
+      class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2.5 text-gray-100 font-mono text-sm mb-4" required />
+    <button type="submit" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded">Sign in</button>
+  </form>
+  {% else %}
+
+  <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Last 24 hours</h2>
+  <div class="mb-8" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+    {% set tiles = [
+      ('Requests', summary.total),
+      ('Uploads', summary.uploads),
+      ('Unique IPs', summary.unique_ips),
+      ('Errors', summary.errors),
+      ('Error rate', (summary.error_rate | string) ~ '%'),
+      ('Countries', summary.top_countries | length),
+    ] %}
+    {% for label, value in tiles %}
+    <div class="nt-card p-4">
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ label }}</div>
+      <div class="text-2xl font-semibold text-gray-100 font-mono">{{ value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-8" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+    {% set lists = [
+      ('Top paths', summary.top_paths),
+      ('Top IPs', summary.top_ips),
+      ('Top countries', summary.top_countries),
+    ] %}
+    {% for label, rows in lists %}
+    <div class="nt-card p-4">
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">{{ label }}</div>
+      {% if rows %}
+      <table class="w-full text-xs font-mono">
+        <tbody>
+          {% for name, count in rows %}
+          <tr class="border-b border-gray-800">
+            <td class="py-1.5 pr-4 text-gray-300 break-all">{{ name }}</td>
+            <td class="py-1.5 text-gray-500 text-right">{{ count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="text-xs text-gray-500">No data.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Requests &mdash; last {{ days }} day{{ '' if days == 1 else 's' }}</h2>
+    <span class="text-xs text-gray-500 font-mono">{{ total }} record{{ '' if total == 1 else 's' }}</span>
+  </div>
+
+  <div class="nt-card p-4 mb-4 overflow-x-auto">
+    {% if entries %}
+    <table class="w-full text-xs font-mono">
+      <thead>
+        <tr class="text-gray-500 text-left border-b border-gray-700">
+          <th class="pb-1.5 pr-4">Time (UTC)</th>
+          <th class="pb-1.5 pr-4">User</th>
+          <th class="pb-1.5 pr-4">IP</th>
+          <th class="pb-1.5 pr-4">CC</th>
+          <th class="pb-1.5 pr-4">Method</th>
+          <th class="pb-1.5 pr-4">Path</th>
+          <th class="pb-1.5 pr-4">Status</th>
+          <th class="pb-1.5 pr-4">ms</th>
+          <th class="pb-1.5">Up</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        {% set status = e.get('status') or 0 %}
+        {# The user agent is recorded but given no column: it is long, low-signal at a
+           glance, and would push the table into horizontal scrolling. Hover a row. #}
+        <tr class="border-b border-gray-800" title="{{ e.get('ua') or '' }}">
+          <td class="py-1.5 pr-4 text-gray-400 whitespace-nowrap">{{ e.get('ts') or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-400 break-all">{{ e.get('user') or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-300 whitespace-nowrap">{{ e.get('ip') or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-500">{{ e.get('country') or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-400">{{ e.get('method') or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-300 break-all">
+            {{ e.get('path') or '-' }}{% if e.get('rid') %} <span class="text-gray-500">{{ e.get('rid') }}</span>{% endif %}
+            {%- if not e.get('matched') %} <span class="text-gray-500">(no route)</span>{% endif %}
+          </td>
+          <td class="py-1.5 pr-4 {% if status >= 500 %}text-red-400{% elif status >= 400 %}text-yellow-400{% else %}text-green-400{% endif %}">{{ status or '-' }}</td>
+          <td class="py-1.5 pr-4 text-gray-500">{{ e.get('ms') or 0 }}</td>
+          <td class="py-1.5 text-gray-400">{{ '↑' if e.get('upload') else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-xs text-gray-500">No requests recorded in this window.</div>
+    {% endif %}
+  </div>
+
+  <div class="flex items-center gap-2 text-sm">
+    {% if page > 1 %}
+    <a href="/admin?page={{ page - 1 }}&per={{ per_page }}&days={{ days }}" class="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-gray-300">Newer</a>
+    {% endif %}
+    <span class="text-xs text-gray-500 font-mono">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}
+    <a href="/admin?page={{ page + 1 }}&per={{ per_page }}&days={{ days }}" class="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-gray-300">Older</a>
+    {% endif %}
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}

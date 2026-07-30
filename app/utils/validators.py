@@ -56,7 +56,7 @@ def is_valid_url(url):
 
 
 # Mozilla's PSL via the `publicsuffixlist` package, which ships a dated snapshot
-# and never touches the network at import or call time — registrable_domain()
+# and never touches the network at import or call time - registrable_domain()
 # runs inside URL scans and .eml parsing. Refreshing the list is a deliberate
 # version bump; see the note in pyproject.toml. Built once at import and then
 # immutable, so it is safe to share across gunicorn's worker threads.
@@ -70,8 +70,8 @@ _PSL = PublicSuffixList()
 def registrable_domain(host):
     """Best-effort eTLD+1 for a hostname. Never raises; junk in, junk out.
 
-    Inputs with no registrable part — a bare public suffix (``com``, ``co.uk``),
-    a single-label host (``localhost``), an unknown TLD's suffix — return the
+    Inputs with no registrable part - a bare public suffix (``com``, ``co.uk``),
+    a single-label host (``localhost``), an unknown TLD's suffix - return the
     normalized host itself, NOT ``''``. Callers treat ``''`` as "no opinion" and
     skip their check, so collapsing these to empty would silently disable the
     comparison instead of making it. An IP literal is returned normalized.

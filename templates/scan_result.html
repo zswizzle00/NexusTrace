@@ -21,6 +21,8 @@
     {% if scan.status == 'error' and scan.error %}
       <span class="ml-auto text-xs text-red-400 bg-red-900/30 border border-red-800 px-2 py-0.5 rounded">{{ scan.error }}</span>
     {% endif %}
+    <a href="{{ url_for('scan.url_scan_delete_confirm', scan_id=scan.id) }}"
+       class="ml-auto text-xs text-red-400 hover:text-gray-200 transition-colors mt-0.5">Delete this scan</a>
   </div>
 
   {% set asn = scan.asn %}
@@ -67,7 +69,7 @@
         {% macro fact(k, v) %}
         <div>
           <div class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</div>
-          <div class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '—' }}</div>
+          <div class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '-' }}</div>
         </div>
         {% endmacro %}
 
@@ -82,7 +84,7 @@
         {% if scan.ptr %}{{ fact('PTR', scan.ptr[0]) }}{% endif %}
       </div>
 
-      {# A structural heuristic, NOT a reputation verdict — the scan path queries no
+      {# A structural heuristic, NOT a reputation verdict - the scan path queries no
          reputation source, so the caption is deliberately hedged. See scan_rules.py. #}
       {% set v = scan.verdict or {} %}
       {% set level = v.level or 'unknown' %}
@@ -118,7 +120,7 @@
           <span class="text-xs text-gray-600 font-mono">scanned before scoring existed</span>
           {% endif %}
           <span class="text-xs text-gray-600">
-            Structural heuristic — no reputation source was queried.
+            Structural heuristic - no reputation source was queried.
           </span>
         </div>
         {% if v.signals %}
@@ -136,7 +138,7 @@
       </div>
 
       {# Discriminate on 'network_error', not on 'blocked', so an entry with no `kind` at
-         all — every scan persisted before `kind` existed — falls under 'blocked'. #}
+         all - every scan persisted before `kind` existed - falls under 'blocked'. #}
       {% set blocked_security = (scan.blocked_requests or []) | rejectattr('kind', 'equalto', 'network_error') | list %}
       {% set blocked_network = (scan.blocked_requests or []) | selectattr('kind', 'equalto', 'network_error') | list %}
       {% if scan.blocked_requests %}
@@ -150,7 +152,7 @@
         <ul class="mt-2 space-y-1">
           {% for b in blocked_security[:10] %}
           <li class="text-xs text-orange-200/80 font-mono break-all">
-            {{ b.url }} — {{ b.reason }}
+            {{ b.url }} - {{ b.reason }}
           </li>
           {% endfor %}
         </ul>
@@ -162,7 +164,7 @@
         <ul class="mt-2 space-y-1">
           {% for b in blocked_network[:10] %}
           <li class="text-xs text-gray-400 font-mono break-all">
-            {{ b.url }} — {{ b.reason }}
+            {{ b.url }} - {{ b.reason }}
           </li>
           {% endfor %}
         </ul>
@@ -180,22 +182,22 @@
         <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <div class="text-xs text-gray-500 uppercase tracking-wide">Filename</div>
-            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.filename or '—' }}</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.filename or '-' }}</div>
           </div>
           <div>
             <div class="text-xs text-gray-500 uppercase tracking-wide">Content type</div>
-            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.content_type or '—' }}</div>
+            <div class="text-gray-200 font-mono text-xs mt-0.5">{{ scan.payload.content_type or '-' }}</div>
           </div>
           <div>
             <div class="text-xs text-gray-500 uppercase tracking-wide">Size</div>
             <div class="text-gray-200 font-mono text-xs mt-0.5">
-              {{ scan.payload.size_bytes if scan.payload.size_bytes is not none else '—' }}
+              {{ scan.payload.size_bytes if scan.payload.size_bytes is not none else '-' }}
             </div>
           </div>
           <div>
             <div class="text-xs text-gray-500 uppercase tracking-wide">SHA-256</div>
             <div class="text-gray-200 font-mono text-xs mt-0.5 break-all">
-              {{ scan.payload.sha256 or '—' }}
+              {{ scan.payload.sha256 or '-' }}
             </div>
           </div>
         </div>
@@ -254,7 +256,7 @@
               {% if r.status and r.status < 400 %}text-green-400
               {% elif r.status and r.status < 500 %}text-yellow-400
               {% else %}text-red-400{% endif %}">
-              {{ r.status or '—' }}
+              {{ r.status or '-' }}
             </td>
             <td class="py-1.5 text-gray-300 truncate max-w-0 w-full" title="{{ r.url }}">{{ r.url }}</td>
           </tr>
@@ -292,7 +294,7 @@
                 {% elif t.status and t.status < 500 %}text-yellow-400
                 {% elif t.status %}text-red-400
                 {% else %}text-gray-500{% endif %}">
-                {{ t.status or '—' }}
+                {{ t.status or '-' }}
               </td>
               <td class="py-1 pr-3 text-gray-500">{{ t.resource_type }}</td>
               <td class="py-1 pr-3 text-gray-400">
@@ -300,9 +302,9 @@
                   {% if t.size_bytes < 1024 %}{{ t.size_bytes }} B
                   {% elif t.size_bytes < 1048576 %}{{ '%.1f' | format(t.size_bytes / 1024) }} KB
                   {% else %}{{ '%.2f' | format(t.size_bytes / 1048576) }} MB{% endif %}
-                {% else %}—{% endif %}
+                {% else %}-{% endif %}
               </td>
-              <td class="py-1 pr-3 text-gray-500">{{ t.server_ip or '—' }}</td>
+              <td class="py-1 pr-3 text-gray-500">{{ t.server_ip or '-' }}</td>
               <td class="py-1 text-gray-300 truncate max-w-0 w-full" title="{{ t.url }}">{{ t.url }}</td>
             </tr>
             {% else %}
@@ -319,7 +321,7 @@
     <div class="nt-card p-4 mb-4">
       <h3 class="nt-card-title mb-3">Network</h3>
       <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-        {% macro kv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '—' }}</dd></div>{% endmacro %}
+        {% macro kv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5">{{ v or '-' }}</dd></div>{% endmacro %}
         {{ kv('IP', scan.main_ip) }}
         {{ kv('ASN', asn.asn) }}
         {{ kv('Name', asn.name) }}
@@ -343,7 +345,7 @@
         {% endif %}
       </div>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-        {% macro tlskv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ v or '—' }}</dd></div>{% endmacro %}
+        {% macro tlskv(k,v) %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ v or '-' }}</dd></div>{% endmacro %}
         {{ tlskv('Subject', tls.subject) }}
         {{ tlskv('Issuer', tls.issuer) }}
         {{ tlskv('Valid from', tls.valid_from) }}
@@ -480,7 +482,7 @@
               <td class="py-1.5 pr-3">
                 {% if c.http_only %}<span class="text-green-400">yes</span>{% else %}<span class="text-yellow-400">no</span>{% endif %}
               </td>
-              <td class="py-1.5 pr-3 text-gray-400">{{ c.same_site or '—' }}</td>
+              <td class="py-1.5 pr-3 text-gray-400">{{ c.same_site or '-' }}</td>
               <td class="py-1.5 text-gray-400">{% if c.session %}session{% else %}persistent{% endif %}</td>
             </tr>
             {% endfor %}
@@ -534,7 +536,7 @@
             {% for d in scan.domains %}
             <tr class="border-b border-gray-800/40">
               <td class="py-1.5 pr-4 text-gray-300">{{ d.domain }}</td>
-              <td class="py-1.5 text-gray-500">{{ d.ips | join(', ') or '—' }}</td>
+              <td class="py-1.5 text-gray-500">{{ d.ips | join(', ') or '-' }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -600,7 +602,7 @@
           {% if scheme_ok %}
           <a href="{{ link }}" target="_blank" rel="noopener nofollow" class="hover:text-blue-400">{{ link }}</a>
           {% else %}
-          <span class="text-gray-500" title="Non-HTTP scheme — not rendered as a link">{{ link }}</span>
+          <span class="text-gray-500" title="Non-HTTP scheme - not rendered as a link">{{ link }}</span>
           {% endif %}
         </div>
         {% endfor %}

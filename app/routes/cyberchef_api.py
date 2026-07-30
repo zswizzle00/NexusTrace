@@ -10,7 +10,7 @@ def run_cyberchef():
     recipe = data.get('recipe')
     
     try:
-        # Echo only — the recipe is executed client-side in the CyberChef iframe.
+        # Echo only - the recipe is executed client-side in the CyberChef iframe.
         return jsonify({
             'input': input_data,
             'recipe': recipe

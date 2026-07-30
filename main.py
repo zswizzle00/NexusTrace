@@ -9,7 +9,7 @@ from flask import send_from_directory
 app = create_app()
 
 # /sw.js must be at root scope for full-origin service-worker coverage. Use the
-# absolute app.static_folder — relative 'static' resolves against app/, not the
+# absolute app.static_folder - relative 'static' resolves against app/, not the
 # project root where static/ actually lives.
 @app.route('/sw.js')
 def service_worker():

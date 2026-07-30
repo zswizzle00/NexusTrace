@@ -25,7 +25,7 @@
   {%- if code and code is string and code|length == 2 -%}
     {%- set up = code|upper -%}
     {%- set table = {'A':'🇦','B':'🇧','C':'🇨','D':'🇩','E':'🇪','F':'🇫','G':'🇬','H':'🇭','I':'🇮','J':'🇯','K':'🇰','L':'🇱','M':'🇲','N':'🇳','O':'🇴','P':'🇵','Q':'🇶','R':'🇷','S':'🇸','T':'🇹','U':'🇺','V':'🇻','W':'🇼','X':'🇽','Y':'🇾','Z':'🇿'} -%}
-    {# Regional indicators only render correctly when paired — build with two chars from the table #}
+    {# Regional indicators only render correctly when paired - build with two chars from the table #}
     {{- table.get(up[0], '') -}}{{- table.get(up[1], '') -}}
   {%- endif -%}
 {%- endmacro %}
@@ -472,7 +472,7 @@
           <p class="nt-card__section-title">Open Ports ({{ shodan.raw.ports|length }})</p>
           <div class="nt-port-cloud">
             {% for port in shodan.raw.ports %}
-              <span class="nt-port" title="{{ port.product or '' }} {{ port.version or '' }}{% if port.banner %} — {{ port.banner[:120] }}{% endif %}">
+              <span class="nt-port" title="{{ port.product or '' }} {{ port.version or '' }}{% if port.banner %} - {{ port.banner[:120] }}{% endif %}">
                 <span class="nt-port__num">{{ port.port }}</span>
                 {% if port.service %}<span class="nt-port__svc">{{ port.service }}</span>{% endif %}
               </span>
@@ -967,7 +967,7 @@
             <h3 class="nt-card__title">Reverse IP Domains</h3>
             <span class="nt-card__source">Rate Limited</span>
           </div>
-          <span class="text-yellow-400 text-sm">API count exceeded — increase quota with a paid plan or try again later.</span>
+          <span class="text-yellow-400 text-sm">API count exceeded - increase quota with a paid plan or try again later.</span>
         </div>
       {% else %}
         <div class="nt-card">
@@ -1099,7 +1099,7 @@
 </div>
 {% endblock %}
 
-{# AlienVault OTX card — shared between IP and domain grids. #}
+{# AlienVault OTX card - shared between IP and domain grids. #}
 {% macro render_alienvault(alienvault) %}
   <div class="nt-card is-otx">
     <div class="nt-card__head">
@@ -1221,7 +1221,7 @@
   {% endif %}
 {% endmacro %}
 
-{# abuse.ch ThreatFox — IOC attribution for an IP, domain or URL.
+{# abuse.ch ThreatFox - IOC attribution for an IP, domain or URL.
    Every displayed string (family, threat type, tag, reference) is attacker-influenced
    third-party text: it is escaped by autoescape and never marked |safe, and the
    reference only becomes an anchor when it is http(s), so a `javascript:` reference
@@ -1301,7 +1301,7 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
     {% elif ref %}
-      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme — not rendered as a link">Reference: {{ ref }}</p>
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme - not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
     <details class="nt-raw"><summary>Show Raw Data</summary>
@@ -1310,7 +1310,7 @@
   </div>
 {% endmacro %}
 
-{# abuse.ch URLhaus — malware-distribution URLs seen on a host (IPv4 or domain).
+{# abuse.ch URLhaus - malware-distribution URLs seen on a host (IPv4 or domain).
    Same escaping rules as render_threatfox. #}
 {% macro render_urlhaus(env) %}
   {% set e = env if env is mapping else {} %}
@@ -1383,7 +1383,7 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
     {% elif ref %}
-      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme — not rendered as a link">Reference: {{ ref }}</p>
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme - not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
     <details class="nt-raw"><summary>Show Raw Data</summary>

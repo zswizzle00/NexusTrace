@@ -109,7 +109,7 @@ curl -s -X POST <your-host>/api/enrich/ip \
 | `is_vpn`              | VPNapi      | Whether the IP is a known VPN exit node  |
 | `is_proxy`            | VPNapi      | Whether the IP is a known proxy          |
 | `is_tor`              | VPNapi      | Whether the IP is a Tor exit node        |
-| `abuse_score`         | AbuseIPDB   | Abuse confidence score (0–100)           |
+| `abuse_score`         | AbuseIPDB   | Abuse confidence score (0-100)           |
 | `total_abuse_reports` | AbuseIPDB   | Number of abuse reports in 90 days       |
 | `threat_pulse_count`  | AlienVault  | Number of OTX threat pulses              |
 | `open_ports`          | Shodan      | Open ports detected by Shodan            |

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ kind }} | NexusTrace{% endblock %}
+
+{% block content %}
+{# `summary` is the record's URL or subject: attacker-controlled, rendered escaped
+   and never as a link. #}
+<div class="max-w-3xl mx-auto px-4 py-10">
+  <div class="nt-card p-6">
+    <h1 class="text-xl font-semibold text-gray-100 mb-2">Delete this {{ kind }}?</h1>
+    <p class="text-sm text-gray-300 font-mono break-all mb-3">{{ summary }}</p>
+    <p class="text-xs text-gray-400 leading-relaxed mb-4">{{ removes }} This cannot be undone.</p>
+    <form method="POST" action="{{ action }}" class="flex items-center gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit"
+        class="px-3 py-1.5 rounded text-xs font-medium
+               bg-red-800/50 text-red-200 border border-red-700/60 hover:bg-red-800/70">
+        Delete permanently
+      </button>
+      <a href="{{ cancel }}" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

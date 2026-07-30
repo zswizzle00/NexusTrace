@@ -2,7 +2,7 @@
 subprocess.
 
 Every function is ``bytes``-in / plain-data-out and **never retains or returns the
-payload** — callers hand over a buffer and get back names, offsets, digests, and
+payload** - callers hand over a buffer and get back names, offsets, digests, and
 numbers. That property is what lets both the upload path and
 :func:`app.utils.email_parse.attachment_metadata` share this module while still
 guaranteeing attachment content has no code path into storage or a response.
@@ -40,7 +40,7 @@ MAX_STRINGS = 2000
 MAX_EMBEDDED_HITS = 32
 MAX_EMBEDDED_CANDIDATES = 100_000
 
-# A PE header cannot start before 0x40 — e_lfanew itself lives at 0x3c.
+# A PE header cannot start before 0x40 - e_lfanew itself lives at 0x3c.
 _PE_LFANEW_OFFSET = 0x3C
 _PE_MIN_HEADER_OFFSET = 0x40
 
@@ -187,7 +187,7 @@ def shannon_entropy(data):
 def _string_patterns(min_length):
     """(ascii, utf16le) run patterns for ``min_length``.
 
-    The UTF-16LE pattern matches only NUL-padded ASCII — the ``strings -e l`` case
+    The UTF-16LE pattern matches only NUL-padded ASCII - the ``strings -e l`` case
     that surfaces Windows wide-char URLs, paths, and registry keys. Genuine
     non-Latin UTF-16 is out of scope for a triage listing.
 
@@ -219,7 +219,7 @@ def extract_strings(data, min_length=MIN_STRING_LENGTH, limit=MAX_STRINGS):
 
     Returns at most ``limit`` strings, each truncated to ``MAX_STRING_LENGTH``, in
     offset order within each encoding (ASCII first, then UTF-16LE). Duplicates are
-    kept — this is the ``strings`` primitive, so de-duplication is the caller's
+    kept - this is the ``strings`` primitive, so de-duplication is the caller's
     call.
 
     ``limit`` is shared round-robin between the two encodings. Filling it
@@ -261,7 +261,7 @@ _EMBEDDED_MAGIC_RE = re.compile(b'MZ|\x7fELF')
 def _confirms_pe(buf, offset):
     """True when ``MZ`` at ``offset`` is followed by a reachable ``PE\\0\\0``.
 
-    A bare ``MZ`` is not evidence of anything — it is two common ASCII letters and
+    A bare ``MZ`` is not evidence of anything - it is two common ASCII letters and
     occurs constantly in text and compressed data. Following e_lfanew is what makes
     this a signal rather than noise.
     """
@@ -283,7 +283,7 @@ def _confirms_elf(buf, offset):
 
 
 def find_embedded_executables(data, limit=MAX_EMBEDDED_HITS):
-    """PE and ELF headers at **nonzero** offsets — appended or padded droppers.
+    """PE and ELF headers at **nonzero** offsets - appended or padded droppers.
 
     Returns up to ``limit`` ``{'offset': int, 'signature': 'PE'|'ELF'}`` in
     ascending offset order. Offset 0 is excluded by definition: that is the file's

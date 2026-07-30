@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the NexusTrace retention sweep daily
+Documentation=file:///opt/NexusTrace/docs/operations.md
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+# Persistent so a sweep missed while the box was off runs on next boot; retention that
+# silently skips a week of downtime is not retention.
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

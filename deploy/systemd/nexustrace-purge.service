@@ -1,0 +1,22 @@
+[Unit]
+Description=NexusTrace retention sweep
+Documentation=file:///opt/NexusTrace/docs/operations.md
+# Purging needs nothing but the filesystem, so this deliberately does not depend on
+# docker or the app being up. It must still run if the container is stopped.
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/opt/NexusTrace
+Environment=HOME=/home/%i
+# --yes is what makes this actually delete. Drop it to run the timer in report-only
+# mode while you decide on the retention window.
+ExecStart=/usr/bin/env uv run python scripts/purge_data.py --max-age-days 30 --yes
+Nice=10
+IOSchedulingClass=idle
+# It only ever writes inside data/, so everything else can be read-only.
+ProtectSystem=strict
+ReadWritePaths=/opt/NexusTrace/data /opt/NexusTrace/logs
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=read-only

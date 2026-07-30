@@ -2,7 +2,7 @@
 
 Additive weights over named signals, clamped to [0, 1], then banded. Combos add
 on top of their constituents because the combination is the tell, not either
-half — a brand name in a display line is nothing, a brand name plus a reply-to
+half - a brand name in a display line is nothing, a brand name plus a reply-to
 on someone else's domain is business e-mail compromise.
 
 **The band floor is the important design property.** The four ambient header

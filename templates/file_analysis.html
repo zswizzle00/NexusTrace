@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_submit_form.html" import ioc_form, sample_form %}
+{% from "_use_notice.html" import use_notice %}
 
 {% block title %}File Analysis | NexusTrace{% endblock %}
 
@@ -15,7 +16,7 @@
   {%- if sz < 1024 %}{{ sz }} B
   {%- elif sz < 1048576 %}{{ '%.1f' | format(sz / 1024) }} KB
   {%- else %}{{ '%.2f' | format(sz / 1048576) }} MB{% endif -%}
-{%- else -%}—{%- endif -%}
+{%- else -%}-{%- endif -%}
 {%- endmacro %}
 
 <div class="max-w-7xl mx-auto px-4 py-6">
@@ -55,13 +56,12 @@
       <input type="file" id="sample-file" name="file" class="hidden">
     </div>
 
+    <div class="mt-4">{{ use_notice('file') }}</div>
+
     <div class="flex items-center gap-3 mt-4">
       <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
         Analyze
       </button>
-      <span class="text-xs text-gray-500">
-        The sample is inspected in a temporary file and deleted — it is never stored or uploaded to a sandbox.
-      </span>
     </div>
   </form>
 
@@ -118,7 +118,7 @@
       <div class="nt-verdict__stat">
         <span class="nt-verdict__stat-label">Entropy</span>
         <span class="nt-verdict__stat-value {% if entropy is not none and entropy >= 7.2 %}is-warn{% endif %}">
-          {% if entropy is not none %}{{ '%.2f' | format(entropy) }} / 8.00{% else %}—{% endif %}
+          {% if entropy is not none %}{{ '%.2f' | format(entropy) }} / 8.00{% else %}-{% endif %}
         </span>
       </div>
       <div class="nt-verdict__stat">
@@ -140,7 +140,7 @@
       <span class="text-xs text-gray-600 font-mono">not scored</span>
       {% endif %}
       <span class="text-xs text-gray-600">
-        Structural heuristic over the file's own contents plus hash reputation — not a sandbox result.
+        Structural heuristic over the file's own contents plus hash reputation - not a sandbox result.
       </span>
     </div>
     {% set vsignals = v.get('signals') or [] %}
@@ -152,8 +152,8 @@
         {# A signal is either a bare key string or a {'key','label','detail'} dict. #}
         <span>
           {% if sig is mapping %}
-            {{ sig.get('label') or sig.get('key') or '—' }}
-            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">— {{ sig.get('detail') }}</span>{% endif %}
+            {{ sig.get('label') or sig.get('key') or '-' }}
+            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">- {{ sig.get('detail') }}</span>{% endif %}
           {% else %}
             {{ sig }}
           {% endif %}
@@ -176,7 +176,7 @@
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
       <div>
         <dt class="text-xs text-gray-500 uppercase tracking-wide">Filename</dt>
-        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ analysis.get('filename') or '—' }}</dd>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ analysis.get('filename') or '-' }}</dd>
       </div>
       <div>
         <dt class="text-xs text-gray-500 uppercase tracking-wide">Size</dt>
@@ -194,7 +194,7 @@
           {% if analysis.get('is_executable') %}<span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 mr-1">executable</span>{% endif %}
           {% if analysis.get('is_archive') %}<span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60 mr-1">archive</span>{% endif %}
           {% if analysis.get('lnk') %}<span class="px-2 py-0.5 rounded text-xs bg-purple-900/50 text-purple-300 border border-gray-700">shortcut</span>{% endif %}
-          {% if not analysis.get('is_executable') and not analysis.get('is_archive') and not analysis.get('lnk') %}<span class="text-gray-600 text-xs">—</span>{% endif %}
+          {% if not analysis.get('is_executable') and not analysis.get('is_archive') and not analysis.get('lnk') %}<span class="text-gray-600 text-xs">-</span>{% endif %}
         </dd>
       </div>
     </dl>
@@ -273,7 +273,7 @@
           {% set state = info.get('state') or info.get('status') %}
           {% set label, colour = state_labels.get(state, ('Unknown', 'text-gray-400')) %}
           <tr class="border-t border-gray-800">
-            <td class="py-2 pr-4 text-gray-300">{{ (name or '—') | replace('_', ' ') | title }}</td>
+            <td class="py-2 pr-4 text-gray-300">{{ (name or '-') | replace('_', ' ') | title }}</td>
             <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
             <td class="py-2 pr-4 text-gray-500 break-all">
               {% if state in ['skipped'] and info.get('key_env') %}
@@ -301,7 +301,7 @@
     </div>
     {% else %}
     <p class="text-xs text-gray-500">
-      No reputation source answered for this file. Unknown is not clean — an absence of
+      No reputation source answered for this file. Unknown is not clean - an absence of
       evidence is not evidence of absence, and a freshly built dropper is unknown to every
       feed by design.
     </p>
@@ -339,8 +339,8 @@
         <span class="text-gray-600 mt-0.5">▸</span>
         <span>
           {% if sig is mapping %}
-            {{ sig.get('label') or sig.get('key') or '—' }}
-            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">— {{ sig.get('detail') }}</span>{% endif %}
+            {{ sig.get('label') or sig.get('key') or '-' }}
+            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">- {{ sig.get('detail') }}</span>{% endif %}
           {% else %}
             {{ sig }}
           {% endif %}
@@ -352,7 +352,7 @@
     <p class="text-xs text-gray-500 mb-4">No shortcut heuristics fired.</p>
     {% else %}
     <p class="text-xs text-yellow-300 mb-4">
-      This shortcut could not be parsed{% if parsed.get('error') %}: {{ parsed.get('error') }}{% endif %} —
+      This shortcut could not be parsed{% if parsed.get('error') %}: {{ parsed.get('error') }}{% endif %} -
       no signals were derived, which is not the same as a clean result.
     </p>
     {% endif %}
@@ -377,7 +377,7 @@
     <div>
       <div class="flex items-center gap-2 mb-2 flex-wrap">
         <h4 class="text-xs text-gray-500 uppercase tracking-wide">Command-line arguments</h4>
-        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">untrusted content — do not execute</span>
+        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">untrusted content - do not execute</span>
         {% if parsed.get('arguments_length') %}
         <span class="text-xs text-gray-600 font-mono">{{ parsed.get('arguments_length') }} chars</span>
         {% endif %}
@@ -401,10 +401,10 @@
             <tr class="border-t border-gray-800">
               <td class="py-1.5 pr-4 text-gray-500 font-mono whitespace-nowrap">{{ k }}</td>
               <td class="py-1.5 text-gray-300 font-mono break-all">
-                {% if val is string %}{{ val or '—' }}
+                {% if val is string %}{{ val or '-' }}
                 {% elif val is sequence and val is not mapping %}{{ val | length }} item{{ 's' if val | length != 1 else '' }}
                 {% elif val is mapping %}{{ val | length }} key{{ 's' if val | length != 1 else '' }}
-                {% elif val is none %}—
+                {% elif val is none %}-
                 {% else %}{{ val }}{% endif %}
               </td>
             </tr>
@@ -423,7 +423,7 @@
     <h3 class="nt-card-title mb-3">Embedded Executables{% if embedded %} ({{ embedded | length }}){% endif %}</h3>
     {% if embedded %}
     <p class="text-xs text-gray-500 mb-3">
-      Executable headers found past offset 0 — appended or padded payloads. Offset 0 is
+      Executable headers found past offset 0 - appended or padded payloads. Offset 0 is
       excluded because that is the file's own format, already reported above.
     </p>
     <div class="overflow-x-auto">
@@ -437,9 +437,9 @@
           {% for hit in embedded %}
           {% set off = hit.get('offset') if hit is mapping else None %}
           <tr class="border-t border-gray-800">
-            <td class="py-2 pr-4 text-red-300 font-mono">{{ (hit.get('signature') if hit is mapping else hit) or '—' }}</td>
-            <td class="py-2 pr-4 text-gray-300 font-mono">{{ off if off is not none else '—' }}</td>
-            <td class="py-2 text-gray-500 font-mono">{% if off is not none %}0x{{ '%x' | format(off) }}{% else %}—{% endif %}</td>
+            <td class="py-2 pr-4 text-red-300 font-mono">{{ (hit.get('signature') if hit is mapping else hit) or '-' }}</td>
+            <td class="py-2 pr-4 text-gray-300 font-mono">{{ off if off is not none else '-' }}</td>
+            <td class="py-2 text-gray-500 font-mono">{% if off is not none %}0x{{ '%x' | format(off) }}{% else %}-{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -458,11 +458,11 @@
       <span class="font-mono text-lg text-gray-100">{{ '%.3f' | format(entropy) }}</span>
       <span class="text-xs text-gray-500 font-mono">of 8.000 bits/byte</span>
       {% if entropy >= 7.2 %}
-      <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">high — packed, encrypted, or compressed</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">high - packed, encrypted, or compressed</span>
       {% elif entropy >= 6.0 %}
       <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">moderate</span>
       {% else %}
-      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">low — plain text or sparse data</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">low - plain text or sparse data</span>
       {% endif %}
     </div>
     <p class="text-xs text-gray-500 mt-3">
@@ -518,8 +518,8 @@
           {% set itype = (ioc.get('type') if ioc is mapping else None) %}
           {% set ival = (ioc.get('value') if ioc is mapping else ioc) %}
           <tr class="border-t border-gray-800">
-            <td class="py-2 pr-4 text-gray-500 font-mono">{{ itype or '—' }}</td>
-            <td class="py-2 pr-4 text-gray-300 font-mono break-all">{{ ival or '—' }}</td>
+            <td class="py-2 pr-4 text-gray-500 font-mono">{{ itype or '-' }}</td>
+            <td class="py-2 pr-4 text-gray-300 font-mono break-all">{{ ival or '-' }}</td>
             <td class="py-2 whitespace-nowrap">
               {# Only hosts and addresses get a pivot, and only through url_for into this
                  app. A `url` IOC stays inert defanged text: refanging one into an href
@@ -537,7 +537,7 @@
               <a href="{{ url_for('home.analyze_deeplink', indicator=refanged) }}"
                  class="text-blue-400 hover:text-blue-300 transition-colors" style="text-decoration:none;">Analyze →</a>
               {% else %}
-              <span class="text-gray-600">—</span>
+              <span class="text-gray-600">-</span>
               {% endif %}
             </td>
           </tr>

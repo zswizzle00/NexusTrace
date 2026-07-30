@@ -13,6 +13,8 @@
     <span class="text-gray-600">|</span>
     <span class="text-gray-300 text-sm font-mono truncate max-w-2xl mt-0.5">{{ headers.get('subject') or '(no subject)' }}</span>
     <span class="ml-auto text-xs text-gray-500 font-mono mt-0.5">{{ headers.get('from') or 'unknown sender' }}</span>
+    <a href="{{ url_for('email.email_analysis_delete_confirm', analysis_id=analysis.get('id')) }}"
+       class="ml-2 text-xs text-red-400 hover:text-gray-200 transition-colors mt-0.5">Delete this analysis</a>
   </div>
 
   {% if analysis.get('status') == 'error' %}
@@ -64,7 +66,7 @@
       <span class="text-xs text-gray-500 font-mono">score {{ '%.2f' % score }}</span>
       {% endif %}
       <span class="text-xs text-gray-600">
-        Heuristic over message structure and reputation lookups — not a definitive judgement.
+        Heuristic over message structure and reputation lookups - not a definitive judgement.
       </span>
     </div>
     {% if signals %}
@@ -196,7 +198,7 @@
     {% else %}
     <p class="text-xs text-gray-500">
       No domain enrichment. The domain did not resolve to a globally-routable
-      address, or every lookup failed — parsing and scoring are unaffected.
+      address, or every lookup failed - parsing and scoring are unaffected.
     </p>
     {% endif %}
   </div>
@@ -233,19 +235,19 @@
           {% set vpn_net = (vpn.get('network') or {}) if vpn else {} %}
           {% set abuse_score = abuse.get('abuse_confidence_score') if abuse else None %}
           <tr class="border-b border-gray-800/40">
-            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full" title="{{ hop.get('from_host') or '' }}">{{ hop.get('from_host') or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-500">{{ hop.get('by_host') or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-300">{{ ip or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_loc.get('country') or abuse.get('country_name') or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_net.get('autonomous_system_number') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400 truncate max-w-0 w-full" title="{{ hop.get('from_host') or '' }}">{{ hop.get('from_host') or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ hop.get('by_host') or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-300">{{ ip or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_loc.get('country') or abuse.get('country_name') or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">{{ vpn_net.get('autonomous_system_number') or '-' }}</td>
             <td class="py-1.5 pr-4 {% if abuse_score is not none and abuse_score > 25 %}text-red-400{% else %}text-gray-400{% endif %}">
-              {{ abuse_score if abuse_score is not none else '—' }}
+              {{ abuse_score if abuse_score is not none else '-' }}
             </td>
             <td class="py-1.5">
               {% if ip and dnsbl_ip and ip == dnsbl_ip and dnsbl.get('listed') %}
               <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">DNSBL listed</span>
               {% else %}
-              <span class="text-gray-600">—</span>
+              <span class="text-gray-600">-</span>
               {% endif %}
             </td>
           </tr>
@@ -283,22 +285,22 @@
           {% set hsum = (hinfo.get('summary') or {}) if hinfo else {} %}
           {% set sz = att.get('size_bytes') if att else None %}
           <tr class="border-b border-gray-800/40">
-            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-0 w-full" title="{{ att.get('filename') or '' }}">{{ att.get('filename') or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('content_type') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-0 w-full" title="{{ att.get('filename') or '' }}">{{ att.get('filename') or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('content_type') or '-' }}</td>
             <td class="py-1.5 pr-4 text-gray-400">
               {% if sz is not none %}
                 {% if sz < 1024 %}{{ sz }} B
                 {% elif sz < 1048576 %}{{ '%.1f' | format(sz / 1024) }} KB
                 {% else %}{{ '%.2f' | format(sz / 1048576) }} MB{% endif %}
-              {% else %}—{% endif %}
+              {% else %}-{% endif %}
             </td>
-            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('magic_type') or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500">{{ att.get('magic_type') or '-' }}</td>
             <td class="py-1.5 pr-4">
               {% if att.get('is_executable') %}<span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 mr-1">executable</span>{% endif %}
               {% if att.get('is_archive') %}<span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">archive</span>{% endif %}
-              {% if not att.get('is_executable') and not att.get('is_archive') %}<span class="text-gray-600">—</span>{% endif %}
+              {% if not att.get('is_executable') and not att.get('is_archive') %}<span class="text-gray-600">-</span>{% endif %}
             </td>
-            <td class="py-1.5 pr-4 text-gray-500 break-all">{{ sha or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500 break-all">{{ sha or '-' }}</td>
             <td class="py-1.5">
               {# Pivot only when the value really is an MD5/SHA-1/SHA-256 digest: the
                  record is read back off disk, so `sha` is not guaranteed to be a
@@ -312,7 +314,7 @@
               {% if hsum.get('is_malicious') %}
               <span class="{% if is_digest %}ml-2 {% endif %}px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">malicious</span>
               {% elif not is_digest %}
-              <span class="text-gray-600">—</span>
+              <span class="text-gray-600">-</span>
               {% endif %}
             </td>
           </tr>
@@ -344,13 +346,13 @@
         <tbody>
           {% for u in urls %}
           <tr class="border-b border-gray-800/40">
-            <td class="py-1.5 pr-4 text-gray-300 break-all">{{ (u.get('url') if u else None) or '—' }}</td>
-            <td class="py-1.5 pr-4 text-gray-400 break-all">{{ (u.get('anchor_text') if u else None) or '—' }}</td>
+            <td class="py-1.5 pr-4 text-gray-300 break-all">{{ (u.get('url') if u else None) or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-400 break-all">{{ (u.get('anchor_text') if u else None) or '-' }}</td>
             <td class="py-1.5">
               {% if u and u.get('display_mismatch') %}
               <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 font-semibold uppercase tracking-wide">mismatch</span>
               {% else %}
-              <span class="text-gray-600">—</span>
+              <span class="text-gray-600">-</span>
               {% endif %}
             </td>
           </tr>
@@ -385,8 +387,8 @@
         <tbody>
           {% for ioc in iocs %}
           <tr class="border-t border-gray-800">
-            <td class="py-2 pr-4 text-gray-500 font-mono">{{ (ioc.get('type') if ioc else None) or '—' }}</td>
-            <td class="py-2 text-gray-300 font-mono break-all">{{ (ioc.get('value') if ioc else None) or '—' }}</td>
+            <td class="py-2 pr-4 text-gray-500 font-mono">{{ (ioc.get('type') if ioc else None) or '-' }}</td>
+            <td class="py-2 text-gray-300 font-mono break-all">{{ (ioc.get('value') if ioc else None) or '-' }}</td>
           </tr>
           {% endfor %}
         </tbody>

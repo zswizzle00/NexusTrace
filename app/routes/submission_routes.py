@@ -315,7 +315,7 @@ def _group(label, ioc_type, threat_type, values, hint=None):
             'indicators': values, 'hint': hint}
 
 
-_IP_HINT = 'abuse.ch expects host:port — append the port before queueing.'
+_IP_HINT = 'abuse.ch expects host:port - append the port before queueing.'
 
 
 def _scan_prefill(scan):
