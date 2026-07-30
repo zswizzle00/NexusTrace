@@ -60,7 +60,9 @@ Built for security analysts, incident responders, and researchers who need fast,
 
 > **Prerequisite:** dependencies are managed with [uv](https://docs.astral.sh/uv/).
 > Install it once with `curl -LsSf https://astral.sh/uv/install.sh | sh`.
-> (Docker builds bundle uv automatically - no local install needed for `--docker`/`--prod`.)
+> (Docker builds do not use uv - the image installs from `requirements.txt` with pip, so
+> after `uv add <pkg>` you must run `uv export --no-dev --no-hashes -o requirements.txt`
+> or the Docker build silently misses the new dependency.)
 
 ### Option 1: Dev Server (Recommended for testing)
 
@@ -87,11 +89,16 @@ cp .env.example .env
 - Flask app: `http://localhost:5050`
 - Nginx reverse proxy: `http://localhost:80`
 
-### Option 3: Production Docker (full rebuild)
+### Option 3: Production Docker
 
 ```bash
-./start.sh --prod
+./start.sh --prod     # cached build - minutes
+./start.sh --clean    # cold rebuild, discards the cache - ~40 minutes
 ```
+
+`--prod` reuses cached layers. Only reach for `--clean` when you actually need a cold
+build (base-image refresh, suspected corrupt cache): it re-downloads Chromium, every
+apt package, and every wheel.
 
 ### Stopping the server
 
@@ -198,8 +205,9 @@ NexusTrace/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── nginx.conf
-├── start.sh             # Start script (dev / docker / prod modes)
-└── stop.sh              # Stop script (dev / docker / all / status)
+├── start.sh             # Start script (dev / docker / prod / clean modes)
+├── stop.sh              # Stop script (dev / docker / all / status)
+└── nexus_auto_update.sh # Production updater: fetch + reset + cached rebuild, in place
 ```
 
 **How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format - IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string - and routes to the appropriate analysis pipeline.

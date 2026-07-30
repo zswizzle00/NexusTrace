@@ -34,7 +34,9 @@ dependencies = [
     "OTXv2==1.5.12",
     "Flask-WTF==1.2.1",
     "flask-talisman==1.1.0",
-    "playwright>=1.61.0",
+    # Pinned, not a floor: the browser binary is downloaded per-version in the Docker
+    # build, so a drifting library version silently mismatches the installed Chromium.
+    "playwright==1.61.0",
     # Public Suffix List for validators.registrable_domain(). Pinned exactly on
     # purpose: the trailing date IS the bundled PSL snapshot date, so the pin is
     # the staleness signal. Refreshing the list = bump this pin, then

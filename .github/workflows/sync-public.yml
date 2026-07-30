@@ -19,6 +19,12 @@ jobs:
           # Personal AI workflow instructions
           rm -f CLAUDE.md
 
+          # Production deploy script (host-specific paths, branch, and auth setup)
+          rm -f nexus_auto_update.sh
+
+          # Internal host IP and VM specs
+          rm -f ENHANCEMENT_PLAN.md
+
           # Deployment-specific docs (contain personal domain/setup details)
           rm -rf docs/
 
