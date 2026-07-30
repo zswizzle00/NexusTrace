@@ -46,7 +46,9 @@
     </form>
   </div>
 
-  {% set has_ip_cards = ipinfo or ip2location or vpnapi or proxycheck or shodan or abuseipdb %}
+  {# ipapi included: it is keyless, so on a deployment with no API keys at all it is
+     often the only source that answers. Leaving it out rendered a bare page. #}
+  {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb %}
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
 
   {% if has_ip_cards %}
@@ -56,14 +58,62 @@
     {% set is_vpn = (vpnapi.security.vpn if vpnapi and vpnapi.security else false) | default(false, true) %}
     {% set is_proxy = (vpnapi.security.proxy if vpnapi and vpnapi.security else false) | default(false, true) %}
     {% set is_relay = (vpnapi.security.relay if vpnapi and vpnapi.security else false) | default(false, true) %}
-    {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor) else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy) else 'clean') %}
-    {% set verdict_label = {'malicious': 'High Risk', 'suspicious': 'Suspicious', 'clean': 'Clean'} %}
+    {# Which reputation sources actually answered. Geolocation sources are excluded:
+       knowing where an IP is says nothing about whether it is hostile. `is defined`
+       matters - an absent key is Undefined, and `Undefined is not none` is true. #}
+    {% set rep_answered = [] %}
+    {% if abuseipdb and abuseipdb.summary and abuseipdb.summary.risk_score is defined
+          and abuseipdb.summary.risk_score is not none %}
+      {% set _ = rep_answered.append('AbuseIPDB') %}
+    {% endif %}
+    {% if alienvault and alienvault.summary and alienvault.summary.pulse_count is defined
+          and alienvault.summary.pulse_count is not none %}
+      {% set _ = rep_answered.append('OTX') %}
+    {% endif %}
+    {% if vpnapi and vpnapi.security %}
+      {% set _ = rep_answered.append('VPNapi') %}
+    {% endif %}
+    {% if proxycheck and proxycheck.summary %}
+      {% set _ = rep_answered.append('ProxyCheck') %}
+    {% endif %}
 
+    {# 'clean' is only honest when something was actually consulted. With every source
+       silent, abuse_score/pulses default to 0 and the anonymizer flags to false, which
+       previously rendered a green CLEAN badge for an IP nothing was known about. #}
+    {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor)
+                     else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy)
+                     else ('clean' if rep_answered else 'unknown')) %}
+    {% set verdict_label = {'malicious': 'High Risk', 'suspicious': 'Suspicious',
+                            'clean': 'Clean', 'unknown': 'No Reputation Data'} %}
+
+    {# Geo and ASN fall back across every source that carries them, rather than depending
+       on IPinfo alone. ip-api.com (`ipapi`) needs no key, so these render even with zero
+       API keys configured. Note parse_abuseipdb emits summary.country - the old fallback
+       read summary.countryName/country_code, which the parser never produces. #}
     {% set cc = (ipinfo.country_code if ipinfo and ipinfo.country_code is defined else None)
               or (ipinfo.country if ipinfo and ipinfo.country and ipinfo.country|length == 2 else None)
-              or (abuseipdb.summary.country_code if abuseipdb and abuseipdb.summary and abuseipdb.summary.country_code is defined else None) %}
-    {% set geo_city = ipinfo.city if ipinfo and ipinfo.city else '' %}
-    {% set geo_country = (ipinfo.country if ipinfo and ipinfo.country else '') or (abuseipdb.summary.countryName if abuseipdb and abuseipdb.summary and abuseipdb.summary.countryName else '') %}
+              or (ipapi.countryCode if ipapi and ipapi.countryCode is defined else None)
+              or (ip2location.country_code if ip2location and ip2location.country_code is defined else None) %}
+    {% set geo_city = (ipinfo.city if ipinfo and ipinfo.city else '')
+                   or (ipapi.city if ipapi and ipapi.city else '')
+                   or (ip2location.city_name or ip2location.city if ip2location else '')
+                   or (vpnapi.location.city if vpnapi and vpnapi.location and vpnapi.location.city else '') %}
+    {% set geo_country = (ipinfo.country if ipinfo and ipinfo.country else '')
+                      or (ipapi.country if ipapi and ipapi.country else '')
+                      or (ip2location.country_name if ip2location and ip2location.country_name else '')
+                      or (vpnapi.location.country if vpnapi and vpnapi.location and vpnapi.location.country else '')
+                      or (abuseipdb.summary.country if abuseipdb and abuseipdb.summary and abuseipdb.summary.country else '') %}
+
+    {# ip-api returns `as` as "AS15169 Google LLC" and `asname` separately; IPinfo Lite
+       returns asn + as_name; vpnapi uses autonomous_system_number/organization. #}
+    {% set asn_num = (ipinfo.asn if ipinfo and ipinfo.asn else '')
+                  or (ipapi.as.split(' ')[0] if ipapi and ipapi.as else '')
+                  or (ip2location.asn if ip2location and ip2location.asn else '')
+                  or (vpnapi.network.autonomous_system_number if vpnapi and vpnapi.network and vpnapi.network.autonomous_system_number else '') %}
+    {% set asn_name = (ipinfo.as_name if ipinfo and ipinfo.as_name else '')
+                   or (ipapi.asname if ipapi and ipapi.asname else '')
+                   or (vpnapi.network.autonomous_system_organization if vpnapi and vpnapi.network and vpnapi.network.autonomous_system_organization else '')
+                   or (ipapi.isp if ipapi and ipapi.isp else '') %}
 
     <section class="nt-verdict is-{{ verdict }}" aria-label="Verdict summary">
       <div class="nt-verdict__main">
@@ -84,11 +134,11 @@
             </span>
           </div>
         {% endif %}
-        {% if ipinfo and ipinfo.asn %}
+        {% if asn_num or asn_name %}
           <div class="nt-verdict__stat">
             <span class="nt-verdict__stat-label">Network</span>
-            <span class="nt-verdict__stat-value" title="{{ ipinfo.as_name or '' }} ({{ ipinfo.asn }})">
-              {% if ipinfo.as_name %}{{ ipinfo.as_name }} · {% endif %}{{ ipinfo.asn }}
+            <span class="nt-verdict__stat-value" title="{{ asn_name }}{% if asn_num %} ({{ asn_num }}){% endif %}">
+              {% if asn_name %}{{ asn_name }}{% if asn_num %} · {% endif %}{% endif %}{{ asn_num }}
             </span>
           </div>
         {% endif %}
@@ -112,6 +162,12 @@
             </span>
           </div>
         {% endif %}
+        <div class="nt-verdict__stat">
+          <span class="nt-verdict__stat-label">Reputation Sources</span>
+          <span class="nt-verdict__stat-value {{ '' if rep_answered else 'is-warn' }}">
+            {{ rep_answered | join(' · ') if rep_answered else 'None answered' }}
+          </span>
+        </div>
       </div>
     </section>
   {% endif %}
