@@ -1,0 +1,621 @@
+{% extends "base.html" %}
+{% from "_submit_form.html" import ioc_form, sample_form %}
+
+{% block title %}File Analysis | NexusTrace{% endblock %}
+
+{% block content %}
+{# Every value out of `analysis` originates in an uploaded file: filename, magic type,
+   extracted strings, .lnk target paths and arguments, IOCs. All of it is rendered
+   escaped and none of it is ever `|safe`. Extracted URLs never become anchors - the
+   app's CSP carries 'unsafe-inline', so a clickable harvested href is an XSS hole. #}
+{% set post_url = submit_url | default('/api/file/analyze_file', true) %}
+
+{% macro bytes_h(sz) -%}
+{%- if sz is not none -%}
+  {%- if sz < 1024 %}{{ sz }} B
+  {%- elif sz < 1048576 %}{{ '%.1f' | format(sz / 1024) }} KB
+  {%- else %}{{ '%.2f' | format(sz / 1048576) }} MB{% endif -%}
+{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">File Analysis</h1>
+    <p class="text-sm text-gray-400">
+      Upload a sample for static triage. NexusTrace hashes it, sniffs its real format,
+      measures entropy, looks for appended executables, parses Windows shortcuts,
+      extracts indicators, and checks hash reputation.
+    </p>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mb-4 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+      {{ message }}
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST" action="{{ post_url }}" enctype="multipart/form-data" class="nt-card p-5 mb-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="flex-1 min-w-0">
+      <label class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+        Upload a file
+      </label>
+      <label for="sample-file" style="cursor:pointer;display:block;">
+        <div id="file-dropzone"
+             class="rounded border border-gray-700 p-5 text-center hover:border-blue-500 transition-colors"
+             style="border-style:dashed;">
+          <p class="text-gray-300 text-sm mb-1" id="file-name-label">Click to select or drag and drop</p>
+          <p class="text-gray-500 text-xs">Executables, documents, archives, scripts, and .lnk shortcuts</p>
+        </div>
+      </label>
+      <input type="file" id="sample-file" name="file" class="hidden">
+    </div>
+
+    <div class="flex items-center gap-3 mt-4">
+      <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+        Analyze
+      </button>
+      <span class="text-xs text-gray-500">
+        The sample is inspected in a temporary file and deleted — it is never stored or uploaded to a sandbox.
+      </span>
+    </div>
+  </form>
+
+  {% if analysis is defined and analysis is not none %}
+
+  {% if analysis.get('error') %}
+  <div class="mb-5 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+    Could not fully process this file: {{ analysis.get('error') }}
+  </div>
+  {% endif %}
+
+  {% if analysis.get('truncated') %}
+  <div class="mb-5 px-4 py-3 rounded text-sm bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">
+    Only the leading portion of this file was inspected. Entropy, strings, and embedded-executable
+    findings describe the part that was read, not the whole sample.
+  </div>
+  {% endif %}
+
+  {% set digests = analysis.get('digests') or {} %}
+  {% set rep = analysis.get('reputation') or {} %}
+  {% set v = analysis.get('verdict') or {} %}
+  {# .get() with a default, NEVER [level]: the scorer may not be wired yet, and a
+     record carrying a level this template does not know about must not raise. #}
+  {% set level = v.get('level') or 'unknown' %}
+  {% set vmod = {
+       'malicious':  'is-malicious',
+       'suspicious': 'is-suspicious',
+       'benign':     'is-clean',
+       'clean':      'is-clean',
+       'unknown':    'is-unknown'
+     }.get(level, 'is-unknown') %}
+  {% set entropy = analysis.get('entropy') %}
+  {% set size = analysis.get('size_bytes') %}
+
+  <section class="nt-verdict {{ vmod }}" aria-label="File verdict summary">
+    <div class="nt-verdict__main">
+      <span class="nt-verdict__label">File</span>
+      <div class="nt-verdict__indicator">{{ analysis.get('filename') or 'unnamed file' }}</div>
+      <span class="nt-verdict__badge">
+        <span class="nt-verdict__badge-dot"></span>
+        {{ level }}
+      </span>
+    </div>
+
+    <div class="nt-verdict__stats">
+      <div class="nt-verdict__stat">
+        <span class="nt-verdict__stat-label">Size</span>
+        <span class="nt-verdict__stat-value">{{ bytes_h(size) }}</span>
+      </div>
+      <div class="nt-verdict__stat">
+        <span class="nt-verdict__stat-label">Format</span>
+        <span class="nt-verdict__stat-value" title="{{ analysis.get('magic_type') or '' }}">{{ analysis.get('magic_type') or 'unrecognised' }}</span>
+      </div>
+      <div class="nt-verdict__stat">
+        <span class="nt-verdict__stat-label">Entropy</span>
+        <span class="nt-verdict__stat-value {% if entropy is not none and entropy >= 7.2 %}is-warn{% endif %}">
+          {% if entropy is not none %}{{ '%.2f' | format(entropy) }} / 8.00{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="nt-verdict__stat">
+        <span class="nt-verdict__stat-label">Reputation</span>
+        <span class="nt-verdict__stat-value {% if rep.get('known_malware') %}is-danger{% endif %}">
+          {% if rep.get('known_malware') %}Known malware{% elif rep %}No record{% else %}Not checked{% endif %}
+        </span>
+      </div>
+    </div>
+  </section>
+
+  {# ---- Verdict signals ---- #}
+  <div class="nt-card p-5 mb-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="nt-card-title">Verdict</h3>
+      {% if v.get('score') is not none %}
+      <span class="text-xs text-gray-500 font-mono">score {{ '%.2f' % v.get('score') }}</span>
+      {% else %}
+      <span class="text-xs text-gray-600 font-mono">not scored</span>
+      {% endif %}
+      <span class="text-xs text-gray-600">
+        Structural heuristic over the file's own contents plus hash reputation — not a sandbox result.
+      </span>
+    </div>
+    {% set vsignals = v.get('signals') or [] %}
+    {% if vsignals %}
+    <ul class="mt-3 space-y-1">
+      {% for sig in vsignals %}
+      <li class="text-xs text-gray-300 flex items-start gap-2">
+        <span class="text-gray-600 mt-0.5">▸</span>
+        {# A signal is either a bare key string or a {'key','label','detail'} dict. #}
+        <span>
+          {% if sig is mapping %}
+            {{ sig.get('label') or sig.get('key') or '—' }}
+            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">— {{ sig.get('detail') }}</span>{% endif %}
+          {% else %}
+            {{ sig }}
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif v %}
+    <div class="mt-3 text-xs text-gray-500">No notable signals.</div>
+    {% else %}
+    <div class="mt-3 text-xs text-gray-500">
+      No verdict was produced for this file. Treat the sections below as raw observations.
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---- Identity ---- #}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Identity</h3>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Filename</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ analysis.get('filename') or '—' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Size</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">
+          {{ bytes_h(size) }}{% if size is not none and size >= 1024 %} <span class="text-gray-500">({{ size }} bytes)</span>{% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Detected format</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ analysis.get('magic_type') or 'unrecognised' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Flags</dt>
+        <dd class="mt-0.5">
+          {% if analysis.get('is_executable') %}<span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60 mr-1">executable</span>{% endif %}
+          {% if analysis.get('is_archive') %}<span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60 mr-1">archive</span>{% endif %}
+          {% if analysis.get('lnk') %}<span class="px-2 py-0.5 rounded text-xs bg-purple-900/50 text-purple-300 border border-gray-700">shortcut</span>{% endif %}
+          {% if not analysis.get('is_executable') and not analysis.get('is_archive') and not analysis.get('lnk') %}<span class="text-gray-600 text-xs">—</span>{% endif %}
+        </dd>
+      </div>
+    </dl>
+
+    {% if digests %}
+    <div class="overflow-x-auto mt-4">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-gray-500 uppercase tracking-wide text-left">
+            <th class="pb-2 pr-4">Digest</th><th class="pb-2 pr-4">Value</th><th class="pb-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for label, key in [('MD5', 'md5'), ('SHA-1', 'sha1'), ('SHA-256', 'sha256')] %}
+          {% set val = digests.get(key) %}
+          {% if val %}
+          {% set vlow = (val or '') | lower %}
+          {# Pivot only when the value really is a hexdigest: the record may have been
+             assembled by an older version, so `val` is not guaranteed to be one. #}
+          {% set is_digest = vlow | length in [32, 40, 64]
+                             and vlow | reject('in', '0123456789abcdef') | list | length == 0 %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2 pr-4 text-gray-500 font-mono">{{ label }}</td>
+            <td class="py-2 pr-4 text-gray-300 font-mono break-all" id="file-digest-{{ key }}">{{ val }}</td>
+            <td class="py-2 whitespace-nowrap">
+              <button onclick="copyFileValue('file-digest-{{ key }}')"
+                      class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                             border border-gray-700 hover:bg-gray-700">Copy</button>
+              {% if is_digest %}
+              <a href="{{ url_for('home.analyze_deeplink', indicator=val) }}"
+                 class="ml-2 text-blue-400 hover:text-blue-300 transition-colors" style="text-decoration:none;">Analyze →</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500 mt-4">No digests were computed.</p>
+    {% endif %}
+  </div>
+
+  {# ---- Hash reputation ---- #}
+  {% set rep_sources = rep.get('sources') or {} %}
+  {% set src_rows = [] %}
+  {% if rep_sources is mapping %}
+    {% for name, info in rep_sources.items() %}
+      {% set _ = src_rows.append((name, info if info is mapping else {})) %}
+    {% endfor %}
+  {% elif rep_sources is sequence and rep_sources is not string %}
+    {% for info in rep_sources %}
+      {% set _ = src_rows.append(((info.get('name') if info is mapping else info), info if info is mapping else {})) %}
+    {% endfor %}
+  {% endif %}
+  {% set state_labels = {
+       'no_record':   ('No record',    'text-gray-300'),
+       'not_found':   ('No record',    'text-gray-300'),
+       'skipped':     ('Not queried',  'text-gray-500'),
+       'unavailable': ('Unavailable',  'text-yellow-300'),
+       'error':       ('Unavailable',  'text-yellow-300'),
+       'found':       ('Record found', 'text-red-300')
+     } %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Hash Reputation
+      {% if rep.get('known_malware') %}
+      <span class="ml-2 px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">known malware</span>
+      {% endif %}
+    </h3>
+    {% if src_rows %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <tbody>
+          {% for name, info in src_rows %}
+          {% set state = info.get('state') or info.get('status') %}
+          {% set label, colour = state_labels.get(state, ('Unknown', 'text-gray-400')) %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2 pr-4 text-gray-300">{{ (name or '—') | replace('_', ' ') | title }}</td>
+            <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
+            <td class="py-2 pr-4 text-gray-500 break-all">
+              {% if state in ['skipped'] and info.get('key_env') %}
+                {{ info.get('key_env') }} not configured
+              {% elif state in ['skipped'] %}
+                API key not configured
+              {% elif state in ['unavailable', 'error'] %}
+                query failed or timed out
+              {% elif info.get('message') %}
+                {{ info.get('message') }}
+              {% endif %}
+            </td>
+            <td class="py-2 whitespace-nowrap">
+              {% set surl = info.get('url') %}
+              {% set surl_ok = surl and ((surl | lower).startswith('http://') or (surl | lower).startswith('https://')) %}
+              {% if surl_ok %}
+              <a href="{{ surl }}" target="_blank" rel="noopener noreferrer"
+                 class="text-blue-400 hover:underline text-xs">Search →</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">
+      No reputation source answered for this file. Unknown is not clean — an absence of
+      evidence is not evidence of absence, and a freshly built dropper is unknown to every
+      feed by design.
+    </p>
+    {% endif %}
+
+    {% set rep_links = rep.get('links') or {} %}
+    {% if rep_links is mapping and rep_links %}
+    <div class="mt-4">
+      <h4 class="text-xs text-gray-500 uppercase tracking-wide mb-2">Look it up elsewhere</h4>
+      <div class="flex flex-wrap gap-2">
+        {% for name, link in rep_links.items() %}
+        {% if link and ((link | lower).startswith('http://') or (link | lower).startswith('https://')) %}
+        <a href="{{ link }}" target="_blank" rel="noopener noreferrer"
+           class="px-3 py-1 rounded text-xs bg-gray-800 text-gray-300
+                  border border-gray-700 hover:bg-gray-700">{{ name | replace('_', ' ') | title }}</a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---- Windows shortcut (.lnk) ---- #}
+  {% set lnk = analysis.get('lnk') or {} %}
+  {% if lnk %}
+  {% set parsed = lnk.get('parsed') or {} %}
+  {% set lnk_signals = lnk.get('signals') or [] %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Windows Shortcut (.lnk)</h3>
+
+    {% if lnk_signals %}
+    <ul class="space-y-1 mb-4">
+      {% for sig in lnk_signals %}
+      <li class="text-xs text-gray-300 flex items-start gap-2">
+        <span class="text-gray-600 mt-0.5">▸</span>
+        <span>
+          {% if sig is mapping %}
+            {{ sig.get('label') or sig.get('key') or '—' }}
+            {% if sig.get('detail') %}<span class="text-gray-500 font-mono break-all">— {{ sig.get('detail') }}</span>{% endif %}
+          {% else %}
+            {{ sig }}
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif parsed.get('parsed_ok') %}
+    <p class="text-xs text-gray-500 mb-4">No shortcut heuristics fired.</p>
+    {% else %}
+    <p class="text-xs text-yellow-300 mb-4">
+      This shortcut could not be parsed{% if parsed.get('error') %}: {{ parsed.get('error') }}{% endif %} —
+      no signals were derived, which is not the same as a clean result.
+    </p>
+    {% endif %}
+
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
+      {% macro lkv(k, val) %}{% if val %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ val }}</dd></div>{% endif %}{% endmacro %}
+      {{ lkv('Target', parsed.get('target_path') or parsed.get('local_base_path') or parsed.get('env_target')) }}
+      {{ lkv('Working directory', parsed.get('working_dir')) }}
+      {{ lkv('Network share', parsed.get('network_share')) }}
+      {{ lkv('Relative path', parsed.get('relative_path')) }}
+      {{ lkv('Icon location', parsed.get('icon_location')) }}
+      {{ lkv('Window state', parsed.get('show_command')) }}
+      {{ lkv('Machine ID', parsed.get('machine_id')) }}
+      {{ lkv('Created', parsed.get('creation_time')) }}
+      {{ lkv('Modified', parsed.get('write_time')) }}
+    </dl>
+
+    {# Command-line arguments are the payload of a .lnk lure: fully attacker-controlled,
+       often thousands of characters of obfuscated PowerShell. Escaped monospace text,
+       explicitly marked untrusted, never markup and never a link. #}
+    {% if parsed.get('arguments') %}
+    <div>
+      <div class="flex items-center gap-2 mb-2 flex-wrap">
+        <h4 class="text-xs text-gray-500 uppercase tracking-wide">Command-line arguments</h4>
+        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">untrusted content — do not execute</span>
+        {% if parsed.get('arguments_length') %}
+        <span class="text-xs text-gray-600 font-mono">{{ parsed.get('arguments_length') }} chars</span>
+        {% endif %}
+        <button onclick="copyFileValue('lnk-arguments')"
+                class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                       border border-gray-700 hover:bg-gray-700">Copy</button>
+      </div>
+      <pre id="lnk-arguments"
+           class="max-h-96 overflow-y-auto whitespace-pre-wrap break-words
+                  text-xs text-gray-300 font-mono bg-gray-900/50 rounded p-3">{{ parsed.get('arguments') }}</pre>
+    </div>
+    {% endif %}
+
+    {% if parsed %}
+    <details class="mt-4">
+      <summary class="nt-card-title cursor-pointer select-none">All parsed shortcut fields ({{ parsed | length }})</summary>
+      <div class="overflow-x-auto mt-3" style="max-height:24rem;overflow-y:auto;">
+        <table class="w-full text-xs">
+          <tbody>
+            {% for k, val in parsed.items() | sort %}
+            <tr class="border-t border-gray-800">
+              <td class="py-1.5 pr-4 text-gray-500 font-mono whitespace-nowrap">{{ k }}</td>
+              <td class="py-1.5 text-gray-300 font-mono break-all">
+                {% if val is string %}{{ val or '—' }}
+                {% elif val is sequence and val is not mapping %}{{ val | length }} item{{ 's' if val | length != 1 else '' }}
+                {% elif val is mapping %}{{ val | length }} key{{ 's' if val | length != 1 else '' }}
+                {% elif val is none %}—
+                {% else %}{{ val }}{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ---- Embedded executables ---- #}
+  {% set embedded = analysis.get('embedded_executables') or [] %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Embedded Executables{% if embedded %} ({{ embedded | length }}){% endif %}</h3>
+    {% if embedded %}
+    <p class="text-xs text-gray-500 mb-3">
+      Executable headers found past offset 0 — appended or padded payloads. Offset 0 is
+      excluded because that is the file's own format, already reported above.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-gray-500 uppercase tracking-wide text-left">
+            <th class="pb-2 pr-4">Signature</th><th class="pb-2 pr-4">Offset</th><th class="pb-2">Offset (hex)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for hit in embedded %}
+          {% set off = hit.get('offset') if hit is mapping else None %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2 pr-4 text-red-300 font-mono">{{ (hit.get('signature') if hit is mapping else hit) or '—' }}</td>
+            <td class="py-2 pr-4 text-gray-300 font-mono">{{ off if off is not none else '—' }}</td>
+            <td class="py-2 text-gray-500 font-mono">{% if off is not none %}0x{{ '%x' | format(off) }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-gray-500">No executable headers found past the start of the file.</p>
+    {% endif %}
+  </div>
+
+  {# ---- Entropy ---- #}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Entropy</h3>
+    {% if entropy is not none %}
+    <div class="flex items-center gap-3 flex-wrap">
+      <span class="font-mono text-lg text-gray-100">{{ '%.3f' | format(entropy) }}</span>
+      <span class="text-xs text-gray-500 font-mono">of 8.000 bits/byte</span>
+      {% if entropy >= 7.2 %}
+      <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">high — packed, encrypted, or compressed</span>
+      {% elif entropy >= 6.0 %}
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">moderate</span>
+      {% else %}
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">low — plain text or sparse data</span>
+      {% endif %}
+    </div>
+    <p class="text-xs text-gray-500 mt-3">
+      High entropy is expected for archives and installers, so on its own it is a
+      description of the bytes, not a finding.
+    </p>
+    {% else %}
+    <p class="text-xs text-gray-500">Entropy was not measured for this file.</p>
+    {% endif %}
+  </div>
+
+  {# ---- Strings sample ---- #}
+  {% set strings_sample = analysis.get('strings_sample') or [] %}
+  {% if strings_sample %}
+  <div class="nt-card p-4 mb-5">
+    <details>
+      <summary class="nt-card-title cursor-pointer select-none">
+        Strings Sample ({{ strings_sample | length }})
+      </summary>
+      <p class="text-xs text-gray-500 mt-3 mb-2">
+        Printable runs lifted out of the sample. Attacker-controlled text, shown escaped.
+      </p>
+      <pre class="max-h-96 overflow-y-auto whitespace-pre-wrap break-words
+                  text-xs text-gray-300 font-mono bg-gray-900/50 rounded p-3">{% for s in strings_sample %}{{ s }}
+{% endfor %}</pre>
+    </details>
+  </div>
+  {% endif %}
+
+  {# ---- Indicators ---- #}
+  {% set iocs = analysis.get('iocs') or [] %}
+  <div class="nt-card p-4">
+    {% if iocs %}
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="nt-card-title">Indicators ({{ iocs | length }})</h3>
+      <button onclick="copyFileIocs()"
+              class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300
+                     border border-gray-700 hover:bg-gray-700">Copy all</button>
+    </div>
+    <p class="text-xs text-gray-500 mb-3">
+      Defanged for safe copying. Extracted from the file's strings and, for a shortcut,
+      its embedded paths and arguments. URLs are never rendered as links.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs" id="file-ioc-table">
+        <thead>
+          <tr class="text-gray-500 uppercase tracking-wide text-left">
+            <th class="pb-2 pr-4">Type</th><th class="pb-2 pr-4">Indicator</th><th class="pb-2">Pivot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ioc in iocs %}
+          {% set itype = (ioc.get('type') if ioc is mapping else None) %}
+          {% set ival = (ioc.get('value') if ioc is mapping else ioc) %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2 pr-4 text-gray-500 font-mono">{{ itype or '—' }}</td>
+            <td class="py-2 pr-4 text-gray-300 font-mono break-all">{{ ival or '—' }}</td>
+            <td class="py-2 whitespace-nowrap">
+              {# Only hosts and addresses get a pivot, and only through url_for into this
+                 app. A `url` IOC stays inert defanged text: refanging one into an href
+                 would hand an attacker-chosen scheme a live anchor in an origin whose
+                 CSP allows 'unsafe-inline'.
+
+                 The value is also checked character-by-character before it becomes a
+                 link. The record is read back from whatever produced it, so `ival` is
+                 not guaranteed to be the validated hostname the extractor emits, and a
+                 pivot to a URL-encoded blob of markup is a broken link at best. #}
+              {% set refanged = (ival or '') | replace('[.]', '.') %}
+              {% set host_ok = refanged | length > 0 and refanged | length <= 253
+                               and refanged | lower | reject('in', 'abcdefghijklmnopqrstuvwxyz0123456789.-:') | list | length == 0 %}
+              {% if itype in ['domain', 'ipv4', 'ipv6'] and host_ok %}
+              <a href="{{ url_for('home.analyze_deeplink', indicator=refanged) }}"
+                 class="text-blue-400 hover:text-blue-300 transition-colors" style="text-decoration:none;">Analyze →</a>
+              {% else %}
+              <span class="text-gray-600">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-sm text-gray-500">No indicators extracted.</div>
+    {% endif %}
+  </div>
+
+  {% set file_prefill = submission_prefill('file', analysis) %}
+  <div class="mt-5">
+    {{ ioc_form(file_prefill, 'fileq') }}
+    {{ sample_form(file_prefill, 'filesample') }}
+  </div>
+
+  {% if analysis.get('analyzed_at') %}
+  <p class="text-xs text-gray-600 font-mono mt-4">Analyzed {{ analysis.get('analyzed_at') }}</p>
+  {% endif %}
+
+  {% else %}
+
+  <div class="nt-card p-4 text-sm text-gray-500">
+    Upload a file above to see hashes, format detection, entropy, embedded executables,
+    shortcut internals, extracted indicators, and hash reputation.
+  </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var fileInput = document.getElementById('sample-file');
+  var label = document.getElementById('file-name-label');
+  var zone = document.getElementById('file-dropzone');
+  if (!fileInput || !label || !zone) return;
+
+  function updateLabel() {
+    label.textContent = fileInput.files.length ? fileInput.files[0].name : 'Click to select or drag and drop';
+  }
+  fileInput.addEventListener('change', updateLabel);
+
+  ['dragover', 'dragenter'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zone.style.borderColor = '#3b82f6';
+    });
+  });
+  ['dragleave', 'dragend'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zone.style.borderColor = '';
+    });
+  });
+  zone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      updateLabel();
+    }
+  });
+})();
+
+function copyFileValue(id) {
+  var el = document.getElementById(id);
+  if (el) navigator.clipboard.writeText(el.textContent.trim());
+}
+
+function copyFileIocs() {
+  var rows = document.querySelectorAll('#file-ioc-table tbody tr td:nth-child(2)');
+  var text = Array.from(rows).map(function (td) { return td.textContent.trim(); }).join('\n');
+  navigator.clipboard.writeText(text);
+}
+</script>
+{% endblock %}

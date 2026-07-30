@@ -46,10 +46,23 @@
     </form>
   </div>
 
-  {# ipapi included: it is keyless, so on a deployment with no API keys at all it is
-     often the only source that answers. Leaving it out rendered a bare page. #}
-  {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb %}
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
+
+  {# abuse.ch envelopes arrive from a third-party client and are normalised defensively:
+     a missing or non-mapping `summary` must render an empty card, never raise. #}
+  {% set tf_env = threatfox if (threatfox is defined and threatfox is mapping) else none %}
+  {% set uh_env = urlhaus if (urlhaus is defined and urlhaus is mapping) else none %}
+  {% set tf_state = tf_env.get('state') if (tf_env and tf_env.get('state') is string) else '' %}
+  {% set uh_state = uh_env.get('state') if (uh_env and uh_env.get('state') is string) else '' %}
+  {% set tf_sum = tf_env.get('summary') if (tf_env and tf_env.get('summary') is mapping) else {} %}
+  {% set uh_sum = uh_env.get('summary') if (uh_env and uh_env.get('summary') is mapping) else {} %}
+
+  {# ipapi included: it is keyless, so on a deployment with no API keys at all it is
+     often the only source that answers. Leaving it out rendered a bare page.
+     abuse.ch counts too, but only when nothing identifies this as a domain report -
+     an IP that is known solely to ThreatFox/URLhaus must still get the IP verdict. #}
+  {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb
+                        or ((tf_env or uh_env) and not has_domain_cards) %}
 
   {% if has_ip_cards %}
     {% set abuse_score = (abuseipdb.summary.risk_score if abuseipdb and abuseipdb.summary else 0) | default(0, true) | int %}
@@ -76,12 +89,43 @@
     {% if proxycheck and proxycheck.summary %}
       {% set _ = rep_answered.append('ProxyCheck') %}
     {% endif %}
+    {# abuse.ch answered only if it was actually asked: `skipped` (no key) and
+       `unavailable` (error/rejected key) are silence, and must not license 'clean'. #}
+    {% if tf_state in ('found', 'no_record') %}
+      {% set _ = rep_answered.append('ThreatFox') %}
+    {% endif %}
+    {% if uh_state in ('found', 'no_record') %}
+      {% set _ = rep_answered.append('URLhaus') %}
+    {% endif %}
+
+    {# ThreatFox names the malware family behind an IOC, so a `found` with a printable
+       family is a positive attribution, not an ambient signal; a high-confidence
+       botnet_cc IOC is live C2 infrastructure and bands as malicious on its own.
+       URLhaus counts only URLs still serving (`online_url_count`) - a host whose
+       payloads are all dead is history, not a live finding. #}
+    {% set _tf_fam = tf_sum.get('malware') %}
+    {% set tf_families = ([_tf_fam] if _tf_fam is string
+                          else (_tf_fam | list if (_tf_fam is sequence and _tf_fam is not mapping) else []))
+                         | select | map('string') | list %}
+    {% set _tf_tt = tf_sum.get('threat_types') %}
+    {% set tf_threat_types = ([_tf_tt] if _tf_tt is string
+                              else (_tf_tt | list if (_tf_tt is sequence and _tf_tt is not mapping) else []))
+                             | select | map('string') | list %}
+    {% set tf_botnet_hits = [] %}
+    {% for t in tf_threat_types %}
+      {% if 'botnet_cc' in (t | lower) %}{% set _ = tf_botnet_hits.append(1) %}{% endif %}
+    {% endfor %}
+    {% set tf_conf = tf_sum.get('confidence_max') | int %}
+    {% set tf_attributed = tf_state == 'found' and tf_families | length > 0 %}
+    {% set tf_live_c2 = tf_state == 'found' and tf_botnet_hits | length > 0 and tf_conf >= 75 %}
+    {% set uh_live = uh_state == 'found' and (uh_sum.get('online_url_count') | int) > 0 %}
 
     {# 'clean' is only honest when something was actually consulted. With every source
        silent, abuse_score/pulses default to 0 and the anonymizer flags to false, which
        previously rendered a green CLEAN badge for an IP nothing was known about. #}
-    {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor)
-                     else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy)
+    {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor or tf_live_c2)
+                     else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy
+                                            or tf_attributed or uh_live)
                      else ('clean' if rep_answered else 'unknown')) %}
     {% set verdict_label = {'malicious': 'High Risk', 'suspicious': 'Suspicious',
                             'clean': 'Clean', 'unknown': 'No Reputation Data'} %}
@@ -549,6 +593,9 @@
     {% if alienvault and has_ip_cards %}
       {{ render_alienvault(alienvault) }}
     {% endif %}
+
+    {% if tf_env %}{{ render_threatfox(tf_env) }}{% endif %}
+    {% if uh_env %}{{ render_urlhaus(uh_env) }}{% endif %}
   </div>
   {% endif %}
 
@@ -557,6 +604,9 @@
     {% if alienvault and not has_ip_cards %}
       {{ render_alienvault(alienvault) }}
     {% endif %}
+
+    {% if tf_env and not has_ip_cards %}{{ render_threatfox(tf_env) }}{% endif %}
+    {% if uh_env and not has_ip_cards %}{{ render_urlhaus(uh_env) }}{% endif %}
 
     {% if domain_info and domain_info.ssl_info %}
       <div class="nt-card is-ssl">
@@ -1133,6 +1183,211 @@
     {% endif %}
     <details class="nt-raw"><summary>Show Raw Data</summary>
       <pre>{{ alienvault.raw | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+{% endmacro %}
+
+{# abuse.ch state → (pill class, headline). Rendered for every state on purpose: a
+   source that was never asked has to say so, otherwise "no card" reads as "nothing
+   found". Mirrors the per-source state table in hash_analysis.html. #}
+{% macro abusech_state_pill(state) %}
+  {% if state == 'found' %}
+    <span class="nt-pill is-positive"><span class="nt-pill__dot"></span> Record found</span>
+  {% elif state == 'no_record' %}
+    <span class="nt-pill is-negative"><span class="nt-pill__dot"></span> No record</span>
+  {% elif state == 'skipped' %}
+    <span class="nt-pill is-neutral"><span class="nt-pill__dot"></span> Not queried</span>
+  {% else %}
+    <span class="nt-pill is-warn"><span class="nt-pill__dot"></span> Unavailable</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro abusech_state_note(state) %}
+  {% if state == 'no_record' %}
+    <div class="nt-otx-empty">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+      <span>Nothing known about this indicator</span>
+    </div>
+  {% elif state == 'skipped' %}
+    <div class="nt-otx-empty">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
+      <span>ABUSECH_AUTH_KEY not configured &mdash; this source was never queried</span>
+    </div>
+  {% elif state != 'found' %}
+    <div class="nt-otx-empty">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
+      <span>Lookup failed or the key was rejected &mdash; treat as no information</span>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{# abuse.ch ThreatFox — IOC attribution for an IP, domain or URL.
+   Every displayed string (family, threat type, tag, reference) is attacker-influenced
+   third-party text: it is escaped by autoescape and never marked |safe, and the
+   reference only becomes an anchor when it is http(s), so a `javascript:` reference
+   cannot execute in this app's origin (whose CSP allows 'unsafe-inline'). #}
+{% macro render_threatfox(env) %}
+  {% set e = env if env is mapping else {} %}
+  {% set state = e.get('state') if e.get('state') is string else 'unavailable' %}
+  {% set s = e.get('summary') if e.get('summary') is mapping else {} %}
+  {% set _fam = s.get('malware') %}
+  {% set families = ([_fam] if _fam is string
+                     else (_fam | list if (_fam is sequence and _fam is not mapping) else []))
+                    | select | map('string') | list %}
+  {% set _tt = s.get('threat_types') %}
+  {% set threat_types = ([_tt] if _tt is string
+                         else (_tt | list if (_tt is sequence and _tt is not mapping) else []))
+                        | select | map('string') | list %}
+  {% set _tg = s.get('tags') %}
+  {% set tags = ([_tg] if _tg is string
+                 else (_tg | list if (_tg is sequence and _tg is not mapping) else []))
+                | select | map('string') | list %}
+  {% set count = s.get('count') | int %}
+  {% set conf = s.get('confidence_max') | int %}
+  {% set ref = e.get('reference') if e.get('reference') is string else '' %}
+  {% set ref_ok = (ref | lower).startswith('http://') or (ref | lower).startswith('https://') %}
+
+  <div class="nt-card">
+    <div class="nt-card__head">
+      <span class="nt-card__icon" style="background: rgba(251,146,60,.18); border-color: rgba(251,146,60,.40); color: #fed7aa;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 11l9-7 9 7v7a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 20v-6h6v6"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">ThreatFox</h3>
+      <span class="nt-card__source">abuse.ch IOCs</span>
+    </div>
+
+    <div class="nt-pills">
+      {{ abusech_state_pill(state) }}
+      {% if state == 'found' %}
+        {% if count %}
+          <span class="nt-pill is-warn"><span class="nt-pill__dot"></span> {{ count }} IOC{{ '' if count == 1 else 's' }}</span>
+        {% endif %}
+        {% if conf %}
+          <span class="nt-pill {{ 'is-positive' if conf >= 75 else ('is-warn' if conf >= 50 else 'is-neutral') }}">
+            <span class="nt-pill__dot"></span> Confidence {{ conf }}%
+          </span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {{ abusech_state_note(state) }}
+
+    {% if state == 'found' %}
+      <table class="w-full text-sm">
+        {% if families %}{{ kv_row('Malware', families | join(', ')) }}{% endif %}
+        {% if threat_types %}{{ kv_row('Threat Types', threat_types | join(', ')) }}{% endif %}
+        {{ kv_row('First Seen', s.get('first_seen')) }}
+        {{ kv_row('Last Seen', s.get('last_seen')) }}
+      </table>
+
+      {% if tags %}
+        <p class="nt-card__section-title">Tags</p>
+        <div class="nt-pills">
+          {% for tag in tags[:20] %}
+            <span class="nt-pill is-neutral"><span class="nt-pill__dot"></span> {{ tag }}</span>
+          {% endfor %}
+        </div>
+        {% if tags | length > 20 %}
+          <span class="text-gray-500 text-xs">+{{ tags | length - 20 }} more</span>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    {% if ref_ok %}
+      <a href="{{ ref }}" target="_blank" rel="noopener noreferrer" class="nt-card__external-link">
+        View on ThreatFox
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
+    {% elif ref %}
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme — not rendered as a link">Reference: {{ ref }}</p>
+    {% endif %}
+
+    <details class="nt-raw"><summary>Show Raw Data</summary>
+      <pre>{{ (e.get('raw') if e.get('raw') is not none else {}) | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+{% endmacro %}
+
+{# abuse.ch URLhaus — malware-distribution URLs seen on a host (IPv4 or domain).
+   Same escaping rules as render_threatfox. #}
+{% macro render_urlhaus(env) %}
+  {% set e = env if env is mapping else {} %}
+  {% set state = e.get('state') if e.get('state') is string else 'unavailable' %}
+  {% set s = e.get('summary') if e.get('summary') is mapping else {} %}
+  {% set bl = s.get('blacklists') if s.get('blacklists') is mapping else {} %}
+  {% set _th = s.get('threats') %}
+  {% set threats = ([_th] if _th is string
+                    else (_th | list if (_th is sequence and _th is not mapping) else []))
+                   | select | map('string') | list %}
+  {% set url_count = s.get('url_count') | int %}
+  {% set online = s.get('online_url_count') | int %}
+  {% set ref = e.get('reference') if e.get('reference') is string else '' %}
+  {% set ref_ok = (ref | lower).startswith('http://') or (ref | lower).startswith('https://') %}
+
+  <div class="nt-card">
+    <div class="nt-card__head">
+      <span class="nt-card__icon" style="background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.40); color: #fecaca;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">URLhaus</h3>
+      <span class="nt-card__source">abuse.ch Malware URLs</span>
+    </div>
+
+    <div class="nt-pills">
+      {{ abusech_state_pill(state) }}
+      {% if state == 'found' %}
+        <span class="nt-pill {{ 'is-warn' if url_count else 'is-neutral' }}">
+          <span class="nt-pill__dot"></span> {{ url_count }} URL{{ '' if url_count == 1 else 's' }}
+        </span>
+        <span class="nt-pill {{ 'is-positive' if online else 'is-negative' }}">
+          <span class="nt-pill__dot"></span> {{ online }} online
+        </span>
+      {% endif %}
+    </div>
+
+    {{ abusech_state_note(state) }}
+
+    {% if state == 'found' %}
+      <table class="w-full text-sm">
+        {{ kv_row('First Seen', s.get('firstseen')) }}
+        {% if threats %}{{ kv_row('Threats', threats | join(', ')) }}{% endif %}
+      </table>
+
+      <p class="nt-card__section-title">Blacklists</p>
+      <table class="w-full text-sm">
+        {% for label, key in [('Spamhaus DBL', 'spamhaus_dbl'), ('SURBL', 'surbl')] %}
+          {% set val = bl.get(key) %}
+          {% set text = val | string if val is not none else '' %}
+          {% set listed = text and 'not listed' not in (text | lower) and 'not_listed' not in (text | lower) %}
+          <tr>
+            <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">{{ label }}</th>
+            <td class="py-2 break-words">
+              {% if text %}
+                <span class="nt-pill {{ 'is-positive' if listed else 'is-negative' }}"><span class="nt-pill__dot"></span> {{ text }}</span>
+              {% else %}
+                <span class="text-gray-500 text-sm">Not reported</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    {% if ref_ok %}
+      <a href="{{ ref }}" target="_blank" rel="noopener noreferrer" class="nt-card__external-link">
+        View on URLhaus
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
+    {% elif ref %}
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme — not rendered as a link">Reference: {{ ref }}</p>
+    {% endif %}
+
+    <details class="nt-raw"><summary>Show Raw Data</summary>
+      <pre>{{ (e.get('raw') if e.get('raw') is not none else {}) | tojson(indent=2) }}</pre>
     </details>
   </div>
 {% endmacro %}

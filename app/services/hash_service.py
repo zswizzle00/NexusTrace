@@ -4,6 +4,7 @@ import requests
 import logging
 from typing import Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from . import abusech
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
 from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
@@ -126,87 +127,79 @@ def get_virustotal_report(hash_value: str) -> Optional[Dict]:
         return None
 
 
+def _abusech_failure(envelope: Dict) -> Dict:
+    """Map an `unavailable` abuse.ch envelope onto this module's legacy status shape."""
+    raw = envelope.get('raw') or {}
+    if raw.get('error') == 'timeout':
+        return {'status': 'timeout'}
+    return {'status': 'error', 'message': raw.get('query_status') or raw.get('error')}
+
+
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_malwarebazaar_report(hash_value: str) -> Optional[Dict]:
-    """Get a MalwareBazaar report for a hash (free, no API key required)."""
-    try:
-        response = requests.post(
-            'https://mb-api.abuse.ch/api/v1/',
-            data={'query': 'get_info', 'hash': hash_value},
-            timeout=TIMEOUT_SHORT
-        )
-        response.raise_for_status()
-        data = response.json()
+    """Get a MalwareBazaar report for a hash.
 
-        if data.get('query_status') == 'hash_not_found':
-            return {'status': 'not_found'}
+    abuse.ch made `Auth-Key` mandatory, so this is no longer keyless: with no
+    ABUSECH_AUTH_KEY the request is not made at all and this returns None, which
+    unknown_hash_report() renders as 'skipped' rather than as a failed query.
+    """
+    envelope = abusech.malwarebazaar_hash(hash_value)
+    state = envelope['state']
 
-        if data.get('query_status') == 'ok' and data.get('data'):
-            info = data['data'][0]
-            return {
-                'status': 'found',
-                'sha256': info.get('sha256_hash'),
-                'sha1': info.get('sha1_hash'),
-                'md5': info.get('md5_hash'),
-                'file_type': info.get('file_type'),
-                'file_name': info.get('file_name'),
-                'file_size': info.get('file_size'),
-                'signature': info.get('signature'),
-                'first_seen': info.get('first_seen'),
-                'last_seen': info.get('last_seen'),
-                'reporter': info.get('reporter'),
-                'tags': info.get('tags', []),
-                'delivery_method': info.get('delivery_method'),
-                'intelligence': info.get('intelligence', {}),
-                'mb_link': f"https://bazaar.abuse.ch/sample/{info.get('sha256_hash', hash_value)}/"
-            }
-
-        return {'status': 'error', 'message': data.get('query_status')}
-
-    except requests.Timeout:
-        logger.warning(f"MalwareBazaar request timed out for {hash_value}")
-        return {'status': 'timeout'}
-    except Exception as e:
-        logger.error(f"MalwareBazaar API error: {str(e)}")
+    if state == 'skipped':
         return None
+    if state == 'no_record':
+        return {'status': 'not_found'}
+    if state == 'unavailable':
+        return _abusech_failure(envelope)
+
+    info = (abusech.records(envelope['raw'].get('data')) or [{}])[0]
+    return {
+        'status': 'found',
+        'sha256': info.get('sha256_hash'),
+        'sha1': info.get('sha1_hash'),
+        'md5': info.get('md5_hash'),
+        'file_type': info.get('file_type'),
+        'file_name': info.get('file_name'),
+        'file_size': info.get('file_size'),
+        'signature': info.get('signature'),
+        'first_seen': info.get('first_seen'),
+        'last_seen': info.get('last_seen'),
+        'reporter': info.get('reporter'),
+        'tags': info.get('tags', []),
+        'delivery_method': info.get('delivery_method'),
+        'intelligence': info.get('intelligence', {}),
+        'mb_link': f"https://bazaar.abuse.ch/sample/{info.get('sha256_hash', hash_value)}/"
+    }
 
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
-    """Search ThreatFox for IOCs related to a hash (free, no API key required)."""
-    try:
-        response = requests.post(
-            'https://threatfox-api.abuse.ch/api/v1/',
-            json={'query': 'search_hash', 'hash': hash_value},
-            timeout=TIMEOUT_SHORT
-        )
-        response.raise_for_status()
-        data = response.json()
+    """Search ThreatFox for IOCs related to a hash. Same mandatory key as MalwareBazaar."""
+    envelope = abusech.threatfox_hash(hash_value)
+    state = envelope['state']
 
-        if data.get('query_status') == 'no_result':
-            return {'status': 'not_found'}
-
-        if data.get('query_status') == 'ok' and data.get('data'):
-            iocs = data['data']
-            return {
-                'status': 'found',
-                'ioc_count': len(iocs),
-                'iocs': [{
-                    'id': ioc.get('id'),
-                    'ioc_type': ioc.get('ioc_type'),
-                    'threat_type': ioc.get('threat_type'),
-                    'malware': ioc.get('malware'),
-                    'confidence': ioc.get('confidence_level'),
-                    'first_seen': ioc.get('first_seen_utc'),
-                    'tags': ioc.get('tags', [])
-                } for ioc in iocs[:10]]
-            }
-
-        return {'status': 'error'}
-
-    except Exception as e:
-        logger.debug(f"ThreatFox API error: {str(e)}")
+    if state == 'skipped':
         return None
+    if state == 'no_record':
+        return {'status': 'not_found'}
+    if state == 'unavailable':
+        return _abusech_failure(envelope)
+
+    iocs = abusech.records(envelope['raw'].get('data'))
+    return {
+        'status': 'found',
+        'ioc_count': len(iocs),
+        'iocs': [{
+            'id': ioc.get('id'),
+            'ioc_type': ioc.get('ioc_type'),
+            'threat_type': ioc.get('threat_type'),
+            'malware': ioc.get('malware'),
+            'confidence': ioc.get('confidence_level'),
+            'first_seen': ioc.get('first_seen_utc'),
+            'tags': ioc.get('tags', [])
+        } for ioc in iocs[:10]]
+    }
 
 
 @timed_lru_cache(seconds=1800, maxsize=500)
@@ -356,10 +349,12 @@ def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_r
     sources = [
         {'name': 'VirusTotal', 'key_env': 'VIRUSTOTAL_API_KEY', 'url': links.get('virustotal'),
          'state': source_state(bool(os.getenv('VIRUSTOTAL_API_KEY')), status_of('virustotal'))},
-        {'name': 'MalwareBazaar', 'key_env': None, 'url': links.get('malwarebazaar'),
-         'state': source_state(True, status_of('malwarebazaar'))},
-        {'name': 'ThreatFox', 'key_env': None, 'url': links.get('threatfox'),
-         'state': source_state(True, status_of('threatfox'))},
+        # Both are abuse.ch and share one mandatory key, so both are 'skipped' - not
+        # 'unavailable' - when it is missing.
+        {'name': 'MalwareBazaar', 'key_env': abusech.AUTH_ENV, 'url': links.get('malwarebazaar'),
+         'state': source_state(bool(abusech.auth_key()), status_of('malwarebazaar'))},
+        {'name': 'ThreatFox', 'key_env': abusech.AUTH_ENV, 'url': links.get('threatfox'),
+         'state': source_state(bool(abusech.auth_key()), status_of('threatfox'))},
         {'name': 'AlienVault OTX', 'key_env': 'ALIENVAULT_KEY', 'url': links.get('alienvault_otx'),
          'state': source_state(any(os.getenv(k) for k in OTX_KEY_ENV), otx_status)},
     ]

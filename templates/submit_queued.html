@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Submission queued | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  {% if error %}
+  <div class="nt-card p-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-2">Submission rejected</h1>
+    <div class="mb-4 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+      {{ error }}
+    </div>
+    <p class="text-sm text-gray-400">
+      Nothing was queued and nothing was sent to abuse.ch. Go back, correct the form, and
+      submit it again.
+    </p>
+  </div>
+  {% else %}
+  <div class="nt-card p-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-2">Queued for operator review</h1>
+
+    <div class="mb-4 px-4 py-3 rounded text-sm bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">
+      Nothing has been sent to abuse.ch. This submission is held locally with status
+      <span class="font-mono">{{ record.status }}</span> until an operator approves and
+      publishes it.
+    </div>
+
+    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Submission ID</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ record.id or '—' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Status</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ record.status }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Kind</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">
+          {% if kind == 'sample' %}sample{% else %}indicators{% endif %}
+        </dd>
+      </div>
+      {% if kind == 'sample' %}
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Filename</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ filename }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Size</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ size_bytes }} bytes</dd>
+      </div>
+      {% else %}
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Indicators</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ count }}</dd>
+      </div>
+      {% endif %}
+    </dl>
+
+    <p class="text-sm text-gray-400 mt-4">
+      An operator reviews the queue out of band and publishes approved entries. Until then
+      no request leaves this deployment.
+    </p>
+
+    <a href="{{ url_for('home.home') }}"
+       class="inline-block mt-4 px-3 py-1.5 rounded text-xs bg-gray-800 text-gray-300
+              border border-gray-700 hover:bg-gray-700">← Back to NexusTrace</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

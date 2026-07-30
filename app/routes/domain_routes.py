@@ -7,6 +7,12 @@ from ..utils.validators import is_valid_domain, is_valid_url
 import logging
 from urllib.parse import urlparse
 
+try:
+    from ..services.abusech import threatfox_lookup, urlhaus_host
+except ImportError:
+    threatfox_lookup = None
+    urlhaus_host = None
+
 logger = logging.getLogger(__name__)
 
 domain_bp = Blueprint('domain', __name__)
@@ -72,11 +78,22 @@ def analyze_domain():
         alienvault_raw = get_alienvault_data(domain)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
+        # Both accept a bare domain. `analyze_result.html` already renders these two
+        # envelopes from the IP path; passing them here lights up the same cards.
+        if threatfox_lookup and urlhaus_host:
+            result_data['threatfox'] = threatfox_lookup(domain)
+            result_data['urlhaus'] = urlhaus_host(domain)
+
+        def _abusech_found(env):
+            return isinstance(env, dict) and env.get('state') == 'found'
+
         has_meaningful_data = (
             (result_data['url_analysis'] and result_data['url_analysis'].get('response', {}).get('status_code') is not None) or
             (result_data['domain_info'] and result_data['domain_info'].get('ssl_info')) or
             (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
-            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0)
+            (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0) or
+            _abusech_found(result_data.get('threatfox')) or
+            _abusech_found(result_data.get('urlhaus'))
         )
 
         if not has_meaningful_data:
