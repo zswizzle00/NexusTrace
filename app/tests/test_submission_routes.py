@@ -9,20 +9,44 @@ The load-bearing assertion is the negative one: queueing calls the queue and
 nothing else. `test_no_transmission_path` greps the route module for any abuse.ch
 transmit function.
 
+`storage.LOCAL_ROOT` is repointed at a temp tree for the whole run anyway
+(`check_isolation` refuses to proceed otherwise): the stubs mean nothing here
+*should* reach a store, and a temp root is what makes that a fact rather than a
+claim.
+
 Run: uv run python app/tests/test_submission_routes.py
 """
 import os
 import re
+import shutil
 import sys
+import tempfile
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
 
 os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-submission-routes')
 
+from app.utils import storage                    # noqa: E402
+
+# Before create_app(), so nothing imported below can bind to the real data root.
+_REAL_LOCAL_ROOT = storage.LOCAL_ROOT
+_TEMP_ROOT = Path(tempfile.mkdtemp(prefix='nexustrace-submission-routes-'))
+storage.LOCAL_ROOT = _TEMP_ROOT
+storage.reset_cache()
+
 from app import create_app                       # noqa: E402
 from app.routes import email_routes, scan_routes, submission_routes  # noqa: E402
 from flask import render_template                # noqa: E402
+
+
+def check_isolation():
+    """Refuse to run against the real data directory under any circumstances."""
+    real = (Path(storage.__file__).resolve().parent.parent.parent / 'data').resolve()
+    root = Path(storage.LOCAL_ROOT).resolve()
+    if root == real or real in root.parents:
+        raise SystemExit(f'REFUSING TO RUN: {root} is inside the real data store')
 
 CASES = 0
 
@@ -418,6 +442,7 @@ def test_no_transmission_path():
 
 
 def main():
+    check_isolation()
     app = create_app()
     app.config['SERVER_NAME'] = None
     client = app.test_client()
@@ -427,15 +452,20 @@ def main():
     submission_routes.queue_ioc = queue
     submission_routes.queue_sample = samples
 
-    scan_html, email_html, file_html = test_pages_render(app, client)
-    test_prefill_and_escaping(scan_html, email_html, file_html)
-    test_queue_success(client, queue)
-    test_rejections(client, queue, samples)
-    test_clamping_and_defaults(client, queue)
-    test_sample_success(client, samples)
-    test_csrf(client, queue, samples)
-    test_service_absent(app, client)
-    test_no_transmission_path()
+    try:
+        scan_html, email_html, file_html = test_pages_render(app, client)
+        test_prefill_and_escaping(scan_html, email_html, file_html)
+        test_queue_success(client, queue)
+        test_rejections(client, queue, samples)
+        test_clamping_and_defaults(client, queue)
+        test_sample_success(client, samples)
+        test_csrf(client, queue, samples)
+        test_service_absent(app, client)
+        test_no_transmission_path()
+    finally:
+        storage.LOCAL_ROOT = _REAL_LOCAL_ROOT
+        storage.reset_cache()
+        shutil.rmtree(_TEMP_ROOT, ignore_errors=True)
 
     print(f'\nPASS: {CASES} cases')
 

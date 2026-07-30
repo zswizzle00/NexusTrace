@@ -11,31 +11,37 @@ provider at all. Every outbound call goes through :func:`_provider`, so there is
 exactly one place to audit and exactly one place for tests to intercept - do not
 add a second `from .abusech import submit_ioc` anywhere in this file.
 
-Storage is the filesystem, same shape as ``scan_service`` / ``email_service``:
-``data/submissions/<uuid>.json``, mtime-ordered, tolerant reads (``.get()``
-everywhere) so a record written by an older version still loads.
+Storage goes through ``app.utils.storage``, same shape as ``scan_service`` /
+``email_service``: records at key ``<uuid>.json`` in the ``submissions`` store,
+newest-first by modification time, tolerant reads (``.get()`` everywhere) so a
+record written by an older version still loads.
 
-Sample bytes are held in ``data/quarantine/`` - they are live malware. They are
-written ``0600``, named from a digest this module computes itself, deleted as soon
-as the record reaches a terminal state, and never returned by any accessor.
+Sample bytes are held in the ``quarantine`` store - they are live malware. They are
+written exclusively and owner-only (``0600`` on the local backend), named from a
+digest this module computes itself, deleted as soon as the record reaches a terminal
+state, and never returned by any accessor.
 """
 
 import hashlib
 import json
 import logging
-import os
 import re
-import stat
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from ..utils import storage
+from ..utils.storage import store
+
 logger = logging.getLogger(__name__)
 
-_BASE = Path(__file__).resolve().parent.parent.parent
-SUBMISSION_DIR = _BASE / 'data' / 'submissions'
-QUARANTINE_DIR = _BASE / 'data' / 'quarantine'
+# The local-filesystem view of the two stores. Every read and write in this module
+# goes through `store()`; these exist for the operator tools that are local-disk by
+# design (scripts/manage_submissions.py, scripts/purge_data.py) and must be
+# repointed together with `storage.LOCAL_ROOT`, never on their own.
+SUBMISSION_DIR = Path(storage.LOCAL_ROOT) / 'submissions'
+QUARANTINE_DIR = Path(storage.LOCAL_ROOT) / 'quarantine'
 
 STATUS_PENDING = 'pending'
 STATUS_APPROVED = 'approved'
@@ -87,8 +93,13 @@ def _now():
 
 
 def _ensure_dirs():
-    """Create the stores lazily, reading the module globals every time so tests can
-    repoint SUBMISSION_DIR / QUARANTINE_DIR at a temp directory."""
+    """Create the local store directories, reading the module globals every time so
+    tests can repoint them at a temp tree. A no-op on a non-local backend, where
+    there is no directory to create; the store creates its own root on write either
+    way, so this only makes the two directories visible to an operator before the
+    first record exists."""
+    if storage.backend_name() != 'local':
+        return
     SUBMISSION_DIR.mkdir(parents=True, exist_ok=True)
     QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -159,41 +170,38 @@ def _public(record):
     return clean
 
 
-def _record_path(sid):
-    return SUBMISSION_DIR / f'{sid}.json'
+def _record_key(sid):
+    return f'{sid}.json'
 
 
 def _save(record):
     """Persist atomically - a torn record would be unreadable, and an unreadable
-    record for an in-flight send is an untrackable transmission."""
-    _ensure_dirs()
+    record for an in-flight send is an untrackable transmission. ``write_text`` is
+    the atomic one: temp-and-replace locally, a single object generation on GCS."""
     sid = record.get('id')
-    path = _record_path(sid)
-    tmp = path.with_suffix('.json.tmp')
-    tmp.write_text(json.dumps(record, default=str), encoding='utf-8')
-    os.replace(tmp, path)
+    store('submissions').write_text(_record_key(sid), json.dumps(record, default=str))
     return record
 
 
 def _load(sid):
     """Read a record for internal use. Returns None for a missing, unreadable or
-    non-object file; a partial record comes back as-is and every reader uses
+    non-object record; a partial record comes back as-is and every reader uses
     .get()."""
     if not sid or not _UUID_RE.match(str(sid)):
         return None
-    path = _record_path(sid)
-    if not path.is_file():
+    raw = store('submissions').read_text(_record_key(sid))
+    if raw is None:
         return None
     try:
-        record = json.loads(path.read_text(encoding='utf-8'))
+        record = json.loads(raw)
     except Exception:
         logger.warning('Submission %s is unreadable', sid)
         return None
     if not isinstance(record, dict):
         return None
-    # The filename wins over a stored id: a record whose id disagrees with its
-    # filename would produce links and follow-up calls that hit a different record.
-    record['id'] = path.stem
+    # The record's own key wins over a stored id: a record whose id disagrees with
+    # the key would produce links and follow-up calls that hit a different record.
+    record['id'] = str(sid)
     return record
 
 
@@ -208,8 +216,8 @@ def _touch(record, status):
     return record
 
 
-def _quarantine_path(sha256, sid):
-    """Flat, self-derived filename: ``<sha256>-<record-id>.bin``.
+def _quarantine_key(sha256, sid):
+    """Flat, self-derived store key: ``<sha256>-<record-id>.bin``.
 
     Both halves are generated here - the digest from the bytes themselves, the id
     from ``uuid4`` - so nothing the caller supplied reaches the filesystem. The
@@ -222,27 +230,18 @@ def _quarantine_path(sha256, sid):
     digest = str(sha256 or '').lower()
     if not _SHA256_RE.match(digest) or not _UUID_RE.match(str(sid or '')):
         return None
-    return QUARANTINE_DIR / f'{digest}-{sid}.bin'
+    return f'{digest}-{sid}.bin'
 
 
 def _write_quarantine(data, sha256, sid):
-    path = _quarantine_path(sha256, sid)
-    if path is None:
+    key = _quarantine_key(sha256, sid)
+    if key is None:
         raise ValueError('refusing to quarantine under a non-derived filename')
-    _ensure_dirs()
-    # O_EXCL is deliberate: a pre-existing file under a name only this module can
-    # produce means something is wrong, and truncating it would destroy a sample.
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, 'O_NOFOLLOW'):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(path, flags, 0o600)
-    try:
-        os.write(fd, data)
-    finally:
-        os.close(fd)
-    # Explicit, because the create mode above is masked by the process umask.
-    os.chmod(path, 0o600)
-    return path
+    # exclusive is deliberate: a pre-existing object under a name only this module
+    # can produce means something is wrong, and overwriting it would destroy a
+    # sample. private is the 0600 the local backend creates it with.
+    store('quarantine').write_bytes(key, data, exclusive=True, private=True)
+    return key
 
 
 def _drop_quarantine(record, why):
@@ -251,12 +250,12 @@ def _drop_quarantine(record, why):
     quarantine = record.get('quarantine')
     if not isinstance(quarantine, dict) or not quarantine.get('stored'):
         return
-    path = _quarantine_path(quarantine.get('sha256'), record.get('id'))
-    if path is not None:
+    key = _quarantine_key(quarantine.get('sha256'), record.get('id'))
+    if key is not None:
+        # A sample that is already gone still gets marked removed below - delete()
+        # reports absence rather than raising.
         try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
+            store('quarantine').delete(key)
         except Exception as exc:
             logger.error('Could not remove quarantined sample for %s: %s',
                          record.get('id'), exc)
@@ -435,8 +434,6 @@ def queue_sample(data, filename, *, source_analysis=None, tags=None, references=
 
 def list_submissions(status=None, limit=100):
     """Newest-first summaries. Reads only; issues no provider call."""
-    if not SUBMISSION_DIR.is_dir():
-        return []
     wanted = None
     if status:
         wanted = {status} if isinstance(status, str) else set(status)
@@ -446,14 +443,15 @@ def list_submissions(status=None, limit=100):
     except (TypeError, ValueError):
         limit = 100
 
-    files = sorted(SUBMISSION_DIR.glob('*.json'),
-                   key=lambda p: p.stat().st_mtime, reverse=True)
+    records = store('submissions')
     out = []
-    for path in files:
+    # `limit` bounds the returned summaries, not the records examined, so a status
+    # filter still finds `limit` matches behind newer non-matching records.
+    for entry in records.list(suffix='.json'):
         if len(out) >= limit:
             break
         try:
-            record = json.loads(path.read_text(encoding='utf-8'))
+            record = json.loads(records.read_text(entry['key']) or '')
         except Exception:
             continue
         if not isinstance(record, dict):
@@ -465,7 +463,7 @@ def list_submissions(status=None, limit=100):
         quarantine = record.get('quarantine')
         quarantine = quarantine if isinstance(quarantine, dict) else {}
         out.append({
-            'id': path.stem,
+            'id': entry['key'][:-len('.json')],
             'created_at': record.get('created_at'),
             'updated_at': record.get('updated_at'),
             'kind': record.get('kind'),
@@ -527,13 +525,15 @@ def _send(record):
     if kind == KIND_SAMPLE:
         quarantine = record.get('quarantine')
         quarantine = quarantine if isinstance(quarantine, dict) else {}
-        path = _quarantine_path(quarantine.get('sha256'), record.get('id'))
-        if path is None or not quarantine.get('stored') or not path.is_file():
+        key = _quarantine_key(quarantine.get('sha256'), record.get('id'))
+        if key is None or not quarantine.get('stored'):
             return _envelope_failure('quarantined_sample_missing')
         try:
-            data = path.read_bytes()
+            data = store('quarantine').read_bytes(key)
         except Exception as exc:
             return _envelope_failure('quarantined_sample_unreadable', exc)
+        if data is None:
+            return _envelope_failure('quarantined_sample_missing')
         fn = _provider_call('upload_sample')
         if fn is None:
             return _envelope_failure('submitter_unavailable')
@@ -626,50 +626,49 @@ def reject(sid, reason):
 def purge_quarantine(max_age_days, apply=False):
     """Age out quarantined samples. Reports by default; deletes only with apply=True.
 
-    Only files matching this module's own ``<sha256>-<uuid>.bin`` naming are
-    considered - anything else in the directory is reported and left alone rather
-    than assumed to be junk. Age comes from mtime, never from a field inside a
-    record, so a malformed record cannot make its sample immortal.
+    Only keys matching this module's own ``<sha256>-<uuid>.bin`` naming are
+    considered - anything else in the store is reported and left alone rather than
+    assumed to be junk. Age comes from the stored object's modification time, never
+    from a field inside a record, so a malformed record cannot make its sample
+    immortal.
+
+    ``list()`` never yields anything the store could not itself have written: on the
+    local backend a symlink, a subdirectory or a name outside the key allowlist is
+    skipped rather than reported in ``unexpected``. Either way it is never deleted.
     """
     stats = {'apply': bool(apply), 'max_age_days': max_age_days, 'checked': 0,
              'matched': 0, 'removed': 0, 'bytes': 0, 'errors': 0,
              'files': [], 'unexpected': []}
-    if not QUARANTINE_DIR.is_dir():
-        return stats
     try:
         cutoff = (datetime.now(timezone.utc)
                   - timedelta(days=float(max_age_days))).timestamp()
     except (TypeError, ValueError):
         raise ValueError('max_age_days must be a number')
 
-    for path in sorted(QUARANTINE_DIR.iterdir(), key=lambda p: p.name):
-        try:
-            st = path.lstat()
-        except OSError:
-            continue
-        # lstat, never stat: a symlink is reported, not followed out of the store.
-        if not stat.S_ISREG(st.st_mode):
-            stats['unexpected'].append(path.name)
-            continue
+    quarantine = store('quarantine')
+    # By name, not newest-first: the operator reads this report, and a stable
+    # ordering is what makes two runs comparable.
+    for entry in sorted(quarantine.list(), key=lambda e: e['key']):
+        name = entry['key']
         stats['checked'] += 1
-        if not _QUARANTINE_RE.match(path.name):
-            stats['unexpected'].append(path.name)
+        if not _QUARANTINE_RE.match(name):
+            stats['unexpected'].append(name)
             continue
-        if st.st_mtime > cutoff:
+        if entry['modified'] > cutoff:
             continue
         stats['matched'] += 1
-        stats['bytes'] += st.st_size
-        stats['files'].append(path.name)
+        stats['bytes'] += entry['size']
+        stats['files'].append(name)
         if not apply:
             continue
         try:
-            path.unlink()
+            quarantine.delete(name)
         except Exception as exc:
-            logger.error('Could not purge %s: %s', path.name, exc)
+            logger.error('Could not purge %s: %s', name, exc)
             stats['errors'] += 1
             continue
         stats['removed'] += 1
-        _mark_purged(path.name)
+        _mark_purged(name)
     return stats
 
 

@@ -5,9 +5,12 @@ fake, so every case asserts on the record the queue builds and on *how many time
 the provider was called*. The call count is the whole point - this module exists so
 that nothing reaches abuse.ch without an operator's approve().
 
-`SUBMISSION_DIR` / `QUARANTINE_DIR` are repointed at a temp tree for the entire run
-(`check_isolation` refuses to proceed otherwise). The real `data/` holds live
-records and live malware and must never be touched by a test.
+`storage.LOCAL_ROOT` - and with it both stores this module writes to, plus
+`submissions.SUBMISSION_DIR` / `QUARANTINE_DIR`, the local paths the operator CLI
+reads - is repointed at a temp tree for the entire run (`check_isolation` refuses to
+proceed otherwise, and checks the store roots themselves, not just the two module
+constants). The real `data/` holds live records and live malware and must never be
+touched by a test.
 """
 import hashlib
 import json
@@ -26,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import logging
 
 from app.services import submissions
+from app.utils import storage
 
 # Most failure cases here log at WARNING/ERROR on purpose.
 logging.disable(logging.CRITICAL)
@@ -136,9 +140,18 @@ def queue_a_sample(provider=None, filename='invoice.doc.exe', **kwargs):
 
 
 def check_isolation():
-    """Refuse to run against the real data directory under any circumstances."""
+    """Refuse to run against the real data directory under any circumstances.
+
+    Checks the store roots the module actually writes through as well as the two
+    local-path constants: repointing only one of them would send half the I/O into
+    the real `data/`.
+    """
+    if storage.backend_name() != 'local':
+        raise SystemExit('REFUSING TO RUN: these cases assert local-filesystem '
+                         'behaviour; unset STORAGE_BACKEND')
     real = Path(submissions.__file__).resolve().parent.parent.parent / 'data'
-    for directory in (submissions.SUBMISSION_DIR, submissions.QUARANTINE_DIR):
+    for directory in (submissions.SUBMISSION_DIR, submissions.QUARANTINE_DIR,
+                      storage.LOCAL_ROOT):
         resolved = Path(directory).resolve()
         if real in resolved.parents or resolved == real:
             raise SystemExit(f'REFUSING TO RUN: {directory} is inside the real data store')
@@ -687,8 +700,13 @@ def test_purge_quarantine():
 
 def main():
     root = Path(tempfile.mkdtemp(prefix='nexustrace-submissions-'))
+    real_local_root = storage.LOCAL_ROOT
     real_submission_dir = submissions.SUBMISSION_DIR
     real_quarantine_dir = submissions.QUARANTINE_DIR
+    # The store roots and the module's local-path constants must move together -
+    # the cases read both. reset_cache() drops Stores memoised against the old root.
+    storage.LOCAL_ROOT = root
+    storage.reset_cache()
     submissions.SUBMISSION_DIR = root / 'submissions'
     submissions.QUARANTINE_DIR = root / 'quarantine'
     check_isolation()
@@ -718,6 +736,8 @@ def main():
         submissions.PROVIDER = None
         submissions.SUBMISSION_DIR = real_submission_dir
         submissions.QUARANTINE_DIR = real_quarantine_dir
+        storage.LOCAL_ROOT = real_local_root
+        storage.reset_cache()
         shutil.rmtree(root, ignore_errors=True)
 
     if failures:

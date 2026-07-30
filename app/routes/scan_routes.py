@@ -1,7 +1,13 @@
 """URL scanner routes."""
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, send_file, abort, flash
-from ..services.scan_service import run_scan, get_scan, list_scans, screenshot_path
+from ..services.scan_service import (
+    get_scan,
+    list_scans,
+    run_scan,
+    screenshot_local_path,
+    screenshot_stream,
+)
 from ..utils.url_guard import is_scannable
 
 logger = logging.getLogger(__name__)
@@ -55,7 +61,12 @@ def url_scan_screenshot(scan_id):
     stage = request.args.get('stage')
     if stage is not None and stage not in ('load', 'after-scroll', 'after-consent'):
         abort(404)
-    path = screenshot_path(scan_id, stage)
-    if not path.exists():
+    # Served from disk when the store is local, and from its bytes otherwise -
+    # a GCS-backed screenshot has no filesystem path.
+    path = screenshot_local_path(scan_id, stage)
+    if path is not None:
+        return send_file(path, mimetype='image/png')
+    stream = screenshot_stream(scan_id, stage)
+    if stream is None:
         abort(404)
-    return send_file(path, mimetype='image/png')
+    return send_file(stream, mimetype='image/png')

@@ -31,6 +31,24 @@ RUN python -m venv /app/.venv && \
         --only-binary=cryptography,numpy,pandas,pillow,cffi,greenlet,maxminddb,aiohttp,multidict,yarl,frozenlist,propcache \
         -r requirements.txt
 
+# google-cloud-storage is an optional extra (see [project.optional-dependencies] in
+# pyproject.toml) that app/utils/storage.py imports lazily, so it is absent from
+# requirements.txt - `uv export` does not emit extras. It is needed ONLY by an image
+# that will run with STORAGE_BACKEND=gcs, i.e. Cloud Run; the VM/Compose deployment
+# would just be carrying dead weight. Build that image with:
+#     docker build --build-arg INSTALL_GCS=true ...
+# Kept as its own layer so toggling it does not invalidate the expensive install above.
+# The version is pinned to match the extra; pip resolves the transitive google-auth /
+# google-api-core chain at build time. If you need those pinned too, generate
+# `uv export --no-dev --no-hashes --extra gcs -o requirements-gcs.txt` and build from it
+# instead of using this flag.
+ARG INSTALL_GCS=false
+RUN if [ "$INSTALL_GCS" = "true" ]; then \
+        /app/.venv/bin/pip install --no-cache-dir \
+            --only-binary=google-crc32c,cryptography \
+            "google-cloud-storage==3.13.0"; \
+    fi
+
 # Chromium's system libraries, then the browser itself into PLAYWRIGHT_BROWSERS_PATH.
 # Installing as root into a shared world-readable path avoids the USER root/appuser
 # flip-flop and the dependence on /home/appuser/.cache/.
@@ -65,4 +83,11 @@ EXPOSE 5050
 
 # Threads, not processes: each scan drives a real Chromium instance inside the request.
 # See CLAUDE.md's URL Scanner section before changing this.
-CMD ["gunicorn", "--bind", "0.0.0.0:5050", "--workers", "1", "--threads", "8", "--worker-class", "gthread", "--timeout", "120", "main:app"]
+#
+# Shell form (via `sh -c exec`) rather than a plain exec-form array because the bind
+# port has to be resolved at runtime: Cloud Run injects PORT=8080 and fails the startup
+# probe if the container listens anywhere else, while docker-compose.yml sets
+# FLASK_PORT=5050 and maps 5050:5050. `exec` keeps gunicorn as PID 1 so SIGTERM still
+# reaches it (Cloud Run sends SIGTERM, then kills after 10s). Precedence here must match
+# main.py:resolve_port().
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-${FLASK_PORT:-5050}} --workers 1 --threads 8 --worker-class gthread --timeout 120 main:app"]
