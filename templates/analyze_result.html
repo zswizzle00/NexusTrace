@@ -138,7 +138,9 @@
           <div class="nt-verdict__stat">
             <span class="nt-verdict__stat-label">Network</span>
             <span class="nt-verdict__stat-value" title="{{ asn_name }}{% if asn_num %} ({{ asn_num }}){% endif %}">
-              {% if asn_name %}{{ asn_name }}{% if asn_num %} · {% endif %}{% endif %}{{ asn_num }}
+              {# nbsp after the separator so "· AS13335" wraps as one unit instead of
+                 leaving a dangling middot at the end of a line. #}
+              {% if asn_name %}{{ asn_name }}{% if asn_num %} ·&nbsp;{% endif %}{% endif %}{{ asn_num }}
             </span>
           </div>
         {% endif %}
