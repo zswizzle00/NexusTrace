@@ -16,7 +16,6 @@ import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timezone
-from pathlib import Path
 
 import dns.exception
 import dns.resolver
@@ -35,14 +34,11 @@ from ..utils.email_parse import (
     sender_domain,
 )
 from ..utils.iocs import defang, extract_iocs
+from ..utils.storage import store
 from ..utils.url_guard import is_scannable
 from . import email_rules
 
 logger = logging.getLogger(__name__)
-
-_BASE = Path(__file__).resolve().parent.parent.parent
-ANALYSIS_DIR = _BASE / 'data' / 'analyses'
-ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Enrichment caps. A phishing mail can carry dozens of indicators; enriching all
 # of them would exhaust VirusTotal's 4-req/min free tier and take tens of
@@ -301,8 +297,8 @@ def analyze_email(raw, source='upload'):
 
 
 def save_analysis(analysis):
-    path = ANALYSIS_DIR / f"{analysis['id']}.json"
-    path.write_text(json.dumps(analysis, default=str), encoding='utf-8')
+    store('analyses').write_text(f"{analysis['id']}.json",
+                                 json.dumps(analysis, default=str))
 
 
 def get_analysis(analysis_id):
@@ -310,27 +306,27 @@ def get_analysis(analysis_id):
         uuid.UUID(str(analysis_id))
     except (ValueError, AttributeError, TypeError):
         return None
-    path = ANALYSIS_DIR / f'{analysis_id}.json'
-    if not path.exists():
+    raw = store('analyses').read_text(f'{analysis_id}.json')
+    if raw is None:
         return None
     try:
-        return json.loads(path.read_text(encoding='utf-8'))
+        return json.loads(raw)
     except Exception:
         return None
 
 
 def list_analyses(limit=100):
-    files = sorted(ANALYSIS_DIR.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+    analyses = store('analyses')
     results = []
-    for path in files[:limit]:
+    for entry in analyses.list(suffix='.json', limit=limit):
         try:
-            data = json.loads(path.read_text(encoding='utf-8'))
+            data = json.loads(analyses.read_text(entry['key']) or '')
         except Exception:
             continue
         results.append({
-            # The filename, not data['id']: a stored id disagreeing with its
-            # filename would produce links that 404.
-            'id': path.stem,
+            # The key, not data['id']: a stored id disagreeing with its record
+            # name would produce links that 404.
+            'id': entry['key'][:-len('.json')],
             'created_at': data.get('created_at'),
             'subject': (data.get('headers') or {}).get('subject'),
             'from': (data.get('headers') or {}).get('from'),

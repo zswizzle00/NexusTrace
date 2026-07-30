@@ -8,7 +8,6 @@ import socket
 import ssl
 import uuid
 from datetime import datetime
-from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
 import dns.resolver
@@ -16,17 +15,11 @@ import dns.reversename
 import dns.exception
 
 from ..utils.iocs import extract_iocs
+from ..utils.storage import store
 from ..utils.url_guard import UnsafeURLError, caching_resolver, is_scannable, validate_target
 from .scan_rules import score as score_scan
 
 logger = logging.getLogger(__name__)
-
-_BASE = Path(__file__).resolve().parent.parent.parent
-SCAN_DIR = _BASE / 'data' / 'scans'
-SCREENSHOT_DIR = _BASE / 'data' / 'screenshots'
-
-SCAN_DIR.mkdir(parents=True, exist_ok=True)
-SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 MOBILE_UA = (
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
@@ -38,17 +31,25 @@ MOBILE_UA = (
 _CONSENT_NAME = re.compile(r'accept|agree|consent|allow|got it|i understand', re.I)
 
 
+def _scan_key(scan_id: str) -> str:
+    return f'{scan_id}.json'
+
+
 def save_scan(scan: dict) -> None:
-    path = SCAN_DIR / f"{scan['id']}.json"
-    path.write_text(json.dumps(scan, default=str), encoding='utf-8')
+    store('scans').write_text(_scan_key(scan['id']), json.dumps(scan, default=str))
 
 
 def get_scan(scan_id: str) -> dict | None:
-    path = SCAN_DIR / f"{scan_id}.json"
-    if not path.exists():
+    try:
+        raw = store('scans').read_text(_scan_key(scan_id))
+    except ValueError:
+        # A scan_id the store's key allowlist rejects is a lookup miss, not a
+        # server error: this id comes straight off the URL path.
+        return None
+    if raw is None:
         return None
     try:
-        data = json.loads(path.read_text(encoding='utf-8'))
+        data = json.loads(raw)
     except Exception:
         return None
     if not isinstance(data, dict):
@@ -61,11 +62,14 @@ def get_scan(scan_id: str) -> dict | None:
 
 
 def list_scans(limit: int = 100) -> list:
-    files = sorted(SCAN_DIR.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+    scans = store('scans')
+    # One screenshot listing rather than an existence check per scan: on GCS that
+    # is one request instead of `limit` of them.
+    shot_keys = {entry['key'] for entry in store('screenshots').list(suffix='.png')}
     result = []
-    for f in files[:limit]:
+    for entry in scans.list(suffix='.json', limit=limit):
         try:
-            data = json.loads(f.read_text(encoding='utf-8'))
+            data = json.loads(scans.read_text(entry['key']) or '')
             sid = data.get('id', '')
             # `or {}`, not a .get() default: a JSON-null `page` would raise here and
             # be swallowed below, vanishing from the recent list instead of rendering.
@@ -79,20 +83,37 @@ def list_scans(limit: int = 100) -> list:
                 'main_ip': data.get('main_ip'),
                 'asn': (data.get('asn') or {}).get('asn'),
                 'title': page.get('title'),
-                'has_screenshot': screenshot_path(sid).exists() if sid else False,
+                'has_screenshot': screenshot_key(sid) in shot_keys if sid else False,
             })
         except Exception:
             continue
     return result
 
 
-def screenshot_path(scan_id: str, label: str | None = None) -> Path:
-    """Path for a scan's screenshot. ``label=None`` is the full-page shot and keeps
-    the original ``<id>.png`` name, so pre-staged-capture scans and ``list_scans``'
-    has_screenshot check keep working."""
+def screenshot_key(scan_id: str, label: str | None = None) -> str:
+    """Store key for a scan's screenshot. ``label=None`` is the full-page shot and
+    keeps the original ``<id>.png`` name, so pre-staged-capture scans and
+    ``list_scans``' has_screenshot check keep working."""
     if label:
-        return SCREENSHOT_DIR / f'{scan_id}-{label}.png'
-    return SCREENSHOT_DIR / f'{scan_id}.png'
+        return f'{scan_id}-{label}.png'
+    return f'{scan_id}.png'
+
+
+def screenshot_local_path(scan_id: str, label: str | None = None):
+    """The screenshot's filesystem path, or None when there is none to serve from
+    disk - either the key is absent or the backend is not local."""
+    try:
+        return store('screenshots').local_path(screenshot_key(scan_id, label))
+    except ValueError:
+        return None
+
+
+def screenshot_stream(scan_id: str, label: str | None = None):
+    """The screenshot's bytes as a file object, or None when absent."""
+    try:
+        return store('screenshots').open_stream(screenshot_key(scan_id, label))
+    except ValueError:
+        return None
 
 
 _RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SOA', 'CAA']
@@ -1043,7 +1064,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
             def _capture(label, full_page=False):
                 try:
                     shot = page.screenshot(full_page=full_page, type='png')
-                    screenshot_path(scan_id, label).write_bytes(shot)
+                    store('screenshots').write_bytes(screenshot_key(scan_id, label), shot)
                     scan['screenshots'].append({
                         'label': label,
                         'url': f'/url_scan/screenshot/{scan_id}?stage={label}',
@@ -1075,7 +1096,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
             full_page_screenshot_url = None
             try:
                 shot_bytes = page.screenshot(full_page=True, type='png')
-                screenshot_path(scan_id).write_bytes(shot_bytes)
+                store('screenshots').write_bytes(screenshot_key(scan_id), shot_bytes)
                 full_page_screenshot_url = f'/url_scan/screenshot/{scan_id}'
             except Exception as exc:
                 logger.debug('Full-page screenshot failed: %s', exc)

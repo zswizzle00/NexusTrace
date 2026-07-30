@@ -45,6 +45,19 @@ dependencies = [
     "publicsuffixlist==1.0.2.20260726",
 ]
 
+# Optional, and deliberately not a base dependency: app/utils/storage.py imports
+# google.cloud.storage lazily inside its GCS backend, so the default local/Docker
+# deployment never needs this installed. Only a Cloud Run image (STORAGE_BACKEND=gcs)
+# does, and it must install the extra explicitly - `uv export --no-dev` does NOT
+# include extras, so google-cloud-storage is absent from requirements.txt by design:
+#     uv export --no-dev --no-hashes --extra gcs -o requirements-gcs.txt
+#   or, on top of the base image:
+#     pip install "google-cloud-storage==3.13.0"
+[project.optional-dependencies]
+gcs = [
+    "google-cloud-storage==3.13.0",
+]
+
 # No [build-system] table on purpose: NexusTrace is a deployable application, not an
 # installable library. uv therefore manages the environment without trying to build/install
 # the project itself.

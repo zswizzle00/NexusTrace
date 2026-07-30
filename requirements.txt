@@ -1,5 +1,8 @@
 # Pinned dependencies for Docker builds. Regenerate with:
 #   uv export --no-dev --no-hashes -o requirements.txt
+# Extras are NOT exported. The optional `gcs` extra (google-cloud-storage, needed only
+# for STORAGE_BACKEND=gcs on Cloud Run) is therefore absent here on purpose; a Cloud Run
+# image installs it separately. See [project.optional-dependencies] in pyproject.toml.
 aiohappyeyeballs==2.6.2
     # via aiohttp
 aiohttp==3.14.1

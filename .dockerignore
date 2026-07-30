@@ -23,10 +23,14 @@ tools/
 .git
 .gitignore
 
-# Docker
+# Docker / deployment manifests. service.yaml is applied to Cloud Run from the
+# developer's machine (`gcloud run services replace`); it is never read by the
+# container, and it names the project's service account and secrets.
 Dockerfile
 docker-compose.yml
 .dockerignore
+service.yaml
+nginx.conf
 
 # Logs
 logs/

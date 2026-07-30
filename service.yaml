@@ -1,0 +1,214 @@
+# Cloud Run service manifest for NexusTrace.
+#
+#   gcloud run services replace service.yaml --region <REGION>
+#
+# Replace every PROJECT_ID / REGION / BUCKET placeholder before applying; the full
+# procedure, including the Secret Manager entries this file references, is in
+# docs/cloud-run.md. This file is declarative and authoritative: `services replace`
+# removes anything not named here, so do not mix it with ad-hoc `gcloud run deploy
+# --set-env-vars` edits - change the file and re-apply.
+#
+# This manifest is NOT used by docker-compose.yml or the VM deployment.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: nexustrace
+  annotations:
+    # 'all' = reachable from the internet. Use 'internal-and-cloud-load-balancing'
+    # if the service sits behind a Google external load balancer or is VPN-only;
+    # that is also the only way to put Cloud Armor / IAP in front of it.
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # minScale 1: the image carries a 307 MB venv plus Chromium, and the first
+        # scan also has to launch the browser. Cold starts are measured in tens of
+        # seconds, and an analyst pasting an indicator will read that as a hang.
+        # min 1 also keeps the cache-clearing daemon thread alive between requests
+        # (see cpu-throttling below).
+        autoscaling.knative.dev/minScale: "1"
+        # maxScale 1 is deliberate, not a cost default. Two constraints:
+        #  1. Rate limiters (app/utils/rate_limiter.py) are per-process module-level
+        #     singletons. Two instances double the real request rate against every
+        #     provider; VirusTotal's free tier is 4 req/MINUTE, so a second instance
+        #     silently turns compliance into 429s.
+        #  2. With STORAGE_BACKEND=local each instance has its own in-memory
+        #     filesystem, so /url_scan and /email_analysis listings differ per
+        #     instance and result pages 404 depending on which instance answers.
+        # Raise this only after STORAGE_BACKEND=gcs is in place AND you accept the
+        # multiplied provider rate. SECRET_KEY must already come from Secret Manager
+        # (it does below) or CSRF breaks across instances.
+        autoscaling.knative.dev/maxScale: "1"
+        # gen2 gives a full Linux syscall surface (gVisor in gen1 is a poor host for
+        # Chromium) plus real /tmp and network-mount support.
+        run.googleapis.com/execution-environment: gen2
+        # CPU always allocated. Required for two background behaviours that would
+        # otherwise not run: the 30-minute cache-clearing daemon thread in
+        # app/utils/cache.py, and any straggler enrichment thread that outlives its
+        # request (email_service's ENRICH_DEADLINE detaches, it does not cancel).
+        # Cost: you pay for the instance's full lifetime, not just request time -
+        # roughly 3-4x an idle request-billed instance at minScale 1. If that is not
+        # acceptable, set this to "true" and accept that caches only expire lazily
+        # via each function's own TTL, which is the pre-existing fallback.
+        run.googleapis.com/cpu-throttling: "false"
+        # Extra CPU during startup only; shortens the interpreter + import cost of
+        # the first boot without paying for 4 vCPU steady-state.
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      # Match gunicorn's --threads 8 exactly. Cloud Run's default is 80, which would
+      # hand this container 80 simultaneous requests for 8 worker threads: the extra
+      # 72 sit in the socket backlog, and because a URL scan holds its thread for
+      # ~30s+ while a real Chromium process runs, queued requests blow through both
+      # gunicorn's --timeout 120 and timeoutSeconds below. Pinning concurrency to the
+      # thread count makes Cloud Run's own queue (and its autoscaler) do the waiting,
+      # where it is visible in metrics instead of manifesting as random 504s.
+      containerConcurrency: 8
+      # Must exceed gunicorn's --timeout 120 so a hung worker is killed by gunicorn -
+      # which logs it and returns a 502 - rather than the request being cut off by the
+      # platform first, which surfaces as an unattributable 504. 180 leaves 60s of
+      # headroom for the response to be written.
+      timeoutSeconds: 180
+      # Least privilege. This account needs ONLY: secretmanager.secretAccessor on the
+      # secrets below, and object read/write on the GCS_BUCKET. It must not be the
+      # default compute service account (project-wide Editor). The scanner makes
+      # outbound requests to attacker-supplied URLs, so treat this identity as
+      # reachable - see the Security section of docs/cloud-run.md.
+      serviceAccountName: nexustrace-run@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - name: nexustrace
+          image: REGION-docker.pkg.dev/PROJECT_ID/nexustrace/nexustrace:TAG
+          ports:
+            # Cloud Run injects PORT with this value; the Dockerfile CMD binds
+            # ${PORT:-${FLASK_PORT:-5050}}, so 8080 here and 5050 under Compose both
+            # work from the same image. Do not also set a PORT env var - it is
+            # reserved and would be rejected.
+            - name: http
+              containerPort: 8080
+          resources:
+            limits:
+              # 2 vCPU: Chromium page rendering is CPU-bound, and Cloud Run's own
+              # CPU/memory minimums require >= 2 CPU at 4Gi. At 1 CPU, two concurrent
+              # scans serialize on rendering and both approach the 120s timeout.
+              cpu: "2"
+              # 4Gi budget, at containerConcurrency 8:
+              #   ~250 MB  Python + Flask + the loaded MMDB reader
+              #   ~350 MB  per in-flight scan (Chromium browser + renderer on a
+              #            script-heavy page; --disable-dev-shm-usage means this is
+              #            all heap, there is no /dev/shm to spill into)
+              #   ~100 MB  full-page PNG buffers and visible-text extraction
+              # Eight concurrent scans is the worst case (8 x ~350 MB = 2.8 GB) and is
+              # also unusual - most requests are API fan-outs, not scans. 4Gi covers
+              # it with ~700 MB of headroom. Two things make this a ceiling, not a
+              # guess to leave alone: with STORAGE_BACKEND=local every scan JSON and
+              # screenshot is written to an IN-MEMORY filesystem and charged here, and
+              # OOM on Cloud Run kills the instance rather than the request. Watch the
+              # container/memory/utilizations metric; if it sits above ~70%, drop
+              # --threads and containerConcurrency to 4 together rather than raising
+              # memory, because 4 concurrent Chromiums is the cheaper fix.
+              memory: 4Gi
+          env:
+            # HTTPS is terminated by Google's front end and X-Forwarded-Proto arrives
+            # as https, so Secure cookies are correct and required here.
+            - name: SECURE_COOKIES
+              value: "true"
+            # The container filesystem is in-memory and per-instance. See the
+            # STORAGE_BACKEND notes in .env.example.
+            - name: STORAGE_BACKEND
+              value: gcs
+            - name: GCS_BUCKET
+              value: BUCKET_NAME
+            # HARD PREREQUISITE. Without a fixed value, app/__init__.py generates a
+            # per-process os.urandom(32) key, and every revision, restart, or extra
+            # instance invalidates CSRF tokens and sessions minted by the previous
+            # one - form POSTs then fail with "Your session expired" at random.
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-secret-key
+                  key: latest
+            # Provider keys. Every one is optional in the app - a service whose key is
+            # missing is skipped and its card does not render - but a secretKeyRef to a
+            # secret that does not exist is a HARD DEPLOY FAILURE. Delete the blocks
+            # you have no key for instead of pointing them at empty secrets.
+            - name: VPNAPI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-vpnapi-key
+                  key: latest
+            - name: IPINFO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-ipinfo-token
+                  key: latest
+            - name: SHODAN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-shodan-key
+                  key: latest
+            - name: ABUSEIPDB_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-abuseipdb-key
+                  key: latest
+            - name: PROXYCHECK_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-proxycheck-key
+                  key: latest
+            - name: IP2LOCATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-ip2location-key
+                  key: latest
+            - name: IP2WHOIS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-ip2whois-key
+                  key: latest
+            - name: URLSCAN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-urlscan-api-key
+                  key: latest
+            - name: VIRUSTOTAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-virustotal-api-key
+                  key: latest
+            - name: ALIENVAULT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-alienvault-key
+                  key: latest
+            # One key for MalwareBazaar / ThreatFox / URLhaus. Mandatory as of 2026:
+            # without it those sources return 401 and report as unavailable rather
+            # than "nothing known", which is a silent loss of coverage.
+            - name: ABUSECH_AUTH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexustrace-abusech-auth-key
+                  key: latest
+          # /api/health does no network I/O and touches no optional config
+          # (app/services/health_service.py), so it is safe to poll.
+          startupProbe:
+            httpGet:
+              path: /api/health
+            # 12 x 10s = 120s, inside Cloud Run's 240s startup budget. The image is
+            # large and the first import chain is slow; a tighter probe restart-loops
+            # a container that would have come up fine.
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/health
+            # Deliberately slack: with 8 threads all held by scans, a health request
+            # can wait for a thread. 60s x 3 failures avoids restarting a busy
+            # instance and losing in-flight scans.
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+  traffic:
+    - percent: 100
+      latestRevision: true
