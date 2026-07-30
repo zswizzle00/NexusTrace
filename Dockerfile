@@ -20,23 +20,22 @@ COPY requirements.txt ./
 # numpy/pandas (~25 min) on a 2-core VM. Everything else keeps pip's default, so the
 # sdist-only pure-Python packages (builtwith, python-whois, future, otxv2) still install.
 # That is also why build-essential is not installed here - nothing needs a compiler.
-# The cache mount needs BuildKit; it is mutually exclusive with --no-cache-dir.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m venv /app/.venv && \
-    /app/.venv/bin/pip install \
+#
+# No `RUN --mount=type=cache` here: the production host runs docker-compose v1 with the
+# legacy builder and no buildx, where a cache mount is a hard build failure. Once buildx
+# and the compose v2 plugin are installed, wrap this in
+#   RUN --mount=type=cache,target=/root/.cache/pip
+# and drop --no-cache-dir (the two are mutually exclusive) to stop re-downloading wheels.
+RUN python -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir \
         --only-binary=cryptography,numpy,pandas,pillow,cffi,greenlet,maxminddb,aiohttp,multidict,yarl,frozenlist,propcache \
         -r requirements.txt
 
 # Chromium's system libraries, then the browser itself into PLAYWRIGHT_BROWSERS_PATH.
 # Installing as root into a shared world-readable path avoids the USER root/appuser
 # flip-flop and the dependence on /home/appuser/.cache/.
-# apt cache mounts survive --no-cache, so a --clean rebuild re-uses the ~100 downloaded
-# .debs instead of re-fetching them. docker-clean must go or Debian's DPkg::Post-Invoke
-# deletes them straight back out of the cache. Nothing apt-related enters the image.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    /app/.venv/bin/playwright install-deps chromium
+RUN /app/.venv/bin/playwright install-deps chromium && \
+    rm -rf /var/lib/apt/lists/*
 RUN /app/.venv/bin/playwright install chromium && \
     chmod -R a+rX /ms-playwright
 
