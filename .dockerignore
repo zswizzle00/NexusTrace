@@ -35,4 +35,30 @@ logs/
 # Local development
 *.db
 *.sqlite3
-.DS_Store 
+.DS_Store
+
+# Runtime data. NOT optional: data/ is bind-mounted by docker-compose.yml, so a copy
+# in the image is dead weight AND every new scan/screenshot busts the `COPY . .` layer
+# and everything after it. scan_service.py and email_service.py mkdir their own store
+# directories at import, so nothing here is needed at build time.
+data/
+
+# Agent scratch, planning docs, and host-side tooling — never served or imported.
+.superpowers/
+.worktrees/
+docs/
+tasks/
+icon_tools/
+.claude/
+.github/
+*.md
+uv.lock
+.publicignore
+.nexustrace.pid
+nexus_auto_update.sh
+start.sh
+stop.sh
+
+# Tests run on the host, not in the image (test_endpoints.py talks to the container
+# over HTTP via NEXUSTRACE_BASE_URL).
+app/tests/ 

@@ -5,7 +5,8 @@
 # Usage:
 #   ./start.sh          - Start development server
 #   ./start.sh --docker - Start/rebuild Docker containers
-#   ./start.sh --prod   - Start production Docker with rebuild
+#   ./start.sh --prod   - Production Docker deployment (cached build)
+#   ./start.sh --clean  - Production deployment with a cold, no-cache rebuild
 
 set -e
 
@@ -32,13 +33,17 @@ show_help() {
     echo "Options:"
     echo "  (none)      Start development server (background, logs to logs/nexustrace.log)"
     echo "  --docker    Start Docker containers (rebuild if code changed)"
-    echo "  --prod      Production Docker deployment (full rebuild)"
+    echo "  --prod      Production Docker deployment (cached build)"
+    echo "  --clean     Production deployment, discarding the build cache"
     echo "  --logs      Tail the dev server log (logs/nexustrace.log)"
     echo "  --help      Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./start.sh              # Dev server on port 5050"
     echo "  ./start.sh --docker     # Docker on ports 80 (nginx) & 5050"
+    echo "  ./start.sh --prod       # Production, reusing cached layers (minutes)"
+    echo "  ./start.sh --clean      # Only when you need a cold rebuild (~40 min:"
+    echo "                          # re-downloads Chromium and all apt/pip deps)"
     echo "  ./start.sh --logs       # Follow server logs"
 }
 
@@ -50,6 +55,9 @@ case "${1:-}" in
         ;;
     --prod)
         MODE="prod"
+        ;;
+    --clean)
+        MODE="clean"
         ;;
     --logs)
         if [ -f "logs/nexustrace.log" ]; then
@@ -79,7 +87,7 @@ if [ ! -f ".env" ]; then
     log_warn ".env file not found. Copy .env.example and configure your API keys."
 fi
 
-if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ]; then
+if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ] || [ "$MODE" = "clean" ]; then
     # Docker mode
     log_info "Starting NexusTrace in Docker mode..."
 
@@ -99,8 +107,11 @@ if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ]; then
     log_step "Stopping existing containers..."
     $COMPOSE down 2>/dev/null || true
 
-    if [ "$MODE" = "prod" ]; then
-        log_step "Building containers (full rebuild)..."
+    # --no-cache is opt-in via --clean, not the default for --prod. A cold build
+    # re-downloads Chromium, every apt package, and every wheel; on the 2-core
+    # production VM that is ~40 minutes, versus minutes for a cached build.
+    if [ "$MODE" = "clean" ]; then
+        log_warn "Cold rebuild: discarding the build cache. Expect ~40 minutes."
         $COMPOSE build --no-cache
     else
         log_step "Building containers (using cache)..."
