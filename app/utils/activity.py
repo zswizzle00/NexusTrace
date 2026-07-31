@@ -4,64 +4,33 @@ cloud.nexustrace.net is served out of a homelab through a Cloudflare Tunnel with
 authentication on any browser route, so the only answer to "who is using this, from
 where, and what did they do" is a log the app writes itself.
 
-**Sensitivity.** These records are analyst-adjacent data, not ordinary web logs. They
-tie a real client IP and country to a timeline of investigative actions, and the
-`rid` field points straight at a scan/analysis record. Treat `data/activity/` exactly
-like `data/scans/` and `data/analyses/`: gitignored, never exported, and covered by
-the same retention/purge policy - there is no separate, laxer obligation because it
-happens to be a log file.
+**Sensitivity.** These records tie a real client IP and country to a timeline of
+investigative actions, and `rid` points straight at a scan/analysis record. Treat
+`data/activity/` exactly like `data/scans/`: gitignored, never exported, same
+retention policy - it gets no laxer obligation for being a log file. One JSON object
+per line in `data/activity/YYYY-MM-DD.jsonl`; `build_entry()` names every persisted
+field as an explicit dict literal rather than a filtered copy, so request bodies, form
+fields, query strings, cookies and headers have no code path to disk.
 
-What is deliberately NOT recorded: request bodies, uploaded bytes, form fields, query
-strings, cookies, and headers wholesale. Only the named fields below are written, and
-the writer is an explicit dict literal rather than a filtered copy of anything, so
-there is no code path by which request content reaches disk.
+**Path sensitivity: the route rule is stored, not the URL.** `/i/<indicator>` embeds
+whatever the user looked up, routinely a customer domain, employee e-mail address, or
+internal hostname; logging it would turn a usage log into a second copy of the analysis
+corpus, with none of the review that decided what `data/analyses/` may hold. The rule
+answers "this person ran an indicator lookup" without answering "on what". Two exceptions:
 
-Record schema, one JSON object per line, `data/activity/YYYY-MM-DD.jsonl`:
+  * `rid` carries a dynamic segment only when it is UUID-shaped: an id this app generated
+    for its own record, opaque, containing no user input. "Who else opened this scan" is
+    the difference between a usage counter and something usable in an incident.
+  * When no route matched, the raw path is stored (sanitised, truncated). It was never
+    interpreted as an indicator; it is a scanner probing `/.env`, which on a public
+    endpoint is the most valuable line in the file. The residual risk is a mistyped
+    indicator landing on a 404, bounded by truncation and accepted.
 
-    ts        str   '2026-07-30T14:03:21.184Z', UTC, millisecond, sortable
-    method    str   'GET'
-    path      str   the matched Flask route RULE, e.g. '/i/<path:indicator>' - see
-                    "Path sensitivity" below; the sanitised raw path when nothing
-                    matched
-    matched   bool  False when no route matched (a 404 probe); `path` is then raw
-    rid       str   optional - the request's UUID-shaped view arg, when it has one
-    endpoint  str   'home.analyze_deeplink', or '' when unmatched
-    status    int   HTTP status of the response
-    ms        float wall duration of the request, milliseconds, 1dp
-    ip        str   the true client IP (see `client_ip`), '' when undeterminable
-    country   str   two-letter CF-IPCountry, '' when absent
-    ua        str   User-Agent, truncated to MAX_UA_CHARS
-    user      str   optional - Cf-Access-Authenticated-User-Email, when Access is on
-    upload    bool  the request carried a multipart body
-    bytes_in  int   Content-Length, 0 when absent
-
-**Path sensitivity - the route rule is stored, not the URL.** `/i/<indicator>`
-embeds whatever the user looked up, which on this deployment is routinely a customer
-domain, employee e-mail address, or internal hostname. Logging it would quietly turn
-a usage log into a second copy of the analysis corpus, with none of the review that
-went into deciding what `data/analyses/` may hold. The route rule answers the actual
-question ("this person ran an indicator lookup") without answering a question nobody
-asked ("on what"). Two deliberate exceptions:
-
-  * `rid` carries a dynamic segment's value when, and only when, it is UUID-shaped.
-    Those are ids this app generated for its own records (`/url_scan/<uuid>`,
-    `/email_analysis/<uuid>`); they are opaque, contain no user input, and being able
-    to ask "who else opened this scan" is the difference between a usage counter and
-    something usable in an incident.
-  * When no route matched, the raw path is stored (sanitised to printable ASCII and
-    truncated). An unmatched path was never interpreted as an indicator - it is a
-    scanner probing `/.env` or `/wp-login.php`, and on a public endpoint that is the
-    single most valuable line in the file. The residual risk is a mistyped indicator
-    landing on a 404; it is bounded by the truncation and accepted.
-
-Query strings are never stored, matched or not.
-
-**Bounds.** Both caps below exist because this is an unauthenticated public endpoint:
-an attacker who can make requests can otherwise make the app fill its own disk.
-
-Storage is local-filesystem only, on purpose: this does not go through
+Query strings are never stored, matched or not. Both caps below exist because this is
+an unauthenticated public endpoint: an attacker who can make requests can otherwise
+make the app fill its own disk. Local filesystem only, deliberately not through
 `app/utils/storage.py`, because a per-request object write against the GCS backend
-would add a network round trip to every single response.
+would add a network round trip to every response.
 """
 
 import ipaddress
@@ -79,38 +48,36 @@ logger = logging.getLogger(__name__)
 
 _BASE = Path(__file__).resolve().parent.parent.parent
 
-# Read on every access rather than captured at import, so tests can repoint the whole
-# tree at a temp directory (see app/tests/test_activity.py). NEXUSTRACE_ACTIVITY_DIR
-# is the deployment escape hatch for putting it on a different volume.
+# Callers re-read this global on every access, so tests can repoint the whole tree at a
+# temp directory. NEXUSTRACE_ACTIVITY_DIR is the deployment escape hatch.
 ACTIVITY_DIR = Path(os.environ.get('NEXUSTRACE_ACTIVITY_DIR') or (_BASE / 'data' / 'activity'))
 
-# ~13 MB/day at the ~260-byte typical line this schema produces, and 100 MB/day in the
-# pathological case where every line is padded to MAX_LINE_BYTES. That is the ceiling a
-# hostile client can force onto the homelab's disk in one day, and it is small enough
-# to survive a week of abuse unnoticed. Past the cap the day's file simply stops
-# growing and one warning is logged; dropping records is the correct failure mode when
-# the alternative is filling the disk out from under the app.
+# ~13 MB/day at this schema's typical 260-byte line, 100 MB/day if every line were
+# padded to MAX_LINE_BYTES: the ceiling a hostile client can force onto the homelab's
+# disk in one day. Past the cap the day's file stops growing and one warning is logged;
+# dropping records beats filling the disk out from under the app.
 MAX_ENTRIES_PER_DAY = 50_000
 
-# A hard backstop on one line. Every variable-length field is already truncated at
-# construction (`ua`, `path`), so a line only reaches this if something unforeseen is
-# long - and an unbounded line is both a disk-exhaustion vector and a way to make the
-# reader allocate arbitrarily. Over the limit, the record is dropped, not truncated:
-# half a JSON object is not parseable and would poison every later read.
+# Backstop on one line. Every variable-length field is already truncated at construction,
+# so a line only reaches this if something unforeseen is long. Over the limit the record
+# is dropped, not truncated: half a JSON object would poison every later read.
 MAX_LINE_BYTES = 2000
 
 MAX_UA_CHARS = 200
 
+# Ceiling on the stored identity, whichever branch produced it. The unverified header is
+# truncated one shorter so that appending the `?` marker lands on this limit rather than
+# one past it; deriving that instead of writing 253 keeps the two from drifting apart.
+MAX_USER_CHARS = 254
+
 # Only reached for unmatched (404) paths, where the value is attacker-controlled.
 MAX_PATH_CHARS = 120
 
-# Upper bound on how much the admin view will parse in one request, across all days in
-# its window. Three days at the daily cap; enough that the 24h summary is never
-# truncated in practice, low enough that /admin cannot be turned into a CPU sink.
+# Ceiling on what the admin view parses per request, across its whole window: three days
+# at the daily cap, so /admin cannot be turned into a CPU sink.
 MAX_READ_ENTRIES = 150_000
 
-# Static assets are excluded: they are dozens of requests per page view, carry no
-# information about what an analyst did, and would be ~90% of the file.
+# Static assets would be ~90% of the file and say nothing about what an analyst did.
 _SKIP_ENDPOINTS = frozenset({'static'})
 _SKIP_PREFIXES = ('/static/', '/cyberchef_app/assets/', '/cyberchef_app/images/',
                   '/cyberchef_app/modules/')
@@ -119,8 +86,8 @@ _SKIP_PATHS = frozenset({'/favicon.ico', '/sw.js', '/robots.txt'})
 _UUID_RE = re.compile(
     r'\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z')
 
-# Anything outside printable ASCII becomes '.', so a raw 404 path can never inject a
-# newline (which would forge a second record) or terminal escapes into the file.
+# Anything outside printable ASCII becomes '.', so a raw 404 path cannot inject a newline
+# (which would forge a second record) or terminal escapes into the file.
 _NON_PRINTABLE_RE = re.compile(r'[^\x20-\x7e]')
 
 _COUNTRY_RE = re.compile(r'\A[A-Za-z0-9]{2}\Z')
@@ -153,18 +120,11 @@ def _clean(value, limit):
 
 
 def client_ip(request):
-    """The visitor's IP, not the tunnel's.
-
-    Behind cloudflared, `remote_addr` is the loopback address the tunnel connects
-    from and carries no information at all, so the order here is not a preference so
-    much as a correctness requirement: `CF-Connecting-IP` is set by the Cloudflare
-    edge on every proxied request and is the only field guaranteed to hold the client.
-    `X-Forwarded-For`'s first hop and `remote_addr` are fallbacks for running this app
-    without the tunnel (direct dev, plain nginx).
-
-    Each candidate must parse as an IP address; a header a client can forge is not
-    written to the log verbatim.
-    """
+    """The visitor's IP, not the tunnel's. The order is a correctness requirement, not a
+    preference: behind cloudflared `remote_addr` is the loopback address the tunnel
+    connects from, so `CF-Connecting-IP` is the only field guaranteed to hold the client;
+    the other two are fallbacks for running without the tunnel. Each candidate must parse
+    as an IP address, so a forgeable header is never logged verbatim."""
     candidates = [
         request.headers.get('CF-Connecting-IP'),
         (request.headers.get('X-Forwarded-For') or '').split(',')[0],
@@ -190,13 +150,23 @@ def client_country(request):
 
 
 def authenticated_user(request):
-    """The Cloudflare Access identity, when Access is enabled.
-
-    Access is not switched on yet, so this is empty in production today. It is read
-    anyway so the log is already correct on the day it is turned on, rather than
-    needing a schema change then.
-    """
-    return _clean(request.headers.get('Cf-Access-Authenticated-User-Email'), 254)
+    """The Cloudflare Access identity, from the *verified* JWT when Access is configured.
+    The plaintext `Cf-Access-Authenticated-User-Email` header is recorded only while Access
+    is unconfigured, and then marked `?` because anything that can reach the origin directly
+    can set it - on a homelab LAN, every host. An audit trail whose identity column is
+    forgeable is worse than one with no identity column, because it invites belief; it is
+    never an authorisation input. Under Access the value comes from the signed claim."""
+    try:
+        from . import cf_access
+        if cf_access.is_configured():
+            return _clean(cf_access.identity_from_request(request), MAX_USER_CHARS)
+    except Exception:
+        # A denied or malformed token is not an identity, and identity resolution must
+        # never break request logging.
+        return None
+    header = _clean(request.headers.get('Cf-Access-Authenticated-User-Email'),
+                    MAX_USER_CHARS - 1)
+    return f'{header}?' if header else None
 
 
 def should_skip(request):
@@ -207,7 +177,7 @@ def should_skip(request):
 
 
 def describe_path(request):
-    """(path, matched, rid) - see "Path sensitivity" in the module docstring."""
+    """(path, matched, rid). See "Path sensitivity" in the module docstring."""
     rule = getattr(getattr(request, 'url_rule', None), 'rule', None)
     if not rule:
         return _clean(request.path, MAX_PATH_CHARS), False, ''
@@ -266,8 +236,7 @@ def _count_lines(path):
 def append(entry):
     """Append one record. Returns True when written.
 
-    Raises on I/O failure - callers in the request path must wrap it. Keeping the
-    raise here means `append()` stays testable for the failure case.
+    Raises on I/O failure; callers in the request path must wrap it.
     """
     line = json.dumps(entry, separators=(',', ':'), ensure_ascii=True)
     if len(line) > MAX_LINE_BYTES:
@@ -279,8 +248,7 @@ def append(entry):
     target = _file_for(day)
     with _lock:
         if _state['day'] != day:
-            # Rollover, including the first write of a process: recover the day's
-            # count from the file so a restart cannot reset the cap.
+            # Recover the day's count from the file so a restart cannot reset the cap.
             _state['day'] = day
             _state['count'] = _count_lines(target)
             _state['warned'] = False
@@ -298,8 +266,7 @@ def append(entry):
 
 
 def reset_state():
-    """Forget the cached day/count. Only needed after repointing ACTIVITY_DIR, which
-    in practice means tests."""
+    """Forget the cached day/count. Only needed after repointing ACTIVITY_DIR."""
     with _lock:
         _state.update({'day': None, 'count': 0, 'warned': False})
 
@@ -311,12 +278,9 @@ def _iter_days(days):
 
 
 def read_entries(days=1, since=None):
-    """Records from the last `days` UTC day-files, newest first.
-
-    `since` is an ISO stamp; records older than it are skipped. Malformed lines are
-    ignored rather than fatal - the file is append-only from one writer, but a
-    truncated final line after a hard kill should not break the admin view.
-    """
+    """Records from the last `days` UTC day-files, newest first; `since` is an ISO stamp.
+    Malformed lines are ignored rather than fatal: a final line truncated by a hard kill
+    should not break the admin view."""
     entries = []
     for day in _iter_days(days):
         if since and day < _day_of(since):
@@ -348,7 +312,6 @@ def read_entries(days=1, since=None):
 
 
 def summarize(entries):
-    """Aggregate counts over an already-filtered list of records."""
     total = len(entries)
     uploads = 0
     errors = 0
@@ -388,7 +351,6 @@ def window_start(hours):
 
 
 def summary(hours=24):
-    """The `hours`-window summary the admin page shows."""
     cutoff = window_start(hours)
     # A 24h window straddles at most two UTC day-files; +1 covers a longer window.
     days = int(hours // 24) + 2
@@ -402,8 +364,8 @@ def log_request(request, status, duration_ms):
             return
         append(build_entry(request, status, duration_ms))
     except Exception:
-        # A logging failure must never become a 500. Logged at warning, not exception,
-        # because a full disk would otherwise write a traceback per request.
+        # A logging failure must never become a 500. Warning, not exception, because a
+        # full disk would otherwise write a traceback per request.
         logger.warning('Activity log: failed to record a request', exc_info=False)
 
 
@@ -416,9 +378,9 @@ def install(app):
             return
         g._activity_done = True
         # A missing start marker means a before_request registered ahead of ours
-        # short-circuited the request - CSRFProtect.protect() is the one that does,
-        # on every rejected form POST. Those are worth seeing, so the record is
-        # written with an unknown duration rather than dropped.
+        # short-circuited the request - CSRFProtect.protect() does, on every rejected
+        # form POST. Those are worth seeing, so the record is written with an unknown
+        # duration rather than dropped.
         started = getattr(g, '_activity_t0', None)
         elapsed = 0.0 if started is None else (time.perf_counter() - started) * 1000.0
         log_request(request, status, elapsed)
@@ -438,9 +400,8 @@ def install(app):
 
     @app.teardown_request
     def _activity_teardown(exc):
-        # after_request is skipped when an exception propagates out of the view, which
-        # is exactly the case worth seeing. `_finish` is idempotent per request, so a
-        # normally-completed response is never counted twice.
+        # after_request is skipped when an exception propagates out of the view, which is
+        # exactly the case worth seeing. `_finish` is idempotent per request.
         if exc is None:
             return
         try:

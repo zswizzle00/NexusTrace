@@ -51,12 +51,10 @@ if MMDB_AVAILABLE:
         logger.info("MMDB database file not found. Download from https://ipinfo.io/lite")
 
 def setup_ip_services(app):
-    """Setup IP-related services."""
     pass
 
 @timed_lru_cache(seconds=1800)
 def check_abuseipdb(ip_address):
-    """Check IP address against AbuseIPDB."""
     abuseipdb_api_key = os.getenv('ABUSEIPDB_KEY')
     if not abuseipdb_api_key:
         logger.warning("AbuseIPDB API key not configured")
@@ -108,7 +106,6 @@ def check_abuseipdb(ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_ipinfo_data(ip_address):
-    """Get IP information from IPinfo Lite API (no MMDB support, supports flat IPinfo Lite response)."""
     token = os.getenv('IPINFO_TOKEN')
     if not token:
         logger.warning("IPinfo token not configured")
@@ -133,7 +130,7 @@ def get_ipinfo_data(ip_address):
 def get_shodan_info(ip_address):
     """Get IP information from Shodan, flattening nested data for frontend rendering."""
     if not shodan_api:
-        logger.warning("Shodan API not available - SHODAN_KEY not configured")
+        logger.warning("Shodan API not available: SHODAN_KEY not configured")
         return None
     shodan_limiter.acquire()
     try:
@@ -210,7 +207,6 @@ def get_shodan_info(ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_proxycheck_data(ip_address):
-    """Get IP information from ProxyCheck.io."""
     proxycheck_limiter.acquire()
     try:
         proxycheck_key = os.getenv('PROXYCHECK_KEY')
@@ -245,10 +241,8 @@ def get_proxycheck_data(ip_address):
         return None
 
 def otx_indicator_type(indicator):
-    """Return the OTX endpoint segment for an indicator: 'IPv4', 'IPv6', or 'domain'.
-
-    Must not be narrowed to an IPv4 regex: IPv6 addresses would fall through to the
-    'domain' endpoint and never return OTX data.
+    """The OTX endpoint segment: 'IPv4', 'IPv6' or 'domain'. Must not be narrowed to an
+    IPv4 regex - IPv6 addresses would fall through to 'domain' and never return data.
     """
     try:
         return 'IPv6' if ipaddress.ip_address(indicator).version == 6 else 'IPv4'
@@ -256,11 +250,9 @@ def otx_indicator_type(indicator):
         return 'domain'
 
 def proxycheck_ip_data(data, ip_address):
-    """Pull the per-IP block out of a ProxyCheck.io response.
-
-    ProxyCheck keys the result by IP but may normalize (compress) an IPv6 address so
-    it differs from the queried string, making an exact `data[ip]` lookup silently
-    miss - hence the fallback to address equality.
+    """ProxyCheck keys the result by IP but may normalize (compress) an IPv6 address so
+    it differs from the queried string, making an exact `data[ip]` lookup silently miss;
+    hence the fallback to address equality.
     """
     if not isinstance(data, dict):
         return {}
@@ -281,7 +273,6 @@ def proxycheck_ip_data(data, ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_alienvault_data(indicator):
-    """Get data from AlienVault OTX API"""
     api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not api_key:
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
@@ -333,14 +324,13 @@ def get_alienvault_data(indicator):
             'passive_dns': passive_dns_data
         }
     except Exception as e:
-        # Broad catch (not just RequestException) so a bad/non-JSON response can never
-        # propagate and 500 the analysis page; the service degrades to "no OTX data".
+        # Broad catch (not just RequestException) so a bad/non-JSON response cannot
+        # 500 the analysis page; the service degrades to "no OTX data".
         logger.error(f"AlienVault OTX error: {e}")
         return None
 
 @timed_lru_cache(seconds=1800)
 def get_vpn_data(ip_address):
-    """Get IP information from VPNapi.io."""
     api_key = os.getenv('VPNAPI_KEY')
     if not api_key:
         logger.warning("VPNapi.io API key not configured")
@@ -385,11 +375,10 @@ def batch_row(ip, error=None, **values):
 
 
 def process_ip_batch(ip_addresses):
-    """One row per input address, in input order.
-
-    A row is never dropped: an IP that could not be queried or that no source answered
-    for comes back with its ``error`` column set. Silent omission would make the report
-    lie about how many indicators were checked.
+    """One row per input address, in input order. A row is never dropped: an IP that
+    could not be queried, or that no source answered for, comes back with its ``error``
+    column set - silent omission would make the report lie about how many indicators
+    were checked.
     """
     rows = [None] * len(ip_addresses)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -408,11 +397,9 @@ def process_ip_batch(ip_addresses):
 
 
 def process_single_ip(ip):
-    """Enrich one IP into a batch row from whatever sources answer.
-
-    Every source is optional: a service whose key is missing is a skipped source, not a
-    failed row. VPNapi used to gate the whole row, which silently made VPNAPI_KEY a hard
-    dependency of the bulk report.
+    """Every source is optional: a service whose key is missing is a skipped source, not
+    a failed row. VPNapi used to gate the whole row, which silently made VPNAPI_KEY a
+    hard dependency of the bulk report.
     """
     try:
         parsed = ipaddress.ip_address(ip)
@@ -506,7 +493,6 @@ def process_single_ip(ip):
 
 @timed_lru_cache(seconds=1800)
 def get_ip2location_data(ip_address):
-    """Get IP information from IP2Location.io API."""
     api_key = os.getenv('IP2LOCATION_KEY')
     if not api_key:
         logger.warning("IP2Location.io API key not configured")
@@ -525,10 +511,8 @@ def get_ip2location_data(ip_address):
 
 @timed_lru_cache(seconds=1800)
 def get_ipapi_data(ip_address):
-    """Get geolocation and network data from IP-API.com (free, no key required).
-
-    Uses HTTP (not HTTPS) - required for the free tier.
-    Non-commercial use only per IP-API.com terms.
+    """HTTP, not HTTPS: required for the free tier. Non-commercial use only per
+    IP-API.com's terms.
     """
     try:
         with ipapi_limiter:

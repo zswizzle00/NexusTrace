@@ -1,10 +1,11 @@
 """SSRF tests for the scanner's WebSocket guard (scan_service).
 
-`context.route`/`Route.fetch` never see a WebSocket handshake, so `ws(s)://` is
-guarded separately by `_install_websocket_guard`. Asserts two layers: the pure
-decision (`_validate_ws_target`) and the handler acting on it. NOT asserted:
-that Playwright actually dispatches to the handler - the route is a fake, so no
-Chromium and no network are involved. Case taxonomy mirrors test_url_guard.py.
+`context.route`/`Route.fetch` never see a WebSocket handshake, so `ws(s)://` is guarded
+separately by `_install_websocket_guard`. Asserts two layers: the pure decision
+(`_validate_ws_target`), and that the installed handler never calls connect_to_server()
+for a blocked target. NOT asserted: that Playwright actually dispatches to the handler -
+the route is a fake, so no Chromium and no network are involved. Case taxonomy mirrors
+test_url_guard.py.
 """
 import os
 import sys

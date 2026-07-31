@@ -2,9 +2,8 @@ import re
 from typing import Dict, Any
 
 class UserAgentParser:
-    """A comprehensive user agent parser that extracts detailed browser, OS, and device information."""
 
-    # Browser patterns - order matters (more specific first)
+    # Browser patterns: order matters (more specific first)
     BROWSER_PATTERNS = [
         ('Samsung Internet', r'SamsungBrowser/(\d+(?:\.\d+)*)'),
         ('UC Browser', r'UCBrowser/(\d+(?:\.\d+)*)'),
@@ -48,7 +47,7 @@ class UserAgentParser:
         ('Go-http-client', r'Go-http-client/(\d+(?:\.\d+)*)'),
     ]
 
-    # OS patterns - order matters (specific distros/versions before generic)
+    # OS patterns: order matters (specific distros/versions before generic)
     OS_PATTERNS = [
         ('Windows 11', r'Windows NT 10\.0.*(?:Win64|WOW64)'),  # Win11 uses NT 10.0 but usually 64-bit
         ('Windows 10', r'Windows NT 10\.0'),
@@ -228,7 +227,6 @@ class UserAgentParser:
 
     @staticmethod
     def parse(user_agent: str) -> Dict[str, Any]:
-        """Parse a user agent string into structured browser/OS/device information."""
         if not user_agent or not user_agent.strip():
             return UserAgentParser._empty_result()
 
@@ -336,7 +334,6 @@ class UserAgentParser:
 
     @staticmethod
     def _empty_result() -> Dict[str, Any]:
-        """Return result for empty/invalid user agent."""
         return {
             'raw': '',
             'browser': {'name': 'N/A', 'version': 'N/A'},
@@ -353,5 +350,4 @@ class UserAgentParser:
 
 
 def parse_user_agent(user_agent: str) -> Dict[str, Any]:
-    """Parse a user agent string and return structured information."""
     return UserAgentParser.parse(user_agent)

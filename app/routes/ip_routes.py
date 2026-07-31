@@ -87,7 +87,7 @@ MAX_BATCH_IPS = 200
 
 
 class UnreadableUpload(Exception):
-    """Carries a message that is safe to return to the client - no pandas, codec, or
+    """Carries a message that is safe to return to the client: no pandas, codec, or
     zipfile internals, which the old broad `except` echoed straight back."""
 
 
@@ -118,8 +118,8 @@ def _read_ip_column(filename, raw):
     """First column of an uploaded CSV/XLSX/TXT as a list of cells.
 
     A headerless CSV/XLSX loses its first address to pandas' header row (a single-IP file
-    loses its only one), so the file is re-read with `header=None` when the header cell
-    itself parses as an IP. TXT is always headerless.
+    loses its only one), so it is re-read with `header=None` when the header cell itself
+    parses as an IP. TXT is always headerless.
     """
     name = (filename or '').lower()
     if name.endswith('.txt'):

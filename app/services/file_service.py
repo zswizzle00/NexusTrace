@@ -1,15 +1,11 @@
 """Uploaded-file triage: digest the whole file, inspect a bounded window, look up
-reputation once.
+reputation once. Static inspection is pure (`app/utils/file_inspect.py`,
+`app/utils/lnk_parse.py`) and hash reputation lives in `hash_service`; this module owns
+only what can fail for environmental reasons - reading the temp file, and the network.
 
-The static inspection is pure and lives in `app/utils/file_inspect.py` and
-`app/utils/lnk_parse.py`; hash reputation lives in `hash_service`. This module owns
-only the parts that can fail for environmental reasons - reading the temp file and
-the network.
-
-**Nothing here retains or returns sample bytes.** ``_assemble`` names every field
-of the record explicitly, so file content has no path into a response the way it
-has none into storage in `email_service`. There is no `data/` store for uploads at
-all: the record is rendered synchronously and discarded with the temp file.
+**Nothing here retains or returns sample bytes.** ``_assemble`` names every field of the
+record explicitly, so file content has no path into a response. There is no `data/` store
+for uploads at all: the record is rendered synchronously and discarded with the temp file.
 """
 
 import hashlib
@@ -38,46 +34,38 @@ from OTXv2 import OTXv2, IndicatorTypes
 
 try:
     from .file_rules import score as _score_file
-except ImportError:  # scorer not present yet - records simply carry no 'verdict'
+except ImportError:  # scorer not present yet; records simply carry no 'verdict'
     _score_file = None
 
 logger = logging.getLogger(__name__)
 
-# Streaming chunk for the digest pass. Large enough that a 50 MB upload is ~50
-# reads, small enough that eight concurrent uploads hold 8 MB of chunks, not 400.
+# Large enough that a 50 MB upload is ~50 reads, small enough that eight concurrent
+# uploads hold 8 MB of chunks, not 400.
 HASH_CHUNK_BYTES = 1024 * 1024
 
-# How much of the file the *inspection* primitives see. Digests always cover the
-# whole file; strings, entropy, the embedded-executable scan and the .lnk parse see
-# only this prefix, and `truncated` says so.
+# How much of the file the *inspection* primitives see; digests always cover the whole
+# file, and `truncated` says when strings/entropy/embedded-scan/.lnk parse did not.
 #
-# Why 4 MiB and not the whole file: MAX_CONTENT_LENGTH is 50 MB and the production
-# server is `--threads 8` on a 2-core/8 GiB box, so a full read is 8 x 50 MB = 400 MB
-# of resident buffers before any derived allocation - and `extract_strings` /
-# `find_embedded_executables` allocate match objects and a Counter over whatever
-# they are handed. 4 MiB caps the inspection buffers at 32 MiB across all threads,
-# and the derived work is already bounded by file_inspect's own MAX_STRINGS (2000 x
-# 512 chars) and MAX_EMBEDDED_CANDIDATES (100k) caps.
+# Why not the whole file: MAX_CONTENT_LENGTH is 50 MB and production is `--threads 8` on
+# a 2-core/8 GiB box, so a full read is 8 x 50 MB = 400 MB of resident buffers before any
+# derived allocation. 4 MiB caps inspection buffers at 32 MiB across all threads; derived
+# work is already bounded by file_inspect's MAX_STRINGS/MAX_EMBEDDED_CANDIDATES.
 #
-# Why 4 MiB is enough to be useful: it covers the entire file for every format where
-# the tail matters to triage - a .lnk large enough to be truncated is already
-# ~80x past lnk_parse.OVERSIZED_LNK_BYTES and flagged for it - and for a large
-# binary the headers, imports, and embedded-dropper padding that this scan looks for
-# sit in the first megabytes. A prefix that large is also a statistically sound
-# entropy sample.
+# Why it is enough: it covers the entire file for every format where the tail matters to
+# triage (a .lnk large enough to be truncated is already ~80x past
+# lnk_parse.OVERSIZED_LNK_BYTES and flagged for it), and a large binary's headers,
+# imports and embedded-dropper padding sit in the first megabytes.
 ANALYSIS_WINDOW_BYTES = 4 * 1024 * 1024
 
-# Display cap on the strings listing. IOC extraction runs over the full
-# `extract_strings` result; only the rendered listing is trimmed to this.
+# Display cap only: IOC extraction runs over the full `extract_strings` result.
 STRINGS_SAMPLE_LIMIT = 400
 
-# Bound on the text handed to `extract_iocs`. The strings result can be ~1 MB
-# (MAX_STRINGS x MAX_STRING_LENGTH) and three regexes over that is wasted work for a
-# triage listing capped at 200 IOCs.
+# The strings result can be ~1 MB (MAX_STRINGS x MAX_STRING_LENGTH), and three regexes
+# over that is wasted work for a triage listing capped at 200 IOCs.
 MAX_IOC_TEXT_BYTES = 256 * 1024
 
-# Maps hash_service.unknown_hash_report's display names onto the provider keys
-# hash_info['sources'] and reference_links() use, so the record has one vocabulary.
+# unknown_hash_report's display names -> the provider keys hash_info['sources'] and
+# reference_links() use, so the record has one vocabulary.
 _SOURCE_KEYS = {
     'VirusTotal': 'virustotal',
     'MalwareBazaar': 'malwarebazaar',
@@ -87,7 +75,6 @@ _SOURCE_KEYS = {
 
 
 def setup_file_services(app):
-    """Setup file-related services."""
     pass
 
 
@@ -96,14 +83,9 @@ def _now():
 
 
 def stream_digests(file_path, window_bytes=ANALYSIS_WINDOW_BYTES):
-    """One pass over the file: full md5/sha1/sha256, plus the leading window.
-
-    Returns ``(digests, window_bytes_buffer, size_bytes)``. ``size_bytes`` is the
-    true size on disk, not the window length.
-
-    `file_inspect.file_digests` is the in-memory equivalent and is deliberately not
-    used here: it takes a whole buffer, which is the allocation this function exists
-    to avoid.
+    """``(digests, window_buffer, size_bytes)``; ``size_bytes`` is the true size on disk,
+    not the window length. `file_inspect.file_digests` is the in-memory equivalent and is
+    deliberately unused here: it takes a whole buffer, the allocation this avoids.
     """
     digests = {
         'md5': hashlib.md5(),
@@ -130,7 +112,6 @@ def stream_digests(file_path, window_bytes=ANALYSIS_WINDOW_BYTES):
 
 
 def get_alienvault_analysis(file_hash):
-    """Analyze a file hash using AlienVault OTX API."""
     otx_api_key = os.getenv('ALIENVAULT_KEY') or os.getenv('ALIENVAULT') or os.getenv('OTX_API_KEY')
     if not otx_api_key:
         logger.debug("AlienVault API key not configured (ALIENVAULT_KEY)")
@@ -169,7 +150,6 @@ def get_combined_file_analysis(file_path=None, file_hash=None):
 
 
 def static_inspection(window, filename):
-    """Pure inspection of the analysis window. No network, no filesystem."""
     magic_type = sniff_magic(window)
     strings = extract_strings(window)
     return {
@@ -184,27 +164,21 @@ def static_inspection(window, filename):
 
 
 def looks_like_lnk(magic_type, filename):
-    """True when the shell-link parser should run.
-
-    The extension counts even when the magic does not match: `parse_lnk` reports the
-    mismatch as `parsed_ok: False` with an error, which is a finding about a file
-    named `.lnk`, not a failure.
+    """The extension counts even when the magic does not match: `parse_lnk` reports the
+    mismatch as `parsed_ok: False` with an error, which is a finding about a file named
+    `.lnk`, not a failure.
     """
     return magic_type == 'LNK' or file_extension(filename) == 'lnk'
 
 
 def reputation_report(sha256):
-    """One bounded reputation lookup for the file's SHA-256.
+    """Exactly one `get_hash_info_quick` call plus OTX. Embedded executables are **not**
+    looked up: `virustotal_limiter` is a process-wide 4-per-minute limiter whose acquire()
+    blocks in time.sleep, so a per-hit loop would stall the request and starve concurrent
+    /hash_analysis users (see the MAX_ENRICH_HASHES note in email_service.py).
 
-    Exactly one `get_hash_info_quick` call (VirusTotal + MalwareBazaar + ThreatFox)
-    plus OTX. Embedded executables are **not** looked up: `virustotal_limiter` is a
-    process-wide 4-per-minute limiter whose acquire() blocks in time.sleep, so a
-    per-hit loop would stall the request and starve concurrent /hash_analysis users
-    (see the MAX_ENRICH_HASHES note in email_service.py).
-
-    Per-source state uses `hash_service.source_state`'s vocabulary, so 'skipped'
-    (never queried, no API key) stays distinct from 'no_record' (queried, nothing
-    known) and 'unavailable' (queried, source failed).
+    Per-source state uses `hash_service.source_state`'s vocabulary, so 'skipped' (never
+    queried) stays distinct from 'no_record' (queried, nothing known).
     """
     try:
         hash_info = get_hash_info_quick(sha256) or {}
@@ -226,9 +200,8 @@ def reputation_report(sha256):
             'data': provider_data.get(key),
         }
 
-    # OTX 'found' means unknown_hash_report saw a nonzero pulse count. On a file
-    # hash that is a malware report, so it counts - unlike a VirusTotal record with
-    # zero detections, which is 'found' but means the file is known and clean.
+    # OTX 'found' means a nonzero pulse count, which on a file hash is a malware report,
+    # unlike a zero-detection VirusTotal record - also 'found', but means known and clean.
     known_malware = bool(
         (hash_info.get('summary') or {}).get('is_malicious')
         or sources['alienvault_otx']['state'] == 'found'
@@ -243,8 +216,8 @@ def reputation_report(sha256):
 
 def _assemble(filename, size_bytes, digests, inspection, lnk, iocs, reputation,
               truncated, error):
-    """Build the analysis record. The ONLY place a record is shaped, naming every
-    field explicitly so file content cannot reach a response by accident."""
+    """The ONLY place a record is shaped, naming every field explicitly so file content
+    cannot reach a response by accident."""
     return {
         'filename': filename,
         'size_bytes': size_bytes,
@@ -286,10 +259,8 @@ def _empty_reputation(sha256=''):
 
 
 def _scored(record):
-    """Attach `file_rules.score`'s verdict when the scorer module exists.
-
-    A scorer failure must not fail an upload: the static findings are the analysis,
-    the verdict is a summary of them.
+    """A scorer failure must not fail an upload: the static findings are the analysis, the
+    verdict is only a summary of them.
     """
     if _score_file is None:
         return record
@@ -301,11 +272,9 @@ def _scored(record):
 
 
 def analyze_file(file_path, filename):
-    """Digest, inspect, look up reputation, and return one file-analysis record.
-
-    Never raises for a bad or unreadable file: an unreadable upload comes back with
-    `error` set and every other field at its empty value, so the result page renders
-    the same as any other analysis.
+    """Never raises for a bad or unreadable file: an unreadable upload comes back with
+    `error` set and every other field at its empty value, so the result page renders the
+    same as any other analysis.
     """
     try:
         digests, window, size_bytes = stream_digests(file_path)
@@ -323,9 +292,8 @@ def analyze_file(file_path, filename):
     if looks_like_lnk(inspection['magic_type'], filename):
         lnk = analyze_lnk(window)
 
-    # The shortcut's own IOCs lead the corpus so they survive extract_iocs' budget
-    # ahead of thousands of incidental strings, the way email_service leads with the
-    # sender domain.
+    # The shortcut's own IOCs lead the corpus so they survive extract_iocs' budget ahead
+    # of thousands of incidental strings.
     corpus = []
     if lnk:
         corpus.extend(item['value'] for item in lnk['iocs'])

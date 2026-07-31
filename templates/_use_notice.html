@@ -1,20 +1,19 @@
-{# Acceptable-use and third-party disclosure, shown inline above every submit
-   control. Not dismissible on purpose. The service names come from
-   app/utils/disclosure.py via the `disclosure_for` Jinja global, so they cannot
-   drift from what the service layer actually calls. #}
+{# Acceptable-use and third-party disclosure. Not dismissible on purpose. Service names
+   come from app/utils/disclosure.py via the `disclosure_for` Jinja global, so they
+   cannot drift from what the service layer actually calls. #}
 {% macro use_notice(surface) %}
 {% set d = disclosure_for(surface) %}
 <div class="rounded border border-gray-700 bg-gray-800/60 px-4 py-3 text-xs text-gray-400 leading-relaxed">
   <p>
     <span class="text-gray-200 font-medium">Do not submit anything you are not authorised to share.</span>
-    NexusTrace has no login &mdash; anyone with the link can read any result.
+    NexusTrace has no login, so anyone with the link can read any result.
   </p>
   <p class="mt-1">
     <span class="text-gray-200 font-medium">Kept:</span> {{ d.retained }}.{% if d.retention %} {{ d.retention }}{% endif %}
   </p>
   <p class="mt-1">
     <span class="text-gray-200 font-medium">Sent to third parties:</span>
-    {{ d.sends }} &mdash; transmitted to
+    {{ d.sends }}, transmitted to
     <span class="text-gray-300">{{ d.always | join(', ') }}</span>.
   </p>
   {% if d.on_click %}

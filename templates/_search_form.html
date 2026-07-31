@@ -1,7 +1,6 @@
 {# Every page POSTs an indicator to /analyze, which auto-detects the type, so callers
-   normally override only the placeholder and button label. home passes form_id/input_id
-   for its quick-pick script; azure is handled client-side (its JS preventDefaults the
-   form), so for it the action is a no-op fallback. #}
+   normally override only the placeholder and button label. azure is handled client-side
+   (its JS preventDefaults the form), so its action is a no-op fallback. #}
 {% macro search_form(placeholder, button_label='Analyze', name='indicator', action='/analyze', form_id='', input_id='') -%}
 <form {% if form_id %}id="{{ form_id }}" {% endif %}action="{{ action }}" method="POST"
       class="w-full max-w-2xl mx-auto flex flex-col sm:flex-row gap-3 items-stretch justify-center">

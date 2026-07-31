@@ -6,9 +6,8 @@
 
 {% block content %}
 {# Every value out of `analysis` originates in an uploaded file: filename, magic type,
-   extracted strings, .lnk target paths and arguments, IOCs. All of it is rendered
-   escaped and none of it is ever `|safe`. Extracted URLs never become anchors - the
-   app's CSP carries 'unsafe-inline', so a clickable harvested href is an XSS hole. #}
+   strings, .lnk target paths and arguments, IOCs. All escaped, never `|safe`, and
+   extracted URLs never become anchors (the CSP carries 'unsafe-inline'). #}
 {% set post_url = submit_url | default('/api/file/analyze_file', true) %}
 
 {% macro bytes_h(sz) -%}
@@ -83,8 +82,7 @@
   {% set digests = analysis.get('digests') or {} %}
   {% set rep = analysis.get('reputation') or {} %}
   {% set v = analysis.get('verdict') or {} %}
-  {# .get() with a default, NEVER [level]: the scorer may not be wired yet, and a
-     record carrying a level this template does not know about must not raise. #}
+  {# .get() with a default, NEVER [level]: the scorer may not be wired yet, and a record carrying an unknown level must not raise. #}
   {% set level = v.get('level') or 'unknown' %}
   {% set vmod = {
        'malicious':  'is-malicious',
@@ -130,7 +128,6 @@
     </div>
   </section>
 
-  {# ---- Verdict signals ---- #}
   <div class="nt-card p-5 mb-5">
     <div class="flex items-center gap-3 flex-wrap">
       <h3 class="nt-card-title">Verdict</h3>
@@ -140,7 +137,7 @@
       <span class="text-xs text-gray-600 font-mono">not scored</span>
       {% endif %}
       <span class="text-xs text-gray-600">
-        Structural heuristic over the file's own contents plus hash reputation - not a sandbox result.
+        Structural heuristic over the file's own contents plus hash reputation, not a sandbox result.
       </span>
     </div>
     {% set vsignals = v.get('signals') or [] %}
@@ -170,7 +167,6 @@
     {% endif %}
   </div>
 
-  {# ---- Identity ---- #}
   <div class="nt-card p-4 mb-5">
     <h3 class="nt-card-title mb-3">Identity</h3>
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -212,8 +208,7 @@
           {% set val = digests.get(key) %}
           {% if val %}
           {% set vlow = (val or '') | lower %}
-          {# Pivot only when the value really is a hexdigest: the record may have been
-             assembled by an older version, so `val` is not guaranteed to be one. #}
+          {# Pivot only when the value really is a hexdigest: an older version may have assembled the record, so `val` is not guaranteed to be one. #}
           {% set is_digest = vlow | length in [32, 40, 64]
                              and vlow | reject('in', '0123456789abcdef') | list | length == 0 %}
           <tr class="border-t border-gray-800">
@@ -239,7 +234,6 @@
     {% endif %}
   </div>
 
-  {# ---- Hash reputation ---- #}
   {% set rep_sources = rep.get('sources') or {} %}
   {% set src_rows = [] %}
   {% if rep_sources is mapping %}
@@ -301,7 +295,7 @@
     </div>
     {% else %}
     <p class="text-xs text-gray-500">
-      No reputation source answered for this file. Unknown is not clean - an absence of
+      No reputation source answered for this file. Unknown is not clean; it is an absence of
       evidence is not evidence of absence, and a freshly built dropper is unknown to every
       feed by design.
     </p>
@@ -324,7 +318,6 @@
     {% endif %}
   </div>
 
-  {# ---- Windows shortcut (.lnk) ---- #}
   {% set lnk = analysis.get('lnk') or {} %}
   {% if lnk %}
   {% set parsed = lnk.get('parsed') or {} %}
@@ -371,13 +364,12 @@
     </dl>
 
     {# Command-line arguments are the payload of a .lnk lure: fully attacker-controlled,
-       often thousands of characters of obfuscated PowerShell. Escaped monospace text,
-       explicitly marked untrusted, never markup and never a link. #}
+       often obfuscated PowerShell. Escaped monospace text, never markup and never a link. #}
     {% if parsed.get('arguments') %}
     <div>
       <div class="flex items-center gap-2 mb-2 flex-wrap">
         <h4 class="text-xs text-gray-500 uppercase tracking-wide">Command-line arguments</h4>
-        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">untrusted content - do not execute</span>
+        <span class="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-300 border border-red-800/60">untrusted content, do not execute</span>
         {% if parsed.get('arguments_length') %}
         <span class="text-xs text-gray-600 font-mono">{{ parsed.get('arguments_length') }} chars</span>
         {% endif %}
@@ -417,13 +409,12 @@
   </div>
   {% endif %}
 
-  {# ---- Embedded executables ---- #}
   {% set embedded = analysis.get('embedded_executables') or [] %}
   <div class="nt-card p-4 mb-5">
     <h3 class="nt-card-title mb-3">Embedded Executables{% if embedded %} ({{ embedded | length }}){% endif %}</h3>
     {% if embedded %}
     <p class="text-xs text-gray-500 mb-3">
-      Executable headers found past offset 0 - appended or padded payloads. Offset 0 is
+      Executable headers found past offset 0, indicating appended or padded payloads. Offset 0 is
       excluded because that is the file's own format, already reported above.
     </p>
     <div class="overflow-x-auto">
@@ -450,7 +441,6 @@
     {% endif %}
   </div>
 
-  {# ---- Entropy ---- #}
   <div class="nt-card p-4 mb-5">
     <h3 class="nt-card-title mb-3">Entropy</h3>
     {% if entropy is not none %}
@@ -458,11 +448,11 @@
       <span class="font-mono text-lg text-gray-100">{{ '%.3f' | format(entropy) }}</span>
       <span class="text-xs text-gray-500 font-mono">of 8.000 bits/byte</span>
       {% if entropy >= 7.2 %}
-      <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">high - packed, encrypted, or compressed</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">high: packed, encrypted, or compressed</span>
       {% elif entropy >= 6.0 %}
       <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">moderate</span>
       {% else %}
-      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">low - plain text or sparse data</span>
+      <span class="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">low: plain text or sparse data</span>
       {% endif %}
     </div>
     <p class="text-xs text-gray-500 mt-3">
@@ -474,7 +464,6 @@
     {% endif %}
   </div>
 
-  {# ---- Strings sample ---- #}
   {% set strings_sample = analysis.get('strings_sample') or [] %}
   {% if strings_sample %}
   <div class="nt-card p-4 mb-5">
@@ -492,7 +481,6 @@
   </div>
   {% endif %}
 
-  {# ---- Indicators ---- #}
   {% set iocs = analysis.get('iocs') or [] %}
   <div class="nt-card p-4">
     {% if iocs %}
@@ -521,15 +509,11 @@
             <td class="py-2 pr-4 text-gray-500 font-mono">{{ itype or '-' }}</td>
             <td class="py-2 pr-4 text-gray-300 font-mono break-all">{{ ival or '-' }}</td>
             <td class="py-2 whitespace-nowrap">
-              {# Only hosts and addresses get a pivot, and only through url_for into this
-                 app. A `url` IOC stays inert defanged text: refanging one into an href
-                 would hand an attacker-chosen scheme a live anchor in an origin whose
-                 CSP allows 'unsafe-inline'.
-
-                 The value is also checked character-by-character before it becomes a
-                 link. The record is read back from whatever produced it, so `ival` is
-                 not guaranteed to be the validated hostname the extractor emits, and a
-                 pivot to a URL-encoded blob of markup is a broken link at best. #}
+              {# Only hosts and addresses get a pivot, and only through url_for into this app. A `url`
+                 IOC stays inert defanged text: refanging one would hand an attacker-chosen scheme a
+                 live anchor in an origin whose CSP allows 'unsafe-inline'. The value is also checked
+                 character-by-character first, because `ival` is not guaranteed to be the validated
+                 hostname the extractor emits. #}
               {% set refanged = (ival or '') | replace('[.]', '.') %}
               {% set host_ok = refanged | length > 0 and refanged | length <= 253
                                and refanged | lower | reject('in', 'abcdefghijklmnopqrstuvwxyz0123456789.-:') | list | length == 0 %}

@@ -7,7 +7,6 @@ import time
 logger = logging.getLogger(__name__)
 
 class RateLimiter:
-    """Rate limiter implementation using a sliding window."""
     def __init__(self, max_requests, time_window):
         self.max_requests = max_requests
         self.time_window = time_window
@@ -26,8 +25,6 @@ class RateLimiter:
                     self.requests.append(now)
                     return True
 
-                # Compute the wait, then release the lock before sleeping so other
-                # threads aren't blocked.
                 sleep_time = (self.requests[0] + self.time_window - now).total_seconds()
 
             if sleep_time > 0:
@@ -43,5 +40,4 @@ class RateLimiter:
         pass
 
 def setup_rate_limiters(app):
-    """Setup rate limiters for the application."""
     pass

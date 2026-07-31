@@ -1,9 +1,9 @@
 """Tests for the request activity log and the /admin dashboard.
 
 Runs the real `create_app()` through Flask's test client with `activity.ACTIVITY_DIR`
-repointed at a fresh temp directory for every case - nothing here ever reads or writes
-the real `data/`. No network, no browser: every route exercised is either a static
-page, a 404, or a test-only echo route added to the app before the first request.
+repointed at a fresh temp directory for every case - nothing here ever reads or writes the
+real `data/`. No network, no browser: every route exercised is either a static page, a
+404, or a test-only echo route added to the app before the first request.
 """
 import io
 import json
@@ -66,6 +66,9 @@ class Sandbox:
 
 
 def build_app():
+    # /admin is registered on the admin role only, so these cases build the admin app.
+    # The split itself is covered by app/tests/test_role_split.py.
+    os.environ['NEXUSTRACE_ROLE'] = 'admin'
     app = create_app()
     # The dashboard's own POSTs are the only forms here; the CSRF machinery is not
     # what these cases are testing.
@@ -92,8 +95,6 @@ def set_admin(token='', emails=''):
         else:
             os.environ.pop(name, None)
 
-
-# --- one request, one record, expected shape -------------------------------------
 
 def test_single_record_shape():
     with Sandbox() as box:
@@ -133,8 +134,6 @@ def test_static_assets_are_skipped():
         check(box.lines() == [], f'static asset was logged: {box.lines()!r}')
 
 
-# --- client identity through the tunnel -------------------------------------------
-
 def one_request_ip(headers, environ=None):
     with Sandbox() as box:
         set_admin()
@@ -163,7 +162,6 @@ def test_client_identity():
     check(record.get('ip') == '192.0.2.55',
           f'remote_addr fallback expected, got {record.get("ip")!r}')
 
-    # Unparseable values are dropped, not written through.
     record = one_request_ip({'CF-Connecting-IP': 'not-an-ip; DROP TABLE',
                              'CF-IPCountry': '<script>'},
                             {'REMOTE_ADDR': '192.0.2.55'})
@@ -171,12 +169,14 @@ def test_client_identity():
           f'a junk CF-Connecting-IP must fall through, got {record.get("ip")!r}')
     check(record.get('country') == '', f'a junk country must be dropped, got {record.get("country")!r}')
 
+    # While Access is unconfigured the header is the only identity available, but it is
+    # forgeable by anything that can reach the origin, so it is marked '?' rather than
+    # recorded as fact. Once Access is configured the value comes from the signed claim
+    # and the marker disappears.
     record = one_request_ip({'Cf-Access-Authenticated-User-Email': 'analyst@example.com'})
-    check(record.get('user') == 'analyst@example.com',
-          f'Access identity not recorded, got {record.get("user")!r}')
+    check(record.get('user') == 'analyst@example.com?',
+          f'an unverified Access identity must be marked, got {record.get("user")!r}')
 
-
-# --- path sensitivity --------------------------------------------------------------
 
 def test_path_is_the_route_rule():
     with Sandbox() as box:
@@ -217,7 +217,6 @@ def test_unmatched_path_is_sanitized():
         check(record['path'] == '/wp-login.php', f'path={record["path"]!r}')
         check(record['status'] == 404, f'status={record["status"]!r}')
 
-    # Control characters cannot forge a second record.
     with Sandbox() as box:
         client().get('/probe%0a{"ts":"forged"}')
         lines = box.lines()
@@ -226,13 +225,10 @@ def test_unmatched_path_is_sanitized():
               'a raw newline survived into the log line')
         check('\n' not in lines[0], 'a raw newline survived into the log line')
 
-    # Query strings are never stored.
     with Sandbox() as box:
         client().get('/nope?token=SUPERSECRET&q=customer.example.com')
         check('SUPERSECRET' not in ''.join(box.lines()), 'a query string was logged')
 
-
-# --- no request content ever reaches the log ---------------------------------------
 
 def test_no_body_or_form_content_is_logged():
     with Sandbox() as box:
@@ -253,8 +249,6 @@ def test_no_body_or_form_content_is_logged():
             check(records[0]['upload'] is True, 'a multipart POST must be flagged as an upload')
             check(records[0]['bytes_in'] > 0, 'bytes_in should carry the Content-Length')
 
-
-# --- bounds -------------------------------------------------------------------------
 
 def test_csrf_rejection_is_logged():
     """CSRFProtect registers its before_request ahead of ours and aborts the request,
@@ -319,8 +313,6 @@ def test_user_agent_is_truncated():
                   f'ua length {len(records[0]["ua"])}, expected {activity.MAX_UA_CHARS}')
 
 
-# --- a logging failure must not break the response -----------------------------------
-
 def test_write_failure_does_not_break_the_request():
     with Sandbox() as box:
         set_admin()
@@ -353,8 +345,6 @@ def test_write_failure_does_not_break_the_request():
         activity.reset_state()
         os.unlink(blocker)
 
-
-# --- summary aggregation ---------------------------------------------------------------
 
 def sample(minutes_ago, **overrides):
     moment = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
@@ -395,7 +385,6 @@ def test_summary_counts():
               f'top_countries={result["top_countries"]!r}')
         check(cutoff < activity._stamp(activity._now()), 'cutoff is not in the past')
 
-        # Newest first, and malformed lines are skipped rather than fatal.
         with open(os.path.join(box.dir, f'{activity._day_of(sample(1)["ts"])}.jsonl'),
                   'a', encoding='utf-8') as handle:
             handle.write('{not json\n')
@@ -403,8 +392,6 @@ def test_summary_counts():
         check(len(entries) == 6, f'read_entries returned {len(entries)}, expected 6')
         check(entries[0]['ts'] >= entries[-1]['ts'], 'read_entries is not newest-first')
 
-
-# --- /admin --------------------------------------------------------------------------
 
 def test_admin_disabled_is_a_404():
     with Sandbox():
@@ -462,12 +449,10 @@ def test_admin_accepts_the_right_token():
         check(response.status_code == 200,
               f'the session did not carry: {response.status_code}')
 
-        # A query-string token is not an accepted credential.
         response = client().get(f'/admin?token={RIGHT_TOKEN}')
         check(response.status_code == 403,
               f'a query-string token was accepted ({response.status_code})')
 
-        # Rotating the token invalidates the outstanding session.
         set_admin(token=RIGHT_TOKEN + '-rotated')
         response = session_client.get('/admin')
         check(response.status_code == 403,
@@ -478,18 +463,22 @@ def test_admin_accepts_the_right_token():
               f'logout returned {response.status_code}, expected 303')
 
 
-def test_admin_honours_the_access_allowlist():
+def test_admin_never_trusts_the_plaintext_access_header():
+    """The header is not an authorization input, in either mode.
+
+    It is plaintext, so anything that can reach the origin directly can set it - and on a
+    homelab LAN that is every host on the network, since the tunnel only guards the path
+    in from the internet. Being on ADMIN_EMAILS must not be enough; a signed JWT (Access
+    mode) or ADMIN_TOKEN (before Access is configured) is what opens the door.
+    """
     with Sandbox():
         set_admin(emails='analyst@example.com, boss@example.com')
-        header = {'Cf-Access-Authenticated-User-Email': 'BOSS@example.com'}
-        response = client().get('/admin', headers=header)
-        check(response.status_code == 200,
-              f'an allowlisted Access identity returned {response.status_code}')
-
-        response = client().get(
-            '/admin', headers={'Cf-Access-Authenticated-User-Email': 'nobody@example.com'})
-        check(response.status_code == 403,
-              f'a non-allowlisted Access identity returned {response.status_code}')
+        for claimed in ('BOSS@example.com', 'analyst@example.com', 'nobody@example.com'):
+            response = client().get(
+                '/admin', headers={'Cf-Access-Authenticated-User-Email': claimed})
+            check(response.status_code == 403,
+                  f'the plaintext header authorized {claimed} with {response.status_code} '
+                  '- the LAN bypass is open')
 
 
 def test_admin_paging():
@@ -506,7 +495,6 @@ def test_admin_paging():
         check(b'Page 2 of 3' in second.data, 'page 2 of 3 not rendered')
         check(first.data != second.data, 'page 2 rendered identically to page 1')
 
-        # Out-of-range and junk paging arguments are clamped, not fatal.
         for query in ('page=9999', 'page=-4', 'per=99999', 'per=abc', 'days=0', 'days=999'):
             response = client().get(f'/admin?{query}', headers=auth)
             check(response.status_code == 200,
@@ -530,7 +518,7 @@ TESTS = [
     test_admin_disabled_is_a_404,
     test_admin_rejects_a_wrong_token,
     test_admin_accepts_the_right_token,
-    test_admin_honours_the_access_allowlist,
+    test_admin_never_trusts_the_plaintext_access_header,
     test_admin_paging,
 ]
 
@@ -544,6 +532,7 @@ def main():
             failures.append(f'{test.__name__} raised {exc!r}\n'
                             + ''.join(traceback.format_tb(exc.__traceback__)))
     set_admin()
+    os.environ.pop('NEXUSTRACE_ROLE', None)
 
     if failures:
         print('FAIL:')

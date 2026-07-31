@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw
 import os
 
 def get_shield_points(size=32):
-    # SVG viewBox is 0 0 24 24, so scale accordingly
+    # Source SVG viewBox is 0 0 24 24.
     scale = size / 24
     points = [
         (12, 3), (19, 7), (19, 12), (15.5, 21.74), (12, 23), (8.5, 21.74), (5, 12), (5, 7)
@@ -15,7 +15,7 @@ def create_shield_favicon():
     image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     points = get_shield_points(size)
-    # Draw the outline as a polygon for sharp corners
+    # A polygon rather than a rounded path, for sharp corners at 32 px.
     draw.polygon(points, outline=shield_color, fill=None, width=3)
     if not os.path.exists('static'):
         os.makedirs('static')

@@ -1,18 +1,10 @@
 #!/bin/bash
 
-# NexusTrace Stop Script
-# Handles graceful shutdown and cleanup
-# Usage:
-#   ./stop.sh           - Stop development server
-#   ./stop.sh --docker  - Stop Docker containers
-#   ./stop.sh --all     - Stop both dev server and Docker
-#   ./stop.sh --clean   - Stop and clean cache files
-#   ./stop.sh --status  - Show running status
+# NexusTrace shutdown and cleanup. Run `./stop.sh --help` for the modes.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -49,7 +41,6 @@ stop_dev_server() {
             kill "$PID" 2>/dev/null
             sleep 2
 
-            # Force kill if still running
             if ps -p "$PID" > /dev/null 2>&1; then
                 log_warn "Process didn't stop gracefully, forcing..."
                 kill -9 "$PID" 2>/dev/null
@@ -59,9 +50,7 @@ stop_dev_server() {
         rm -f "$PID_FILE"
     fi
 
-    # Also check for any process on port 5050 (non-Docker)
     if lsof -ti:5050 > /dev/null 2>&1; then
-        # Check if it's not a Docker process
         if ! docker ps 2>/dev/null | grep -q ":5050"; then
             log_step "Stopping process on port 5050..."
             lsof -ti:5050 | xargs kill -9 2>/dev/null || true
@@ -77,13 +66,11 @@ stop_dev_server() {
 }
 
 stop_docker() {
-    # Check if docker-compose is available
     if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
         log_warn "docker-compose not found"
         return
     fi
 
-    # Determine docker compose command
     if docker compose version &> /dev/null 2>&1; then
         COMPOSE="docker compose"
     else
@@ -112,7 +99,6 @@ show_status() {
     echo "=== NexusTrace Status ==="
     echo ""
 
-    # Check dev server
     PID_FILE=".nexustrace.pid"
     if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" > /dev/null 2>&1; then
         echo -e "${GREEN}[RUNNING]${NC} Development server (PID: $(cat "$PID_FILE"))"
@@ -122,7 +108,6 @@ show_status() {
         echo -e "${YELLOW}[STOPPED]${NC} Development server"
     fi
 
-    # Check Docker
     if docker ps 2>/dev/null | grep -q "nexustrace_web"; then
         echo -e "${GREEN}[RUNNING]${NC} Docker web container"
     else
@@ -137,7 +122,6 @@ show_status() {
 
     echo ""
 
-    # Show ports in use
     if lsof -i:5050 > /dev/null 2>&1; then
         echo "Port 5050: IN USE"
     fi
@@ -146,7 +130,6 @@ show_status() {
     fi
 }
 
-# Parse arguments
 case "${1:-}" in
     --docker)
         stop_docker

@@ -1,20 +1,17 @@
 """Tests for the abuse.ch submission-queue routes and result-page forms.
 
-Pure Flask test client: no server, no browser, no network, no filesystem writes.
-The scan/e-mail record lookups are stubbed in the route modules that own them, and
-`app.services.submissions` is stubbed in `submission_routes` itself - that module
-is built separately, and these tests must pass whether or not it exists yet.
+Pure Flask test client: no server, no browser, no network, no filesystem writes. The
+scan/e-mail record lookups are stubbed in the route modules that own them, and
+`app.services.submissions` is stubbed in `submission_routes` itself - that module is
+built separately, and these tests must pass whether or not it exists yet.
 
-The load-bearing assertion is the negative one: queueing calls the queue and
-nothing else. `test_no_transmission_path` greps the route module for any abuse.ch
-transmit function.
+The load-bearing assertion is the negative one: queueing calls the queue and nothing
+else. `test_no_transmission_path` greps the route module for any abuse.ch transmit
+function.
 
 `storage.LOCAL_ROOT` is repointed at a temp tree for the whole run anyway
-(`check_isolation` refuses to proceed otherwise): the stubs mean nothing here
-*should* reach a store, and a temp root is what makes that a fact rather than a
-claim.
-
-Run: uv run python app/tests/test_submission_routes.py
+(`check_isolation` refuses to proceed otherwise): the stubs mean nothing here *should*
+reach a store, and a temp root makes that a fact rather than a claim.
 """
 import os
 import re

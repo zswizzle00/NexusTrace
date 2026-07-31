@@ -34,30 +34,30 @@ dependencies = [
     "OTXv2==1.5.12",
     "Flask-WTF==1.2.1",
     "flask-talisman==1.1.0",
+    # A base dependency, not an extra: /admin's authorization depends on it and `uv export
+    # --no-dev` omits extras, so an extra would be silently missing from the Docker image.
+    # RS256 needs `crypto`, which resolves to the cryptography pin pyOpenSSL already brings
+    # in above; do not move that pin.
+    "PyJWT[crypto]==2.10.1",
     # Pinned, not a floor: the browser binary is downloaded per-version in the Docker
     # build, so a drifting library version silently mismatches the installed Chromium.
     "playwright==1.61.0",
-    # Public Suffix List for validators.registrable_domain(). Pinned exactly on
-    # purpose: the trailing date IS the bundled PSL snapshot date, so the pin is
-    # the staleness signal. Refreshing the list = bump this pin, then
-    # `uv lock && uv export --no-dev --no-hashes -o requirements.txt` (Docker
+    # The trailing date IS the bundled Public Suffix List snapshot date, so this pin is the
+    # staleness signal for validators.registrable_domain(). Refreshing the list means bumping
+    # it, then `uv lock && uv export --no-dev --no-hashes -o requirements.txt` (Docker
     # installs from requirements.txt, not from this file).
     "publicsuffixlist==1.0.2.20260726",
 ]
 
-# Optional, and deliberately not a base dependency: app/utils/storage.py imports
-# google.cloud.storage lazily inside its GCS backend, so the default local/Docker
-# deployment never needs this installed. Only a Cloud Run image (STORAGE_BACKEND=gcs)
-# does, and it must install the extra explicitly - `uv export --no-dev` does NOT
-# include extras, so google-cloud-storage is absent from requirements.txt by design:
-#     uv export --no-dev --no-hashes --extra gcs -o requirements-gcs.txt
-#   or, on top of the base image:
-#     pip install "google-cloud-storage==3.13.0"
+# Deliberately not a base dependency: storage.py imports it lazily, so only a Cloud Run
+# image (STORAGE_BACKEND=gcs) needs it. `uv export --no-dev` omits extras, so it is absent
+# from requirements.txt by design; install it with
+# `uv export --no-dev --no-hashes --extra gcs -o requirements-gcs.txt`, or on top of the
+# base image with `pip install "google-cloud-storage==3.13.0"`.
 [project.optional-dependencies]
 gcs = [
     "google-cloud-storage==3.13.0",
 ]
 
 # No [build-system] table on purpose: NexusTrace is a deployable application, not an
-# installable library. uv therefore manages the environment without trying to build/install
-# the project itself.
+# installable library, so uv manages the environment without trying to build the project.

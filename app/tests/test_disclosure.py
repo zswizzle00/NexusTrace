@@ -1,20 +1,17 @@
 """Holds app/utils/disclosure.py against the service layer.
 
-The point of this file is that the third-party list shown to analysts cannot rot.
-It walks every string constant in `app/services/*.py`, pulls the hostnames out, and
-fails when one is neither claimed by a Party in the registry nor waived in
-`NOT_A_DESTINATION`. Adding a provider to a service therefore breaks this test until
-the acceptable-use notice mentions it.
+The point is that the third-party list shown to analysts cannot rot. It AST-walks every
+string constant in `app/services/*.py`, pulls the hostnames out, and fails when one is
+neither claimed by a Party in the registry nor waived in `NOT_A_DESTINATION` - so adding
+a provider to a service breaks this test until the acceptable-use notice mentions it.
 
-Docstrings are skipped (they carry illustrative hosts like `http://10.0.0.5:8080/`)
-and comments never reach the AST at all, so only strings the code can actually use
-are considered. A provider reached through a library that builds its own URLs -
-Shodan is the only one - has no literal to find; that gap is stated in the module
-docstring of disclosure.py and cannot be closed from here.
+Docstrings are skipped (they carry illustrative hosts like `http://10.0.0.5:8080/`) and
+comments never reach the AST at all, so only strings the code can actually use count. A
+provider reached through a library that builds its own URLs - Shodan, via the `shodan`
+package - has no literal to find and must be listed by hand; that gap is stated in
+disclosure.py and cannot be closed from here.
 
 Pure: no server, no network, no filesystem writes.
-
-Run: uv run python app/tests/test_disclosure.py
 """
 import ast
 import os

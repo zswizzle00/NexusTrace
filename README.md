@@ -1,6 +1,6 @@
 # NexusTrace
 
-**Open-source threat intelligence and OSINT analysis platform.** Submit an IP, domain, URL, file hash, or user agent string and get enriched context from across the threat intelligence ecosystem - all in one dashboard.
+**Open-source threat intelligence and OSINT analysis platform.** Submit an IP, domain, URL, file hash, or user agent string and get enriched context from across the threat intelligence ecosystem, all in one dashboard.
 
 Built for security analysts, incident responders, and researchers who need fast, cross-referenced context on indicators of compromise without jumping between a dozen tools.
 
@@ -18,7 +18,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 
 ### Domain & URL Analysis
 - WHOIS registration data (IP2WHOIS)
-- DNS records - A, AAAA, MX, NS, TXT, CNAME, SOA
+- DNS records: A, AAAA, MX, NS, TXT, CNAME, SOA
 - SSL/TLS certificate details
 - HTTP security headers analysis
 - SPF / DKIM / DMARC email security posture
@@ -27,7 +27,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Technology stack fingerprinting
 - Meta tags, OpenGraph, and favicon extraction
 - Threat intelligence (AlienVault OTX)
-- Heuristic verdict with explicit signals (structural only - no reputation source yet)
+- Heuristic verdict with explicit signals (structural only, no reputation source yet)
 - Form capture with credential-prompt (password field) detection
 - Dropper detection: file downloads are hashed (SHA-256) and pivot into hash reputation lookup
 - Staged screenshots (on load / after scroll / after cookie-consent dismissal)
@@ -38,7 +38,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Threat intelligence cross-reference (AlienVault OTX)
 
 ### E-mail Analysis (`.eml`)
-- Upload an `.eml` file or paste raw message source - no mail server needed
+- Upload an `.eml` file or paste raw message source (no mail server needed)
 - SPF / DKIM / DMARC authentication parsing
 - Spoofing detection: Reply-To mismatch, Return-Path mismatch, display-name impersonation
 - URL display-text-vs-target mismatch detection in message bodies
@@ -46,13 +46,13 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Received-chain IP extraction with enrichment (geolocation, ASN, abuse score)
 - DNSBL sender-IP reputation (Spamhaus, SpamCop, Barracuda)
 - Defanged IOC extraction with copy-all, and a heuristic verdict with explicit signals
-- Only parsed findings are ever stored - the raw message, body, and attachment bytes are not
+- Only parsed findings are ever stored: the raw message, body, and attachment bytes are not
 
 ### Additional Tools
-- **Azure AD Error Decoder** - Look up AADSTS error codes with descriptions and remediation steps
-- **Windows Event ID Reference** - Decode Windows Security event IDs
-- **User Agent Parser** - Break down browser, OS, device, and bot flags from any UA string
-- **CyberChef** - Embedded CyberChef v11.3.0 for in-browser data encoding, decoding, and transformation
+- **Azure AD Error Decoder**: Look up AADSTS error codes with descriptions and remediation steps
+- **Windows Event ID Reference**: Decode Windows Security event IDs
+- **User Agent Parser**: Break down browser, OS, device, and bot flags from any UA string
+- **CyberChef**: Embedded CyberChef v11.3.0 for in-browser data encoding, decoding, and transformation
 
 ---
 
@@ -60,7 +60,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 
 > **Prerequisite:** dependencies are managed with [uv](https://docs.astral.sh/uv/).
 > Install it once with `curl -LsSf https://astral.sh/uv/install.sh | sh`.
-> (Docker builds do not use uv - the image installs from `requirements.txt` with pip, so
+> (Docker builds do not use uv: the image installs from `requirements.txt` with pip, so
 > after `uv add <pkg>` you must run `uv export --no-dev --no-hashes -o requirements.txt`
 > or the Docker build silently misses the new dependency.)
 
@@ -144,7 +144,7 @@ FLASK_PORT=5050
 # MMDB_PATH=/path/to/ipinfo_lite.mmdb
 ```
 
-> **All API keys are optional.** The tool gracefully skips any service whose key is not configured - cards for that service simply won't appear in results.
+> **All API keys are optional.** The tool gracefully skips any service whose key is not configured; cards for that service simply won't appear in results.
 
 ### IPinfo MMDB (optional, offline mode)
 
@@ -210,7 +210,7 @@ NexusTrace/
 └── nexus_auto_update.sh # Production updater: fetch + reset + cached rebuild, in place
 ```
 
-**How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format - IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string - and routes to the appropriate analysis pipeline.
+**How type detection works:** The `/analyze` POST endpoint auto-detects the indicator type from its format (IPv4/IPv6, domain pattern, URL scheme, MD5/SHA1/SHA256 hash, AADSTS code, Windows Event ID, or user agent string) and routes to the appropriate analysis pipeline.
 
 ---
 

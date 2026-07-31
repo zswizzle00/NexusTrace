@@ -1,13 +1,13 @@
 """Pins app/services/abusech.py - the unified abuse.ch client. No network, no key.
 
-The transport (`abusech._post`) is replaced with a recording fake, so every case here
-asserts on the envelope the client builds, not on abuse.ch. The lookups are
-`timed_lru_cache`d, so each case clears the caches first - otherwise case N would be
-answered from case N-1's fake response.
+The transport (`abusech._post`) is replaced with a recording fake, so every case asserts
+on the envelope the client builds, not on abuse.ch. The lookups are `timed_lru_cache`d,
+so each case clears the caches first - otherwise case N would be answered from case
+N-1's fake response.
 
 The submission half (`submit_ioc`, `upload_sample`) is where the fake earns its keep:
-several cases assert that *no* request was issued - for a missing key and for every
-local validation failure - and that the two functions are not cached, because a cached
+several cases assert that *no* request was issued - for a missing key and for every local
+validation failure - and that the two functions are not cached, because a cached
 submission would turn a retry into a silent no-op.
 """
 import hashlib
@@ -351,7 +351,6 @@ def test_sparse_fields():
                                   'last_seen': None, 'tags': []},
           f'threatfox sparse summary {envelope["summary"]}')
 
-    # `data` as a dict instead of a list.
     dict_data = {'query_status': 'ok', 'data': {'ioc': 'bad.test',
                                                 'malware_printable': 'Emotet',
                                                 'confidence_level': '50',
@@ -372,7 +371,6 @@ def test_sparse_fields():
                       lambda: abusech.threatfox_lookup('bad.test'))
     check_envelope('threatfox junk data', envelope, 'threatfox', 'no_record')
 
-    # blacklists missing entirely, url_count absent, urls holding a non-dict.
     thin_host = {'query_status': 'ok', 'urls': ['not-a-dict']}
     envelope, _ = run(FakeResponse(thin_host), lambda: abusech.urlhaus_host('bad.test'))
     check_envelope('urlhaus thin host', envelope, 'urlhaus', 'found')
@@ -382,7 +380,6 @@ def test_sparse_fields():
           f'urlhaus thin host url_count {envelope["summary"]["url_count"]}')
     check(envelope['reference'], 'urlhaus thin host: should fall back to a search link')
 
-    # blacklists present but not a dict.
     odd_host = dict(URLHAUS_HOST_OK, blacklists='not listed')
     envelope, _ = run(FakeResponse(odd_host), lambda: abusech.urlhaus_host('bad.test'))
     check(envelope['summary']['blacklists'] == {'spamhaus_dbl': None, 'surbl': None},
@@ -484,7 +481,6 @@ def test_skipped_without_key():
         check(envelope['summary'] == {}, f'{label}/no-key: summary should be empty')
         check(envelope['raw'] == {}, f'{label}/no-key: raw should be empty')
 
-    # A key that is only whitespace is not a key.
     envelope, transport = run(FakeResponse(THREATFOX_OK),
                               lambda: abusech.threatfox_lookup('bad.test'), key='   ')
     check_envelope('threatfox/blank-key', envelope, 'threatfox', 'skipped')
@@ -639,8 +635,6 @@ def test_cache_registration():
         _reset()
 
 
-# --- submissions -------------------------------------------------------------------
-
 SAMPLE = b'MZ\x90\x00this-is-not-really-malware'
 SAMPLE_SHA256 = hashlib.sha256(SAMPLE).hexdigest()
 
@@ -659,7 +653,6 @@ def _factory(func, defaults, positional, overrides):
 
 
 def submit_ioc(**overrides):
-    """A callable that submits a default-but-overridable IOC batch."""
     return _factory(abusech.submit_ioc,
                     {'iocs': IOCS, 'threat_type': 'botnet_cc', 'ioc_type': 'ip:port',
                      'malware': 'win.zloader'},
@@ -667,7 +660,6 @@ def submit_ioc(**overrides):
 
 
 def upload_sample(**overrides):
-    """A callable that uploads a default-but-overridable sample."""
     return _factory(abusech.upload_sample,
                     {'data': SAMPLE, 'filename': 'sample.bin'},
                     POSITIONAL_UPLOAD, overrides)
@@ -733,7 +725,6 @@ def test_submit_ioc_success():
     check(body['tags'] == ['zloader', 'c2'], f'submit_ioc: tags {body.get("tags")}')
     check(body['comment'] == 'seen in a phish', 'submit_ioc: comment not sent')
 
-    # Whitespace-only iocs are trimmed, not rejected.
     _, transport = run(FakeResponse(TF_SUBMIT_OK), submit_ioc(iocs=[' bad.test ']))
     check(transport.calls[0]['json']['iocs'] == ['bad.test'], 'submit_ioc: iocs not trimmed')
 

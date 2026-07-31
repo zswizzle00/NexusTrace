@@ -1,19 +1,12 @@
 #!/bin/bash
 
-# NexusTrace Start Script
-# Handles dependency updates and server startup
-# Usage:
-#   ./start.sh          - Start development server
-#   ./start.sh --docker - Start/rebuild Docker containers
-#   ./start.sh --prod   - Production Docker deployment (cached build)
-#   ./start.sh --clean  - Production deployment with a cold, no-cache rebuild
+# NexusTrace dev/Docker lifecycle. Run `./start.sh --help` for the modes.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -47,7 +40,6 @@ show_help() {
     echo "  ./start.sh --logs       # Follow server logs"
 }
 
-# Parse arguments
 MODE="dev"
 case "${1:-}" in
     --docker)
@@ -82,22 +74,18 @@ case "${1:-}" in
         ;;
 esac
 
-# Check for .env file
 if [ ! -f ".env" ]; then
     log_warn ".env file not found. Copy .env.example and configure your API keys."
 fi
 
 if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ] || [ "$MODE" = "clean" ]; then
-    # Docker mode
     log_info "Starting NexusTrace in Docker mode..."
 
-    # Check if docker-compose is available
     if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
         log_error "docker-compose not found. Please install Docker Compose."
         exit 1
     fi
 
-    # Determine docker compose command
     if docker compose version &> /dev/null 2>&1; then
         COMPOSE="docker compose"
     else
@@ -107,9 +95,9 @@ if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ] || [ "$MODE" = "clean" ]; then
     log_step "Stopping existing containers..."
     $COMPOSE down 2>/dev/null || true
 
-    # --no-cache is opt-in via --clean, not the default for --prod. A cold build
-    # re-downloads Chromium, every apt package, and every wheel; on the 2-core
-    # production VM that is ~40 minutes, versus minutes for a cached build.
+    # --no-cache is opt-in via --clean, never the default: a cold build re-downloads
+    # Chromium, every apt package and every wheel, which on the 2-core production VM is
+    # ~40 minutes against minutes for a cached build.
     if [ "$MODE" = "clean" ]; then
         log_warn "Cold rebuild: discarding the build cache. Expect ~40 minutes."
         $COMPOSE build --no-cache
@@ -129,49 +117,39 @@ if [ "$MODE" = "docker" ] || [ "$MODE" = "prod" ] || [ "$MODE" = "clean" ]; then
     log_info "Use 'docker-compose logs -f' to view logs"
 
 else
-    # Development mode
     log_info "Starting NexusTrace in development mode..."
 
-    # Warn if running as root
     if [ "$EUID" -eq 0 ]; then
         log_warn "Running as root is not recommended. Run without sudo."
     fi
 
-    # Check if Docker containers are running on same ports
     if docker ps 2>/dev/null | grep -q "nexustrace"; then
         log_warn "Docker containers are running. Stop them first with './stop.sh --docker'"
         log_warn "Or they may conflict with the dev server."
     fi
 
-    # Ensure uv is installed (manages the virtualenv + dependencies)
     if ! command -v uv &> /dev/null; then
         log_error "uv is not installed. Install it with:"
         log_error "  curl -LsSf https://astral.sh/uv/install.sh | sh"
         exit 1
     fi
 
-    # Sync dependencies into .venv from uv.lock (creates the venv if missing; fast & cached)
     log_step "Syncing dependencies with uv..."
     uv sync
 
-    # Use the uv-managed venv's Python directly (works even without activation)
     PYTHON="$SCRIPT_DIR/.venv/bin/python3"
 
-    # Kill any existing NexusTrace process on port 5050
     if lsof -ti:5050 > /dev/null 2>&1; then
         log_warn "Port 5050 in use. Stopping existing process..."
         lsof -ti:5050 | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
 
-    # Ensure logs directory exists
     mkdir -p logs
 
-    # Start the server
     log_step "Starting Flask development server..."
     echo ""
 
-    # Save PID for stop script (use venv python), redirect output to log file
     "$PYTHON" main.py > logs/nexustrace.log 2>&1 &
     echo $! > .nexustrace.pid
 
@@ -180,7 +158,6 @@ else
     log_info "Logs: logs/nexustrace.log  (./start.sh --logs to tail)"
     log_info "Use './stop.sh' to stop the server"
 
-    # Wait for server to be ready
     sleep 2
     if curl -s http://localhost:5050/ > /dev/null 2>&1; then
         log_info "Server is ready!"

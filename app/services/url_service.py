@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def _is_safe_host(hostname):
-    """Return True only if every resolved address for hostname is globally routable.
-
-    Prevents SSRF: a user-supplied hostname resolving to a private, loopback, or
-    link-local address (including metadata endpoints like 169.254.169.254) would let
-    the server fetch internal resources.
+    """True only if *every* resolved address is globally routable. Prevents SSRF: a
+    user-supplied hostname resolving to a private, loopback or link-local address
+    (including metadata endpoints like 169.254.169.254) would let the server fetch
+    internal resources.
     """
     if not hostname:
         return False
@@ -46,15 +45,12 @@ builtwith_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1)
 
 
 def setup_url_services(app):
-    """Setup URL-related services."""
     pass
 
 
 def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
-    """Submit a URL to urlscan.io for analysis.
-
-    Without `wait_for_result` this returns the scan link immediately; with it, polls
-    up to `max_polls` times waiting 5 seconds between attempts.
+    """Without `wait_for_result` this returns the scan link immediately; with it, polls
+    up to `max_polls` times, waiting 5 seconds between attempts.
     """
     api_key = os.getenv('URLSCAN_API_KEY')
     if not api_key:
@@ -135,7 +131,6 @@ def submit_to_urlscan(url, wait_for_result=False, max_polls=3):
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_favicon_hash(url):
-    """Get favicon and compute its MD5 hash."""
     try:
         parsed = urlparse(url)
         if not _is_safe_host(parsed.netloc or ''):
@@ -151,7 +146,6 @@ def get_favicon_hash(url):
 
 
 def parse_opengraph_twitter(soup):
-    """Parse OpenGraph and Twitter meta tags."""
     og = {}
     twitter = {}
     for tag in soup.find_all('meta'):
@@ -166,19 +160,16 @@ def parse_opengraph_twitter(soup):
 
 
 def check_phishtank_url(url):
-    """Generate PhishTank search URL."""
     return f'https://phishtank.org/search.php?valid=y&active=y&Search={url}'
 
 
 def get_google_safebrowsing_link(url):
-    """Generate Google Safe Browsing transparency report link."""
     encoded_url = requests.utils.quote(url, safe='')
     return f'https://transparencyreport.google.com/safe-browsing/search?url={encoded_url}'
 
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_tech_stack(url):
-    """Detect technologies used by the website."""
     try:
         builtwith_limiter.acquire()
         return builtwith.builtwith(url)
@@ -188,8 +179,8 @@ def get_tech_stack(url):
 
 
 def analyze_url(url, deep_scan=False):
-    """Analyze a URL for security and technical aspects. `deep_scan` waits for
-    URLscan results (favicon, tech, screenshot) instead of returning early."""
+    """`deep_scan` waits for URLscan results (favicon, tech, screenshot) instead of
+    returning early."""
     try:
         session = requests.Session()
         retry_strategy = Retry(
@@ -330,10 +321,8 @@ def analyze_url(url, deep_scan=False):
 
 
 def analyze_url_quick(url):
-    """Quick URL analysis - essential info only, fast response."""
     return analyze_url(url, deep_scan=False)
 
 
 def analyze_url_deep(url):
-    """Deep URL analysis - full analysis with URLscan polling, tech, and screenshot."""
     return analyze_url(url, deep_scan=True)

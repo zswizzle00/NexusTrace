@@ -16,7 +16,7 @@ virustotal_limiter = RateLimiter(max_requests=4, time_window=timedelta(minutes=1
 
 
 def identify_hash_type(hash_value: str) -> Tuple[Optional[str], Optional[str]]:
-    """Identify a hash's algorithm from its length. Returns (hash_type, error_message)."""
+    """Returns (hash_type, error_message)."""
     hash_value = hash_value.lower().strip()
 
     if re.match(r'^[a-f0-9]{32}$', hash_value):
@@ -52,7 +52,6 @@ def reference_links(hash_value: str) -> Dict[str, str]:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_virustotal_report(hash_value: str) -> Optional[Dict]:
-    """Get a VirusTotal report for a hash. Requires VIRUSTOTAL_API_KEY."""
     api_key = os.getenv('VIRUSTOTAL_API_KEY')
     if not api_key:
         logger.debug("VIRUSTOTAL_API_KEY not configured")
@@ -137,9 +136,7 @@ def _abusech_failure(envelope: Dict) -> Dict:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_malwarebazaar_report(hash_value: str) -> Optional[Dict]:
-    """Get a MalwareBazaar report for a hash.
-
-    abuse.ch made `Auth-Key` mandatory, so this is no longer keyless: with no
+    """abuse.ch made `Auth-Key` mandatory, so this is no longer keyless: with no
     ABUSECH_AUTH_KEY the request is not made at all and this returns None, which
     unknown_hash_report() renders as 'skipped' rather than as a failed query.
     """
@@ -204,8 +201,7 @@ def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
-    """Look a hash up across every source. `deep_scan` waits for all of them;
-    otherwise shorter timeouts apply."""
+    """`deep_scan` waits for every source; otherwise shorter timeouts apply."""
     hash_value = hash_value.lower().strip()
     hash_type, error = identify_hash_type(hash_value)
 
@@ -277,19 +273,16 @@ def get_hash_info(hash_value: str, deep_scan: bool = False) -> Dict:
 
 
 def get_hash_info_quick(hash_value: str) -> Dict:
-    """Quick hash lookup - shorter timeouts, essential info only."""
     return get_hash_info(hash_value, deep_scan=False)
 
 
 def get_hash_info_deep(hash_value: str) -> Dict:
-    """Deep hash lookup - full analysis with longer timeouts."""
     return get_hash_info(hash_value, deep_scan=True)
 
 
-# Unknown-hash reporting is shared by every hash entry point (GET /i/<hash>,
-# POST /analyze, POST /api/hash/analyze) so one hash renders one page whichever
-# route you arrived through. It lives here rather than in a route because it is
-# entirely about this module's sources.
+# Shared by every hash entry point (GET /i/<hash>, POST /analyze,
+# POST /api/hash/analyze) so one hash renders one page whichever route you arrived
+# through. Here rather than in a route because it is entirely about these sources.
 
 # OTX is keyed off three different env-var names; all three are accepted, so all
 # three count as "configured".
@@ -301,10 +294,8 @@ def _otx_pulse_count(alienvault_raw) -> int:
 
 
 def has_reputation_record(hash_info: Optional[Dict], alienvault_raw) -> bool:
-    """True when at least one source actually holds a record of this hash.
-
-    False is the "nobody has seen it" case, a finding in its own right rather than
-    an error - see unknown_hash_report().
+    """False is the "nobody has seen it" case - a finding in its own right rather than
+    an error; see unknown_hash_report().
     """
     hash_info = hash_info or {}
     sources = hash_info.get('sources') or {}
@@ -317,9 +308,7 @@ def has_reputation_record(hash_info: Optional[Dict], alienvault_raw) -> bool:
 
 
 def source_state(configured: bool, status: Optional[str]) -> str:
-    """Classify one reputation source for the unknown-hash page.
-
-    'skipped' (no API key, never queried) is deliberately distinct from 'no_record':
+    """'skipped' (no API key, never queried) is deliberately distinct from 'no_record':
     a source that was never asked says nothing about the hash.
     """
     if not configured:
@@ -336,7 +325,7 @@ def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_r
     hash_info = hash_info or {}
     provider = hash_info.get('sources') or {}
     # hash_info is absent exactly when every lookup failed, which is when the
-    # manual pivots matter most - so rebuild the links rather than skip them.
+    # manual pivots matter most, so rebuild the links rather than skip them.
     links = hash_info.get('reference_links') or reference_links(hash_value)
 
     def status_of(name):
@@ -349,8 +338,8 @@ def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_r
     sources = [
         {'name': 'VirusTotal', 'key_env': 'VIRUSTOTAL_API_KEY', 'url': links.get('virustotal'),
          'state': source_state(bool(os.getenv('VIRUSTOTAL_API_KEY')), status_of('virustotal'))},
-        # Both are abuse.ch and share one mandatory key, so both are 'skipped' - not
-        # 'unavailable' - when it is missing.
+        # Both are abuse.ch and share one mandatory key, so both are 'skipped' (not
+        # 'unavailable') when it is missing.
         {'name': 'MalwareBazaar', 'key_env': abusech.AUTH_ENV, 'url': links.get('malwarebazaar'),
          'state': source_state(bool(abusech.auth_key()), status_of('malwarebazaar'))},
         {'name': 'ThreatFox', 'key_env': abusech.AUTH_ENV, 'url': links.get('threatfox'),

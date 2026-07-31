@@ -173,7 +173,6 @@ def check_magic(failures):
                     'is declared earlier and shadows it'
                 )
 
-    # Every offset the table needs must be inside the window sniff_magic slices.
     deepest = max(offset + len(sig) for offset, sig, _ in MAGIC_SIGNATURES)
     if deepest > _MAGIC_WINDOW:
         failures.append(f'_MAGIC_WINDOW {_MAGIC_WINDOW} is short of the deepest signature {deepest}')
@@ -224,7 +223,6 @@ def check_strings(failures):
     if 'C:\\Users\\victim\\run.exe' not in got:
         failures.append(f'UTF-16LE run not extracted; got {got}')
 
-    # A wide run must not also surface as a pile of ASCII fragments.
     if any(len(s) >= 4 and '\x00' not in s and s.startswith('C:') and s != 'C:\\Users\\victim\\run.exe'
            for s in got):
         failures.append(f'UTF-16LE run double-reported as ASCII fragments: {got}')
@@ -252,7 +250,6 @@ def check_strings(failures):
     if extract_strings(flood, limit=0) != []:
         failures.append('limit=0 must yield no strings')
 
-    # Fair share: an ASCII flood must not starve the wide strings entirely.
     mixed = flood + b'\x00\x00' + 'WIDE-ONLY-MARKER'.encode('utf-16-le')
     if 'WIDE-ONLY-MARKER' not in extract_strings(mixed):
         failures.append('an ASCII flood starved the UTF-16LE strings')

@@ -1,33 +1,27 @@
 """Pure Windows Shell Link (``.lnk``) parsing and heuristics. stdlib only, no I/O.
+Structures follow MS-SHLLINK: ShellLinkHeader, LinkTargetIDList, LinkInfo, StringData,
+ExtraData.
 
-Structures follow MS-SHLLINK: ShellLinkHeader, LinkTargetIDList, LinkInfo,
-StringData, ExtraData.
+**The input is attacker-controlled binary and nothing here may raise.** Every count and
+length read from the file is clamped against the remaining buffer before it drives a slice
+or a loop, and :func:`parse_lnk` reports failure by returning a partial record with
+``parsed_ok`` false. Bounds on file-supplied fields:
 
-**The input is attacker-controlled binary and nothing here may raise.** Every
-count and length read from the file is clamped against the remaining buffer
-before it drives a slice or a loop, and :func:`parse_lnk` reports failure by
-returning a partial record with ``parsed_ok`` false and ``error`` set. Bounds
-enforced on file-supplied fields:
-
-* ``HeaderSize`` is recorded but never used for arithmetic - the spec fixes the
-  header at 76 bytes, and a lying ``HeaderSize`` is a known evasion, so the
-  structures after it are located at the constant offset.
-* ``IDListSize`` and each ``ItemIDSize`` are clamped to the buffer; an item must
-  be at least 3 bytes (its own size field plus a class byte) or the walk stops,
-  which is what prevents a zero/one-byte item from looping forever. At most
-  ``MAX_IDLIST_ITEMS`` items are walked.
-* ``LinkInfoSize`` must be at least 0x1C and is clamped to the remaining buffer;
-  every offset inside LinkInfo must fall within that clamped span, and the
-  VolumeID / CommonNetworkRelativeLink substructures are additionally bounded by
-  their own declared sizes.
-* ``CountCharacters`` in StringData is 16-bit, so a lie costs at most 128 KiB of
-  read; the byte count is still clamped to the remaining buffer and the decoded
-  value truncated at ``MAX_FIELD_CHARS``.
-* NUL-terminated paths are scanned inside a ``MAX_PATH_CHARS`` window. An
-  unbounded ``find(b'\\x00')`` on a file with no NUL yields a "path" the size of
-  the whole file.
-* ``BlockSize`` in ExtraData must be at least 4 (smaller is the terminal block)
-  and must fit the buffer; at most ``MAX_EXTRA_BLOCKS`` blocks are walked.
+* ``HeaderSize`` is recorded but never used for arithmetic: the spec fixes the header at
+  76 bytes and a lying ``HeaderSize`` is a known evasion, so everything after it is located
+  at the constant offset.
+* ``IDListSize`` and each ``ItemIDSize`` are clamped to the buffer; an item under 3 bytes
+  stops the walk, which is what prevents a zero/one-byte item looping forever. At most
+  ``MAX_IDLIST_ITEMS`` items.
+* ``LinkInfoSize`` must be at least 0x1C and is clamped to the remaining buffer; every
+  offset inside it must fall in that span, and VolumeID / CommonNetworkRelativeLink are
+  additionally bounded by their own declared sizes.
+* ``CountCharacters`` in StringData is 16-bit, so a lie costs at most 128 KiB of read;
+  the byte count is still clamped and the value truncated at ``MAX_FIELD_CHARS``.
+* NUL-terminated paths are scanned inside a ``MAX_PATH_CHARS`` window: an unbounded
+  ``find(b'\\x00')`` on a file with no NUL yields a "path" the size of the whole file.
+* ``BlockSize`` in ExtraData must be at least 4 (smaller is the terminal block) and fit
+  the buffer; at most ``MAX_EXTRA_BLOCKS`` blocks are walked.
 """
 
 import re
@@ -173,8 +167,8 @@ def _u64(data, offset):
 
 
 def _filetime(value):
-    """FILETIME to an ISO-8601 UTC string, or None. The rule engines' date
-    parsers accept this shape, so a future scorer can age these directly."""
+    """FILETIME to an ISO-8601 UTC string, or None - the shape the rule engines' date
+    parsers already accept."""
     if not value:
         return None
     try:
@@ -278,16 +272,12 @@ def _empty_record():
 
 
 def _shell_item_name(item):
-    """Best-effort name from one shell item.
-
-    Shell items are only partially documented. Two shapes are worth recovering
-    and are enough to rebuild a target for the common malicious shortcut that
-    carries no LinkInfo at all: a file-entry item (class type 0x30-0x3F) whose
-    PrimaryName starts at item-data offset 12, and a volume item (0x20-0x2F)
-    whose name starts at offset 1. Windows writes the name in ANSI there and
-    repeats it as UTF-16 in an extension block, so a one-character ANSI read is
-    the tell that this item is the wide variant.
-    """
+    """Shell items are only partially documented. Two shapes are enough to rebuild a
+    target for the common malicious shortcut carrying no LinkInfo at all: a file-entry
+    item (class 0x30-0x3F) whose PrimaryName starts at item-data offset 12, and a volume
+    item (0x20-0x2F) whose name starts at offset 1. Windows writes the name in ANSI there
+    and repeats it as UTF-16 in an extension block, so a one-character ANSI read is the
+    tell that this item is the wide variant."""
     if not item:
         return ''
     class_type = item[0]
@@ -477,11 +467,8 @@ def _guid(buffer):
 
 
 def _harvest_extra_block(signature, block, extras):
-    """Pull the analyst-relevant field out of a known ExtraData block.
-
-    The three "target" blocks (Environment / IconEnvironment / Darwin) share one
-    layout: 260 bytes of ANSI path at offset 8, then 520 bytes of UTF-16.
-    """
+    """The three "target" blocks (Environment / IconEnvironment / Darwin) share one
+    layout: 260 bytes of ANSI path at offset 8, then 520 bytes of UTF-16."""
     if signature in (0xA0000001, 0xA0000007, 0xA0000006):
         key = {
             0xA0000001: 'env_target',
@@ -541,12 +528,9 @@ def _parse_extradata(data, offset, warnings):
 
 
 def parse_lnk(data):
-    """Parse ``.lnk`` bytes into a plain dict. Never raises.
-
-    On malformed input the record is returned with whatever was recovered,
-    ``parse_warnings`` describing each bound that was hit, and ``parsed_ok``
-    false only when the bytes are not a shell link at all.
-    """
+    """Parse ``.lnk`` bytes into a plain dict. Never raises: malformed input returns
+    whatever was recovered, ``parse_warnings`` describing each bound that was hit, and
+    ``parsed_ok`` false only when the bytes are not a shell link at all."""
     record = _empty_record()
     if isinstance(data, (bytearray, memoryview)):
         data = bytes(data)
@@ -625,15 +609,10 @@ def parse_lnk(data):
     return record
 
 
-# --- Heuristics -------------------------------------------------------------
-
-# Base names of execution-capable Windows binaries abused by shortcut lures.
-# Matched with word boundaries, never as substrings: a bare `in` test flags
-# `powershell_helper.txt` as PowerShell (`_` keeps the boundary from closing,
-# which is exactly why the regex form is correct here). Two-letter names that
-# are also English words (`at`, `sc`) are deliberately absent - they produce
-# noise on ordinary paths without adding a detection that the argument patterns
-# below do not already cover.
+# Execution-capable Windows binaries abused by shortcut lures. Matched with word
+# boundaries, never as substrings: a bare `in` test flags `powershell_helper.txt` as
+# PowerShell. Two-letter names that are also English words (`at`, `sc`) are deliberately
+# absent - noise on ordinary paths, and the argument patterns below already cover them.
 LOLBAS_NAMES = (
     'powershell', 'pwsh', 'cmd', 'mshta', 'wscript', 'cscript', 'rundll32',
     'regsvr32', 'regasm', 'regsvcs', 'installutil', 'certutil', 'bitsadmin',
@@ -678,9 +657,8 @@ _ARGUMENT_PATTERNS = (
     ('unc_path_in_arguments', re.compile(r'\\\\[A-Za-z0-9._-]{2,}\\')),
 )
 
-# Path fragments and env-var forms that mark a user-writable drop location.
-# `\appdata\local\programs\` is deliberately not here: it is where VS Code,
-# Slack, and Teams legitimately install.
+# User-writable drop locations. `\appdata\local\programs\` is deliberately absent: it is
+# where VS Code, Slack and Teams legitimately install.
 _USER_WRITABLE_FRAGMENTS = (
     '\\temp\\', '\\tmp\\', '\\appdata\\roaming\\', '\\appdata\\local\\temp\\',
     '\\downloads\\', '\\users\\public\\', '\\programdata\\', '\\windows\\tasks\\',
@@ -762,11 +740,9 @@ def lnk_text(parsed):
 
 
 def lnk_iocs(parsed, limit=100):
-    """URLs, domains, and IPs embedded in the shortcut, defanged.
-
-    Delegates to :func:`app.utils.iocs.extract_iocs` - there is exactly one IOC
-    extractor in this codebase and this is not it.
-    """
+    """URLs, domains and IPs embedded in the shortcut, defanged. Delegates to
+    :func:`app.utils.iocs.extract_iocs` - there is exactly one IOC extractor in this
+    codebase and this is not it."""
     return extract_iocs(lnk_text(parsed), limit=limit)
 
 
@@ -776,12 +752,9 @@ def _basename(path):
 
 def analyze_signals(parsed):
     """Named heuristic signals over a parsed record. Pure; never raises.
-
-    Returns ``[{'key', 'label', 'detail'}]`` in ``SIGNAL_LABELS`` order, so a
-    future ``file_rules.py`` can weight ``key`` the way ``scan_rules`` and
-    ``email_rules`` weight theirs. An unparseable record yields no signals - the
-    absence of evidence must not read as evidence.
-    """
+    ``[{'key', 'label', 'detail'}]`` in ``SIGNAL_LABELS`` order, so ``file_rules`` can
+    weight ``key`` the way ``scan_rules`` and ``email_rules`` weight theirs. An unparseable
+    record yields no signals: absence of evidence must not read as evidence."""
     parsed = parsed or {}
     if not parsed.get('parsed_ok'):
         return []
@@ -868,10 +841,9 @@ def analyze_signals(parsed):
 
     recorded_size = parsed.get('target_size_bytes') or 0
     is_directory = bool((parsed.get('file_attributes') or 0) & ATTR_DIRECTORY)
-    # A shortcut Explorer built records the target's real size. A programmatically
-    # assembled lure usually leaves it zero, and only a corrupt or fabricated
-    # header claims a quarter-gigabyte interpreter. Directories legitimately
-    # record zero, so they are excluded.
+    # A shortcut Explorer built records the target's real size; a programmatically
+    # assembled lure usually leaves it zero, and only a corrupt or fabricated header
+    # claims a quarter-gigabyte interpreter. Directories legitimately record zero.
     if recorded_size > MAX_PLAUSIBLE_TARGET_BYTES:
         mark('target_size_mismatch', f'{recorded_size} bytes recorded')
     elif interpreter_target and not is_directory and recorded_size == 0:

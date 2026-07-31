@@ -10,7 +10,6 @@ from pathlib import Path
 import sys
 
 def check_geoip2():
-    """Check if geoip2 library is installed."""
     try:
         import geoip2
         print("✓ geoip2 library is installed")
@@ -21,13 +20,11 @@ def check_geoip2():
         return False
 
 def create_data_directory():
-    """Create data directory if it doesn't exist."""
     data_dir = Path(__file__).parent.parent / "data"
     data_dir.mkdir(exist_ok=True)
     return data_dir
 
 def download_geolite2_city():
-    """Download GeoLite2 City database (free alternative)."""
     data_dir = create_data_directory()
     mmdb_path = data_dir / "GeoLite2-City.mmdb"
     
@@ -79,7 +76,6 @@ def download_geolite2_city():
         return None
 
 def download_ipinfo_sample():
-    """Download a sample IPinfo database or provide instructions."""
     data_dir = create_data_directory()
     mmdb_path = data_dir / "ipinfo_lite.mmdb"
     
@@ -96,7 +92,6 @@ def download_ipinfo_sample():
     return None
 
 def create_sample_mmdb():
-    """Create a minimal sample MMDB file for testing."""
     data_dir = create_data_directory()
     mmdb_path = data_dir / "sample.mmdb"
     
@@ -122,7 +117,6 @@ def create_sample_mmdb():
         return None
 
 def update_ip_service_config():
-    """Update the IP service configuration to use available MMDB databases."""
     ip_service_path = Path(__file__).parent.parent / "app" / "services" / "ip_service.py"
     
     if not ip_service_path.exists():
@@ -137,14 +131,14 @@ def update_ip_service_config():
     anchor = "mmdb_path = os.getenv('MMDB_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'ipinfo_lite.mmdb'))"
     marker = 'alternative_paths = ['
 
-    # The anchor is the first line of what gets inserted, so it still matches on a
-    # second run: without this guard the block is appended again every time.
+    # The anchor is the first line of what gets inserted, so it still matches on a second
+    # run; without this guard the block is appended again every time.
     if marker in content:
         print("✓ IP service already configured for alternative MMDB paths")
         return True
 
     if anchor not in content:
-        print("✗ Could not find the mmdb_path assignment in ip_service.py - "
+        print("✗ Could not find the mmdb_path assignment in ip_service.py; "
               "not modifying it. Set MMDB_PATH in .env instead.")
         return False
 
@@ -168,7 +162,6 @@ def update_ip_service_config():
     return True
 
 def main():
-    """Main setup function."""
     print("NexusTrace MMDB Database Setup")
     print("=" * 40)
 

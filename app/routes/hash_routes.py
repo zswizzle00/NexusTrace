@@ -14,7 +14,6 @@ hash_bp = Blueprint('hash', __name__)
 
 @hash_bp.route('/check_hash', methods=['POST'])
 def check_hash():
-    """Hash reputation lookup (JSON)."""
     try:
         data = request.get_json()
         hash_value = data.get('hash', '').strip()
@@ -49,7 +48,7 @@ def analyze_hash():
             result = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
 
             if result.get('error'):
-                # Bad hash format - a real input error, not an unknown hash.
+                # Bad hash format: a real input error, not an unknown hash.
                 error = result['error']
                 result = None
             else:

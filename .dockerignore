@@ -10,7 +10,7 @@ ENV/
 env/
 .env
 
-# Tooling (regenerated/downloaded on demand, never needed in the image)
+# Tooling (downloaded on demand, never needed in the image)
 tools/
 
 # IDE
@@ -23,9 +23,8 @@ tools/
 .git
 .gitignore
 
-# Docker / deployment manifests. service.yaml is applied to Cloud Run from the
-# developer's machine (`gcloud run services replace`); it is never read by the
-# container, and it names the project's service account and secrets.
+# Deployment manifests. service.yaml is applied from the developer's machine, never read
+# by the container, and it names the project's service account and secrets.
 Dockerfile
 docker-compose.yml
 .dockerignore
@@ -41,13 +40,13 @@ logs/
 *.sqlite3
 .DS_Store
 
-# Runtime data. NOT optional: data/ is bind-mounted by docker-compose.yml, so a copy
-# in the image is dead weight AND every new scan/screenshot busts the `COPY . .` layer
-# and everything after it. scan_service.py and email_service.py mkdir their own store
-# directories at import, so nothing here is needed at build time.
+# NOT optional: data/ is bind-mounted by docker-compose.yml, so a copy in the image is dead
+# weight AND every new scan or screenshot busts the `COPY . .` layer and everything after
+# it. The services mkdir their own store directories at import, so nothing here is needed
+# at build time.
 data/
 
-# Agent scratch, planning docs, and host-side tooling — never served or imported.
+# Agent scratch, planning docs, and host-side tooling: never served or imported.
 .superpowers/
 .worktrees/
 docs/
@@ -63,6 +62,6 @@ nexus_auto_update.sh
 start.sh
 stop.sh
 
-# Tests run on the host, not in the image (test_endpoints.py talks to the container
-# over HTTP via NEXUSTRACE_BASE_URL).
+# Tests run on the host: test_endpoints.py talks to the container over HTTP via
+# NEXUSTRACE_BASE_URL.
 app/tests/ 

@@ -139,7 +139,7 @@ def _run_analysis(indicator):
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
         if not has_reputation_record(result_data['hash_info'], alienvault_raw):
-            # "Nobody has seen it" is a finding, not an error - a freshly staged
+            # "Nobody has seen it" is a finding, not an error; a freshly staged
             # dropper looks exactly like this, so keep the hash on screen.
             return render_template('hash_analysis.html',
                                    indicator=indicator,
@@ -312,7 +312,6 @@ def analyze_deeplink(indicator):
 
 @home_bp.route('/no_results')
 def no_results():
-    """The no-results page when reached directly rather than via a redirect."""
     indicator = request.args.get('indicator', 'Unknown Indicator')
     error_type = request.args.get('error_type', None)
     return render_template('no_results.html', indicator=indicator, error_type=error_type)

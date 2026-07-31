@@ -1,39 +1,30 @@
 """Client for every abuse.ch service behind their unified Auth-Key.
 
-MalwareBazaar, ThreatFox, URLhaus and the Hunting API all authenticate with one key
-from https://auth.abuse.ch/, sent as the `Auth-Key` header, and that header is
-mandatory on all of them - an unauthenticated MalwareBazaar request is a flat 401,
-not a public read.
+MalwareBazaar, ThreatFox, URLhaus and the Hunting API all authenticate with one key from
+https://auth.abuse.ch/ sent as the `Auth-Key` header, mandatory on all of them - an
+unauthenticated MalwareBazaar request is a flat 401, not a public read.
 
 Every public lookup returns the same envelope, never raises and never returns None:
 
     {'source': 'threatfox'|'urlhaus'|'malwarebazaar'|'hunting',
      'state': 'found'|'no_record'|'skipped'|'unavailable',
-     'summary': {...},
-     'reference': str|None,
-     'raw': {...}}
+     'summary': {...}, 'reference': str|None, 'raw': {...}}
 
-The four states are the vocabulary `hash_service.source_state` already uses, and the
-distinction between three of them is the point of this module:
+The four states are `hash_service.source_state`'s vocabulary, and the distinction between
+three of them is the point of this module:
 
 - `skipped`     no key configured, no request issued - says nothing about the indicator.
 - `no_record`   asked, and abuse.ch has nothing.
 - `unavailable` transport failure, non-200, unparseable body, or a rejected key
                 (`no_api_key`) - also says nothing about the indicator.
 
-`raw` is the decoded provider body when there was one, otherwise a small diagnostic
-dict (`{'error': 'timeout'}`, `{'error': 'http_401'}`, ...).
+`raw` is the decoded provider body when there was one, else a diagnostic dict.
 
-Submissions (`submit_ioc`, `upload_sample`) return the same five keys but a different
-`state` vocabulary, because "we looked and found nothing" has no meaning when you are
-writing rather than reading:
-
-- `submitted`   abuse.ch accepted it.
-- `duplicate`   abuse.ch already has it (`file_already_known`, an all-duplicate batch).
-- `rejected`    refused - either locally, before any request, or by the provider
-                (`user_blacklisted`, `file_expected`, an illegal enum or tag).
-- `skipped`     no key configured, no request issued.
-- `unavailable` transport failure, non-200, unparseable body, or `no_api_key`.
+Submissions return the same five keys but a different `state` vocabulary, because "we
+looked and found nothing" is meaningless when writing: `submitted`, `duplicate`
+(`file_already_known`, an all-duplicate batch), `rejected` (refused locally before any
+request, or by the provider - `user_blacklisted`, `file_expected`, an illegal enum or
+tag), plus `skipped` and `unavailable` as above.
 """
 import hashlib
 import json
@@ -59,13 +50,12 @@ THREATFOX_API = 'https://threatfox-api.abuse.ch/api/v1/'
 URLHAUS_API = 'https://urlhaus-api.abuse.ch/v1/'
 HUNTING_API = 'https://hunting-api.abuse.ch/api/v1/'
 
-# abuse.ch documents no published rate limit. One limiter covers all four APIs
-# because they are one provider behind one account.
+# No published rate limit. One limiter covers all four APIs: one provider, one account.
 abusech_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
-# A sample upload is a body transfer, not a lookup: TIMEOUT_MEDIUM (10s) is a fine
-# bound on "answer a question about a hash" but will abort a multi-megabyte POST on an
-# ordinary uplink, and an aborted upload is indistinguishable to us from a refusal.
+# A body transfer, not a lookup: TIMEOUT_MEDIUM (10s) bounds "answer a question about a
+# hash" fine but aborts a multi-megabyte POST on an ordinary uplink, and an aborted
+# upload is indistinguishable to us from a refusal.
 UPLOAD_TIMEOUT = 60
 
 STATE_FOUND = 'found'
@@ -77,15 +67,13 @@ STATE_SUBMITTED = 'submitted'
 STATE_DUPLICATE = 'duplicate'
 STATE_REJECTED = 'rejected'
 
-# Every abuse.ch "we looked, there is nothing" status across the four APIs. Anything
-# else that is not 'ok' (illegal_hash, invalid_url, no_api_key, ...) is a failed
-# query, not an empty result.
+# Anything else that is not 'ok' (illegal_hash, invalid_url, no_api_key, ...) is a
+# failed query, not an empty result.
 _NO_RECORD_STATUSES = frozenset({'no_results', 'no_result', 'hash_not_found'})
 
-# Submission outcomes. ThreatFox answers 'ok', MalwareBazaar 'inserted'. Everything
-# that is not accepted, duplicate, absent or `no_api_key` is the provider refusing the
-# submission (`user_blacklisted`, `file_expected`, `http_post_expected`, `illegal_*`),
-# which is a `rejected`, not an `unavailable` - resending it unchanged will not help.
+# ThreatFox answers 'ok', MalwareBazaar 'inserted'. Anything not accepted, duplicate or
+# `no_api_key` is the provider refusing (`user_blacklisted`, `file_expected`,
+# `illegal_*`): a `rejected`, not `unavailable` - resending it unchanged will not help.
 _SUBMIT_ACCEPTED_STATUSES = frozenset({'ok', 'inserted'})
 _SUBMIT_DUPLICATE_STATUSES = frozenset({'file_already_known'})
 _SUBMIT_UNAVAILABLE_STATUSES = frozenset({'no_api_key'})
@@ -104,7 +92,6 @@ _TAG_RE = re.compile(r'^[A-Za-z0-9.\- ]+$')
 
 
 def auth_key() -> Optional[str]:
-    """The one abuse.ch key, or None when it is not configured."""
     return (os.getenv(AUTH_ENV) or '').strip() or None
 
 
@@ -127,8 +114,8 @@ def _envelope(source, state, summary=None, reference=None, raw=None) -> Dict:
 
 
 def records(value) -> List[Dict]:
-    """Provider list fields as a list of dicts, tolerant of a single dict or an
-    absent/odd value. Public because hash_service reshapes `raw` itself."""
+    """Tolerant of a single dict or an absent/odd value. Public because hash_service
+    reshapes `raw` itself."""
     if isinstance(value, list):
         return [item for item in value if isinstance(item, dict)]
     if isinstance(value, dict):
@@ -177,9 +164,8 @@ def _pick(record, *names):
 
 
 def _query(source, url, reference, data=None, json_payload=None, allow_list_body=False):
-    """Issue one authenticated request. Returns (body, envelope): exactly one is None.
-
-    A non-None envelope is terminal - the caller returns it unchanged.
+    """Returns (body, envelope): exactly one is None, and a non-None envelope is
+    terminal - the caller returns it unchanged.
     """
     key = auth_key()
     if not key:
@@ -285,7 +271,6 @@ def threatfox_lookup(search_term: str, exact_match: bool = True) -> Dict:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def threatfox_hash(hash_value: str) -> Dict:
-    """ThreatFox lookup for an MD5 or SHA-256 payload hash."""
     value = (hash_value or '').strip().lower()
     reference = _threatfox_reference(value)
     if not value:
@@ -330,7 +315,6 @@ def urlhaus_host(host: str) -> Dict:
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def urlhaus_url(url: str) -> Dict:
-    """URLhaus record for one exact URL."""
     value = (url or '').strip()
     reference = _urlhaus_reference(value)
     if not value:
@@ -382,7 +366,6 @@ def urlhaus_payload(sha256: Optional[str] = None, md5: Optional[str] = None) -> 
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def malwarebazaar_hash(hash_value: str) -> Dict:
-    """MalwareBazaar sample record for an MD5, SHA-1 or SHA-256 hash."""
     value = (hash_value or '').strip().lower()
     if not value:
         return _envelope('malwarebazaar', STATE_UNAVAILABLE, raw={'error': 'empty_hash'})
@@ -415,12 +398,9 @@ def malwarebazaar_hash(hash_value: str) -> Dict:
 
 @timed_lru_cache(seconds=1800, maxsize=2)
 def hunting_fplist() -> Dict:
-    """The abuse.ch Hunting API false-positive list.
-
-    Nothing in the app calls this yet, and no route should: the Hunting API has no
-    per-indicator lookup - its whole surface is `get_fplist` and `create_collection`
-    - so there is no analysis page it can enrich. It is implemented here so the
-    client covers the account's full API surface when a consumer does appear.
+    """No route should call this: the Hunting API has no per-indicator lookup - its whole
+    surface is `get_fplist` and `create_collection` - so there is no analysis page it can
+    enrich. Implemented so the client covers the account's full API surface.
     """
     body, envelope = _query('hunting', HUNTING_API, 'https://hunting.abuse.ch/',
                             json_payload={'query': 'get_fplist', 'format': 'json'},
@@ -436,19 +416,15 @@ def hunting_fplist() -> Dict:
                      reference='https://hunting.abuse.ch/', raw=body)
 
 
-# --- submissions -------------------------------------------------------------------
+# `submit_ioc` and `upload_sample` are deliberately NOT wrapped in @timed_lru_cache
+# (every lookup above is), and must stay out of clear_caches() too. Caching a write is
+# wrong both ways: a cached 'submitted' turns a deliberate retry into a silent no-op that
+# reports success without sending, and a cached failure blocks a legitimate resend for the
+# whole TTL. Two calls means two requests; test_abusech.py asserts it.
 #
-# `submit_ioc` and `upload_sample` are deliberately NOT wrapped in @timed_lru_cache,
-# and that omission is the design, not an oversight - every other entry point above is
-# cached. Caching a write is wrong in both directions: a cached 'submitted' turns an
-# analyst's deliberate retry into a silent no-op that reports success without sending
-# anything, and a cached failure blocks a legitimate resend for the whole TTL. They
-# must also stay out of the clear_caches() list in app/utils/cache.py for the same
-# reason. Two calls means two requests; app/tests/test_abusech.py asserts it.
-#
-# Neither function ever logs `data` or the assembled request body. A submitted sample
-# is live malware that may carry customer content, and an IOC batch can carry internal
-# hostnames; only the filename, byte count and SHA-256 are ever written to the log.
+# Neither ever logs `data` or the assembled body: a submitted sample is live malware that
+# may carry customer content, and an IOC batch can carry internal hostnames. Only the
+# filename, byte count and SHA-256 are logged.
 
 
 def _size(value) -> int:
@@ -463,9 +439,8 @@ def _rejected(source, reason, detail=None, reference=None) -> Dict:
 
 
 def _clean_tags(value):
-    """Returns (tags, reason). Out-of-charset tags are refused here rather than sent:
-    abuse.ch rejects the whole submission over one bad tag, so a local check turns a
-    wasted round trip into an actionable reason."""
+    """Returns (tags, reason). abuse.ch rejects the whole submission over one bad tag, so
+    a local check turns a wasted round trip into an actionable reason."""
     if value in (None, '', [], ()):
         return [], None
     if isinstance(value, str):
@@ -486,10 +461,9 @@ def _clean_tags(value):
 
 
 def _clean_mapping(value, allowed, listify):
-    """Validate a MalwareBazaar `references`/`context` map. Returns (clean, reason, key).
-
-    An unknown key is refused rather than dropped: abuse.ch would silently ignore it,
-    and the analyst would believe the context was recorded when it was not.
+    """Returns (clean, reason, key). An unknown key is refused rather than dropped:
+    abuse.ch would silently ignore it, and the analyst would believe the context was
+    recorded when it was not.
     """
     if value in (None, {}):
         return {}, None, None
@@ -526,10 +500,8 @@ def _safe_filename(value) -> Optional[str]:
 
 def _submit(source, url, reference, summary, json_payload=None, files=None,
             timeout=TIMEOUT_MEDIUM):
-    """Issue one authenticated submission. Returns (body, envelope): exactly one is None.
-
-    A non-None envelope is terminal. `summary` is caller-side metadata about what was
-    sent, so it rides along on every outcome - knowing which SHA-256 was skipped for a
+    """Returns (body, envelope): exactly one is None, and a non-None envelope is terminal.
+    `summary` rides along on every outcome - knowing which SHA-256 was skipped for a
     missing key is exactly what makes a `skipped` actionable.
     """
     key = auth_key()
@@ -594,8 +566,7 @@ def _submit(source, url, reference, summary, json_payload=None, files=None,
 
 def _threatfox_submit_outcome(body, ioc_count):
     """ThreatFox answers `data: {ok, ignored, duplicated, reward}`. A batch abuse.ch
-    already holds is a `duplicate`, not a submission, and one it discarded outright is
-    a `rejected` - only `ok` entries actually landed."""
+    already holds is a `duplicate` and one it discarded is `rejected` - only `ok` landed."""
     data = body.get('data')
     counts = {'accepted': ioc_count, 'duplicated': 0, 'ignored': 0, 'reward': None}
     if not isinstance(data, dict):
@@ -621,12 +592,9 @@ def _threatfox_submit_outcome(body, ioc_count):
 def submit_ioc(iocs, threat_type, ioc_type, malware, *, confidence_level=50,
                is_compromised=False, reference=None, tags=None, comment=None,
                anonymous=True) -> Dict:
-    """Submit IOCs to ThreatFox. `malware` is a Malpedia name, e.g. `win.zloader`.
-
-    `anonymous` defaults to True so attribution is opt-in: an analyst has to decide to
-    put the account's name on a public record, never inherit it from a default.
-
-    Not cached - see the section note above. Never raises.
+    """`malware` is a Malpedia name, e.g. `win.zloader`. `anonymous` defaults to True so
+    attribution is opt-in: an analyst has to decide to put the account's name on a public
+    record, never inherit it from a default. Not cached (see above). Never raises.
     """
     source = 'threatfox'
 
@@ -714,11 +682,8 @@ def submit_ioc(iocs, threat_type, ioc_type, malware, *, confidence_level=50,
 
 def upload_sample(data, filename, *, tags=None, references=None, context=None,
                   delivery_method=None, anonymous=True) -> Dict:
-    """Upload a sample to MalwareBazaar. `data` is the raw bytes of the file.
-
-    `anonymous` defaults to True so attribution is opt-in.
-
-    Not cached - see the section note above. `data` is never logged. Never raises.
+    """`anonymous` defaults to True so attribution is opt-in. Not cached (see above).
+    `data` is never logged. Never raises.
     """
     source = 'malwarebazaar'
 

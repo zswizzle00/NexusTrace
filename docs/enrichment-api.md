@@ -1,6 +1,6 @@
 # NexusTrace Enrichment API
 
-The enrichment API provides programmatic access to NexusTrace's threat intelligence data. It is designed for integration into SIEM/SOAR pipelines, EDR triage workflows, and automation scripts. All endpoints authenticate via an API key - no browser session or CSRF token required.
+The enrichment API provides programmatic access to NexusTrace's threat intelligence data. It is designed for integration into SIEM/SOAR pipelines, EDR triage workflows, and automation scripts. All endpoints authenticate via an API key; no browser session or CSRF token required.
 
 Replace `<your-host>` throughout this document with your NexusTrace instance URL (e.g. `http://localhost:5050` for local dev, or your deployed host).
 
@@ -118,11 +118,11 @@ curl -s -X POST <your-host>/api/enrich/ip \
 
 | Source      | Fields included                                                                 |
 |-------------|---------------------------------------------------------------------------------|
-| `vpnapi`    | Full response (small - security flags, network, location)                       |
-| `ipinfo`    | Full response (small - geo, ASN, org)                                           |
-| `abuseipdb` | Score, report count, ISP, usage type - individual reports omitted               |
-| `shodan`    | Org, ISP, OS, hostnames, ports (number/service/product/version), vulnerabilities - banners and HTTP screenshots omitted |
-| `alienvault`| Pulse count, reputation, ASN, country, geo - full pulse/malware/passive DNS lists omitted |
+| `vpnapi`    | Full response (small: security flags, network, location)                       |
+| `ipinfo`    | Full response (small: geo, ASN, org)                                           |
+| `abuseipdb` | Score, report count, ISP, usage type; individual reports omitted               |
+| `shodan`    | Org, ISP, OS, hostnames, ports (number/service/product/version), vulnerabilities; banners and HTTP screenshots omitted |
+| `alienvault`| Pulse count, reputation, ASN, country, geo; full pulse/malware/passive DNS lists omitted |
 
 ---
 
@@ -254,7 +254,7 @@ Results are returned in the same order as the input `indicators` array. Entries 
 | HTTP status | Meaning                                        |
 |-------------|------------------------------------------------|
 | `200`       | Success                                        |
-| `400`       | Bad request - missing or invalid field         |
+| `400`       | Bad request: missing or invalid field         |
 | `401`       | Missing `X-API-Key` header                     |
 | `403`       | Invalid or revoked API key                     |
 | `500`       | Server-side error (check server logs)          |
@@ -284,7 +284,7 @@ Keys created with `manage_api_keys.py` on the host are immediately visible to th
 
 ### Running behind a reverse proxy
 
-If NexusTrace is deployed behind Nginx, Caddy, or a cloud load balancer, ensure the `X-API-Key` header is forwarded to the origin. Most reverse proxies pass unknown headers through by default - no special configuration is needed unless you have a header allowlist in place.
+If NexusTrace is deployed behind Nginx, Caddy, or a cloud load balancer, ensure the `X-API-Key` header is forwarded to the origin. Most reverse proxies pass unknown headers through by default; no special configuration is needed unless you have a header allowlist in place.
 
 If you terminate TLS at the proxy, set the following in your `.env` on the origin server:
 

@@ -122,9 +122,9 @@ We follow responsible disclosure practices:
 
 ### Recommended Tools
 
-- `pip-audit` - Check for known vulnerabilities
-- `safety` - Security linting for Python
-- `bandit` - Security linter for Python code
+- `pip-audit`: Check for known vulnerabilities
+- `safety`: Security linting for Python
+- `bandit`: Security linter for Python code
 
 ## Security Testing
 
@@ -144,17 +144,17 @@ We follow responsible disclosure practices:
 
 ### Security Incident Process
 
-1. **Detection** - Identify potential security incident
-2. **Assessment** - Evaluate severity and impact
-3. **Containment** - Limit damage if possible
-4. **Eradication** - Remove threat or vulnerability
-5. **Recovery** - Restore normal operations
-6. **Lessons Learned** - Document and improve processes
+1. **Detection**: Identify potential security incident
+2. **Assessment**: Evaluate severity and impact
+3. **Containment**: Limit damage if possible
+4. **Eradication**: Remove threat or vulnerability
+5. **Recovery**: Restore normal operations
+6. **Lessons Learned**: Document and improve processes
 
 ### Contact for Incidents
 
 - **Email:** zackmckone@icloud.com
-- **Subject:** Security Incident - NexusTrace
+- **Subject:** Security Incident (NexusTrace)
 
 ## Compliance
 
@@ -178,6 +178,6 @@ If you have questions about security that don't involve reporting a vulnerabilit
 
 - Open a GitHub Discussion
 - Email: zackmckone@icloud.com
-- Subject: Security Question - NexusTrace
+- Subject: Security Question (NexusTrace)
 
 Thank you for helping keep NexusTrace secure!

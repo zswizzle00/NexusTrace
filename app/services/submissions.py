@@ -1,25 +1,21 @@
-"""Two-person-rule queue for abuse.ch submissions.
-
-An analyst *proposes* a submission; an operator approves it. The point of this
-module is a single, auditable choke point:
+"""Two-person-rule queue for abuse.ch submissions: an analyst *proposes*, an operator
+approves. The point of the module is a single, auditable choke point:
 
     **:func:`approve` is the only function in the app that transmits to abuse.ch.**
 
-``queue_ioc`` / ``queue_sample`` write a record and nothing else. ``reject``,
+``queue_ioc``/``queue_sample`` write a record and nothing else; ``reject``,
 ``list_submissions``, ``get_submission`` and ``purge_quarantine`` never reach the
 provider at all. Every outbound call goes through :func:`_provider`, so there is
-exactly one place to audit and exactly one place for tests to intercept - do not
-add a second `from .abusech import submit_ioc` anywhere in this file.
+exactly one place to audit and one place for tests to intercept - do not add a second
+`from .abusech import submit_ioc` anywhere in this file.
 
-Storage goes through ``app.utils.storage``, same shape as ``scan_service`` /
-``email_service``: records at key ``<uuid>.json`` in the ``submissions`` store,
-newest-first by modification time, tolerant reads (``.get()`` everywhere) so a
-record written by an older version still loads.
+Storage mirrors ``scan_service``/``email_service``: ``<uuid>.json`` in the
+``submissions`` store, newest-first by mtime, tolerant reads.
 
-Sample bytes are held in the ``quarantine`` store - they are live malware. They are
-written exclusively and owner-only (``0600`` on the local backend), named from a
-digest this module computes itself, deleted as soon as the record reaches a terminal
-state, and never returned by any accessor.
+Sample bytes live in the ``quarantine`` store - they are live malware. Written
+exclusively and owner-only (``0600`` locally), named from a digest this module computes
+itself, deleted as soon as the record reaches a terminal state, and never returned by
+any accessor.
 """
 
 import hashlib
@@ -36,9 +32,8 @@ from ..utils.storage import store
 
 logger = logging.getLogger(__name__)
 
-# The local-filesystem view of the two stores. Every read and write in this module
-# goes through `store()`; these exist for the operator tools that are local-disk by
-# design (scripts/manage_submissions.py, scripts/purge_data.py) and must be
+# Every read/write here goes through `store()`; these exist for the operator tools
+# that are local-disk by design (manage_submissions.py, purge_data.py) and must be
 # repointed together with `storage.LOCAL_ROOT`, never on their own.
 SUBMISSION_DIR = Path(storage.LOCAL_ROOT) / 'submissions'
 QUARANTINE_DIR = Path(storage.LOCAL_ROOT) / 'quarantine'
@@ -49,22 +44,18 @@ STATUS_REJECTED = 'rejected'
 STATUS_SENT = 'sent'
 STATUS_FAILED = 'failed'
 
-# A record in one of these has already had its decision published (or refused).
-# approve()/reject() return it unchanged rather than acting again - this is what
-# stops a double-click, a retried POST or a second operator from double-publishing.
+# Already published (or refused): approve()/reject() return the record unchanged,
+# which is what stops a double-click or retried POST double-publishing.
 TERMINAL_STATUSES = frozenset({STATUS_SENT, STATUS_REJECTED})
 
 KIND_IOC = 'ioc'
 KIND_SAMPLE = 'sample'
 DESTINATIONS = {KIND_IOC: 'threatfox', KIND_SAMPLE: 'malwarebazaar'}
 
-# Provider envelope states that mean the indicator reached abuse.ch. `duplicate` is
-# a success: abuse.ch already has it, so re-sending would achieve nothing and the
-# operator's decision is discharged.
+# `duplicate` is a success: abuse.ch has it, so the decision is discharged.
 SENT_STATES = frozenset({'submitted', 'duplicate'})
 
-# Mirrors app.config['MAX_CONTENT_LENGTH']; a second bound here so a caller that is
-# not a Flask route cannot fill the quarantine store.
+# A second bound so a caller that is not a Flask route cannot fill the store.
 MAX_SAMPLE_BYTES = 50 * 1024 * 1024
 
 _SHA256_RE = re.compile(r'^[0-9a-f]{64}$')
@@ -79,12 +70,11 @@ _PRIVATE_KEYS = ('data', 'bytes', 'content', 'raw_bytes', 'quarantine_path', 'pa
 # Set to a module-like object in tests. When None the real abuse.ch client is used.
 PROVIDER = None
 
-# Serialises the whole read-decide-send-write cycle of approve(). Held across the
-# network call on purpose: releasing it after the status flip would let a second
-# approve() of the same record start a second send while the first is in flight.
-# Operator approvals are rare, so serialising them costs nothing. This is a
-# per-process guard only - it does not defend against two gunicorn workers, which
-# is one more reason the production CMD runs a single worker.
+# Serialises approve()'s whole read-decide-send-write cycle, held across the network
+# call on purpose: releasing it after the status flip would let a second approve() of
+# the same record start a second send while the first is in flight. Approvals are
+# rare, so this costs nothing. Per-process only - it does not defend against two
+# gunicorn workers, which is one more reason the production CMD runs a single worker.
 _SEND_LOCK = threading.RLock()
 
 
@@ -93,11 +83,9 @@ def _now():
 
 
 def _ensure_dirs():
-    """Create the local store directories, reading the module globals every time so
-    tests can repoint them at a temp tree. A no-op on a non-local backend, where
-    there is no directory to create; the store creates its own root on write either
-    way, so this only makes the two directories visible to an operator before the
-    first record exists."""
+    """Reads the module globals every time so tests can repoint them at a temp tree.
+    The store creates its own root on write anyway; this only makes the directories
+    visible to an operator before the first record exists."""
     if storage.backend_name() != 'local':
         return
     SUBMISSION_DIR.mkdir(parents=True, exist_ok=True)
@@ -105,11 +93,8 @@ def _ensure_dirs():
 
 
 def _provider():
-    """The abuse.ch client, or None when it cannot be used.
-
-    Imported lazily and defensively: the submit functions land in ``abusech`` on a
-    separate track, and a missing one must degrade to a diagnosable ``failed``
-    record rather than an ImportError at app start.
+    """Imported lazily and defensively: a missing submit function must degrade to a
+    diagnosable ``failed`` record rather than an ImportError at app start.
     """
     if PROVIDER is not None:
         return PROVIDER
@@ -175,18 +160,16 @@ def _record_key(sid):
 
 
 def _save(record):
-    """Persist atomically - a torn record would be unreadable, and an unreadable
-    record for an in-flight send is an untrackable transmission. ``write_text`` is
-    the atomic one: temp-and-replace locally, a single object generation on GCS."""
+    """Atomic (``write_text`` is temp-and-replace locally, one object generation on
+    GCS): an unreadable record for an in-flight send is an untrackable transmission."""
     sid = record.get('id')
     store('submissions').write_text(_record_key(sid), json.dumps(record, default=str))
     return record
 
 
 def _load(sid):
-    """Read a record for internal use. Returns None for a missing, unreadable or
-    non-object record; a partial record comes back as-is and every reader uses
-    .get()."""
+    """None for a missing, unreadable or non-object record; a partial record comes back
+    as-is, and every reader uses .get()."""
     if not sid or not _UUID_RE.match(str(sid)):
         return None
     raw = store('submissions').read_text(_record_key(sid))
@@ -199,8 +182,8 @@ def _load(sid):
         return None
     if not isinstance(record, dict):
         return None
-    # The record's own key wins over a stored id: a record whose id disagrees with
-    # the key would produce links and follow-up calls that hit a different record.
+    # The key wins: a record whose id disagrees with it would produce links and
+    # follow-up calls that hit a different record.
     record['id'] = str(sid)
     return record
 
@@ -219,13 +202,13 @@ def _touch(record, status):
 def _quarantine_key(sha256, sid):
     """Flat, self-derived store key: ``<sha256>-<record-id>.bin``.
 
-    Both halves are generated here - the digest from the bytes themselves, the id
-    from ``uuid4`` - so nothing the caller supplied reaches the filesystem. The
-    uploaded filename is attacker-controlled and is kept for display only.
+    Both halves are generated here - the digest from the bytes themselves, the id from
+    ``uuid4`` - so nothing the caller supplied reaches the filesystem. The uploaded
+    filename is attacker-controlled and is kept for display only.
 
-    The record id is part of the name even though the digest alone would be unique
-    per content: two records may queue the same bytes, and a shared file would let
-    the first one to be approved delete the second one's sample.
+    The id is in the name even though the digest alone is unique per content: two
+    records may queue the same bytes, and a shared file would let the first one
+    approved delete the second one's sample.
     """
     digest = str(sha256 or '').lower()
     if not _SHA256_RE.match(digest) or not _UUID_RE.match(str(sid or '')):
@@ -237,23 +220,21 @@ def _write_quarantine(data, sha256, sid):
     key = _quarantine_key(sha256, sid)
     if key is None:
         raise ValueError('refusing to quarantine under a non-derived filename')
-    # exclusive is deliberate: a pre-existing object under a name only this module
-    # can produce means something is wrong, and overwriting it would destroy a
-    # sample. private is the 0600 the local backend creates it with.
+    # exclusive is deliberate: a pre-existing object under a name only this module can
+    # produce means something is wrong, and overwriting it would destroy a sample.
     store('quarantine').write_bytes(key, data, exclusive=True, private=True)
     return key
 
 
 def _drop_quarantine(record, why):
-    """Delete the sample bytes. Called on every terminal transition - a queue that
-    keeps malware around after the decision is made is a liability, not a feature."""
+    """Called on every terminal transition: a queue that keeps malware around after the
+    decision is made is a liability, not a feature."""
     quarantine = record.get('quarantine')
     if not isinstance(quarantine, dict) or not quarantine.get('stored'):
         return
     key = _quarantine_key(quarantine.get('sha256'), record.get('id'))
     if key is not None:
-        # A sample that is already gone still gets marked removed below - delete()
-        # reports absence rather than raising.
+        # delete() reports absence rather than raising; still marked removed below.
         try:
             store('quarantine').delete(key)
         except Exception as exc:
@@ -266,12 +247,9 @@ def _drop_quarantine(record, why):
 
 
 def _fp_indicator_values(entry):
-    """Candidate indicator strings in one abuse.ch false-positive entry.
-
-    The Hunting API's field naming is not contractual, so the known keys are tried
-    first and every string value is only used as a fallback. An over-broad match
-    costs the operator a warning banner; a missed one costs a false-positive
-    submission, so the bias is deliberate.
+    """The Hunting API's field naming is not contractual, so known keys are tried first
+    and every string value is a fallback. An over-broad match costs a warning banner; a
+    missed one costs a false-positive submission, so the bias is deliberate.
     """
     if not isinstance(entry, dict):
         return [str(entry).strip().lower()] if entry else []
@@ -286,9 +264,7 @@ def _fp_indicator_values(entry):
 
 
 def _fp_check(indicators):
-    """Look the queued indicators up in the abuse.ch false-positive list.
-
-    Advisory only. A missing key, a transport failure or an empty list must never
+    """Advisory only: a missing key, a transport failure or an empty list must never
     block queuing - the operator still sees the record, just without the warning.
     """
     wanted = {str(i).strip().lower() for i in indicators if str(i).strip()}
@@ -356,10 +332,8 @@ def _new_record(kind, payload, indicators, source_analysis, anonymous, queued_by
 def queue_ioc(iocs, threat_type, ioc_type, malware, *, source_analysis=None,
               confidence_level=50, reference=None, tags=None, comment=None,
               anonymous=True, queued_by=None):
-    """Queue an IOC submission for approval. **Transmits nothing.**
-
-    Raises ValueError when there is nothing to submit; every other input is
-    normalised rather than rejected.
+    """Queue an IOC submission for approval. **Transmits nothing.** Raises ValueError
+    when there is nothing to submit; every other input is normalised, not rejected.
     """
     values = _strings(iocs)
     if not values:
@@ -387,10 +361,9 @@ def queue_ioc(iocs, threat_type, ioc_type, malware, *, source_analysis=None,
 
 def queue_sample(data, filename, *, source_analysis=None, tags=None, references=None,
                  context=None, delivery_method=None, anonymous=True, queued_by=None):
-    """Quarantine a sample and queue it for approval. **Transmits nothing.**
-
-    ``filename`` is recorded for the operator to read and is never used to build a
-    path; the quarantine name comes from the SHA-256 computed here.
+    """Quarantine a sample and queue it for approval. **Transmits nothing.** ``filename``
+    is recorded for the operator to read and is never used to build a path; the
+    quarantine name comes from the SHA-256 computed here.
     """
     if isinstance(data, (bytearray, memoryview)):
         data = bytes(data)
@@ -445,8 +418,8 @@ def list_submissions(status=None, limit=100):
 
     records = store('submissions')
     out = []
-    # `limit` bounds the returned summaries, not the records examined, so a status
-    # filter still finds `limit` matches behind newer non-matching records.
+    # `limit` bounds returned summaries, not records examined, so a status filter
+    # still finds `limit` matches behind newer non-matching records.
     for entry in records.list(suffix='.json'):
         if len(out) >= limit:
             break
@@ -496,11 +469,9 @@ def _envelope_failure(reason, detail=None):
 
 
 def _send(record):
-    """Issue the one provider call this module makes. Returns the envelope.
-
-    Never raises: a provider that is missing, uncallable or throwing becomes an
-    ``unavailable`` envelope so the record lands in ``failed`` with the reason
-    attached and can be approved again later.
+    """Never raises: a provider that is missing, uncallable or throwing becomes an
+    ``unavailable`` envelope, so the record lands in ``failed`` with the reason attached
+    and can be approved again later.
     """
     kind = record.get('kind')
     payload = record.get('payload')
@@ -553,10 +524,10 @@ def _send(record):
 def approve(sid):
     """Approve and transmit. **The only function in the app that transmits.**
 
-    Idempotent by status: a record that is already ``sent`` or ``rejected`` is
-    returned untouched, so a double-click or a retried POST cannot publish twice.
-    A ``failed`` record may be approved again - that is the retry path, and the
-    previous provider envelope stays in ``result`` until it is replaced.
+    Idempotent by status: an already ``sent`` or ``rejected`` record is returned
+    untouched, so a double-click or retried POST cannot publish twice. A ``failed``
+    record may be approved again - that is the retry path, and the previous envelope
+    stays in ``result`` until replaced.
     """
     with _SEND_LOCK:
         record = _load(sid)
@@ -567,8 +538,8 @@ def approve(sid):
 
         record['approved_at'] = record.get('approved_at') or _now()
         _touch(record, STATUS_APPROVED)
-        # Durable intent before the wire: a crash mid-send leaves an `approved`
-        # record an operator can see and retry, not a silent transmission.
+        # Durable intent before the wire: a crash mid-send leaves an `approved` record
+        # an operator can see and retry, not a silent transmission.
         _save(record)
 
         try:
@@ -603,10 +574,8 @@ def approve(sid):
 
 
 def reject(sid, reason):
-    """Reject a queued submission. Transmits nothing, ever.
-
-    A ``sent`` record cannot be un-published, and an already-rejected one is left
-    alone; both come back unchanged.
+    """Transmits nothing, ever. A ``sent`` record cannot be un-published and an
+    already-rejected one is left alone; both come back unchanged.
     """
     with _SEND_LOCK:
         record = _load(sid)
@@ -624,17 +593,13 @@ def reject(sid, reason):
 
 
 def purge_quarantine(max_age_days, apply=False):
-    """Age out quarantined samples. Reports by default; deletes only with apply=True.
+    """Reports by default; deletes only with apply=True.
 
-    Only keys matching this module's own ``<sha256>-<uuid>.bin`` naming are
-    considered - anything else in the store is reported and left alone rather than
-    assumed to be junk. Age comes from the stored object's modification time, never
-    from a field inside a record, so a malformed record cannot make its sample
-    immortal.
-
-    ``list()`` never yields anything the store could not itself have written: on the
-    local backend a symlink, a subdirectory or a name outside the key allowlist is
-    skipped rather than reported in ``unexpected``. Either way it is never deleted.
+    Only this module's own ``<sha256>-<uuid>.bin`` naming is considered - anything else is
+    reported and left alone rather than assumed junk. Age comes from the object's mtime,
+    never a field inside a record, so a malformed record cannot make its sample immortal.
+    ``list()`` never yields anything the store could not itself have written: locally a
+    symlink or out-of-allowlist name is skipped, and either way never deleted.
     """
     stats = {'apply': bool(apply), 'max_age_days': max_age_days, 'checked': 0,
              'matched': 0, 'removed': 0, 'bytes': 0, 'errors': 0,
@@ -646,8 +611,7 @@ def purge_quarantine(max_age_days, apply=False):
         raise ValueError('max_age_days must be a number')
 
     quarantine = store('quarantine')
-    # By name, not newest-first: the operator reads this report, and a stable
-    # ordering is what makes two runs comparable.
+    # By name, not newest-first: a stable ordering makes two reports comparable.
     for entry in sorted(quarantine.list(), key=lambda e: e['key']):
         name = entry['key']
         stats['checked'] += 1

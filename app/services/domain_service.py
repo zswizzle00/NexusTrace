@@ -23,12 +23,10 @@ dns_resolver.lifetime = TIMEOUT_MEDIUM
 
 
 def setup_domain_services(app):
-    """Setup domain-related services."""
     pass
 
 
 def safe_execute(func, *args, default=None, timeout=TIMEOUT_MEDIUM, **kwargs):
-    """Execute a function with timeout and error handling."""
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(func, *args, **kwargs)
@@ -43,7 +41,6 @@ def safe_execute(func, *args, default=None, timeout=TIMEOUT_MEDIUM, **kwargs):
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_whois_info(domain):
-    """Fetch WHOIS information for a domain using IP2Location API."""
     try:
         ip2whois_key = os.getenv('IP2WHOIS_KEY')
         if not ip2whois_key:
@@ -68,7 +65,6 @@ def get_whois_info(domain):
 
 @timed_lru_cache(seconds=900, maxsize=500)
 def get_dns_records(domain):
-    """Fetch various DNS records for a domain with timeouts."""
     records = {}
     record_types = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA']
 
@@ -101,7 +97,6 @@ def get_dns_records(domain):
 
 @timed_lru_cache(seconds=1800, maxsize=500)
 def get_ssl_info(domain):
-    """Fetch SSL/TLS certificate information for a domain with timeout."""
     try:
         context = ssl.create_default_context()
         with socket.create_connection((domain, 443), timeout=TIMEOUT_SHORT) as sock:
@@ -174,7 +169,6 @@ def get_subdomains_crtsh(domain):
 
 
 def parse_spf_dkim_dmarc(txt_records):
-    """Parse email security records from TXT records."""
     spf = [r for r in txt_records if 'v=spf1' in r.lower()]
     dkim = [r for r in txt_records if 'dkim' in r.lower()]
     dmarc = [r for r in txt_records if 'v=dmarc1' in r.lower()]
@@ -183,7 +177,6 @@ def parse_spf_dkim_dmarc(txt_records):
 
 @timed_lru_cache(seconds=3600, maxsize=500)
 def get_dmarc_record(domain):
-    """Fetch DMARC record directly."""
     try:
         answers = dns_resolver.resolve(f'_dmarc.{domain}', 'TXT')
         return [str(rdata) for rdata in answers]
@@ -192,7 +185,6 @@ def get_dmarc_record(domain):
 
 
 def extract_domain_for_phishtank(indicator):
-    """Extract domain from URL or return as-is."""
     try:
         if indicator.lower().startswith(('http://', 'https://')):
             return urlparse(indicator).netloc
@@ -224,7 +216,6 @@ def get_talos_reputation(domain):
 
 @timed_lru_cache(seconds=900, maxsize=500)
 def get_domain_info(domain):
-    """Get comprehensive domain information with all operations in parallel."""
     results = {
         'domain': domain,
         'whois': None,
@@ -311,7 +302,6 @@ def get_domain_info(domain):
 
 @timed_lru_cache(seconds=600, maxsize=500)
 def get_domain_info_quick(domain):
-    """Quick domain lookup - only essential info with strict timeouts."""
     results = {
         'domain': domain,
         'dns_records': {},

@@ -1,11 +1,8 @@
-"""Uploaded-file analysis routes.
-
-Two entry points share one pipeline: `POST /api/file/analyze_file` answers JSON for
-SIEM/SOAR callers, `POST /api/file/analyze` renders the browser page. Both are CSRF
-protected - neither is exempted.
-
-Results are rendered synchronously and never stored. The upload lands in a
-per-request temp directory under a random name and is unlinked in a `finally`.
+"""Uploaded-file analysis routes. Two entry points share one pipeline: `POST
+/api/file/analyze_file` answers JSON for SIEM/SOAR callers, `POST /api/file/analyze`
+renders the browser page. Both are CSRF protected; neither is exempted. Results are
+rendered synchronously and never stored - the upload lands in a per-request temp
+directory under a random name and is unlinked in a `finally`.
 """
 
 import logging
@@ -33,18 +30,16 @@ ALLOWED_EXTENSIONS = {
     'dmg', 'pkg',
     'elf', 'so',
     'bin', 'dat',
-    # Delivery formats a phishing triage queue actually receives. 'lnk' is the one
-    # that matters most: shortcut lures were rejected outright before this, so the
-    # shell-link parser had no way to be reached from an upload.
+    # Delivery formats a phishing triage queue actually receives. 'lnk' matters most:
+    # without it the shell-link parser is unreachable from an upload.
     'lnk', 'hta', 'wsf', 'rtf', 'one', 'iso', 'img', 'eml', 'msg', 'chm', 'iqy',
     'svg',
 }
 
 
 def allowed_file(filename):
-    """Check if the file extension is allowed for analysis."""
     if '.' not in filename:
-        return True  # Allow files without extension for analysis
+        return True
     return filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
@@ -89,7 +84,6 @@ def _analyze_upload(uploaded, filename):
 
 @file_bp.route('/analyze_file', methods=['POST'])
 def analyze_file_api():
-    """Static analysis + hash reputation for an uploaded file (JSON)."""
     try:
         uploaded, filename, error = _validate_upload()
         if error:
@@ -109,8 +103,8 @@ def analyze_file_api():
 
 def _render(analysis, status=200):
     """file_analysis.html points its own form at `submit_url`, defaulting to the JSON
-    endpoint. Every render from here must set it to this route or the result page's
-    form would submit to the API and hand the analyst raw JSON."""
+    endpoint. Every render from here must set it to this route, or the result page's form
+    submits to the API and hands the analyst raw JSON."""
     return render_template(
         'file_analysis.html', analysis=analysis,
         submit_url=url_for('file.analyze_file_page'),
@@ -119,11 +113,9 @@ def _render(analysis, status=200):
 
 @file_bp.route('/analyze', methods=['POST'])
 def analyze_file_page():
-    """Same analysis, rendered into file_analysis.html.
-
-    Errors re-render the form page with a flash rather than redirecting, so this does
-    not depend on the name of the GET route that serves the empty form.
-    """
+    """Same analysis, rendered into file_analysis.html. Errors re-render the form page
+    with a flash rather than redirecting, so this does not depend on the name of the GET
+    route that serves the empty form."""
     uploaded, filename, error = _validate_upload()
     if error:
         flash(error, 'error')

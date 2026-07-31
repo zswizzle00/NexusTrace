@@ -1,16 +1,15 @@
 """Pins app/services/submissions.py - the abuse.ch submission approval queue.
 
-No network, no abuse.ch client: `submissions.PROVIDER` is replaced with a recording
-fake, so every case asserts on the record the queue builds and on *how many times
-the provider was called*. The call count is the whole point - this module exists so
-that nothing reaches abuse.ch without an operator's approve().
+No network, no abuse.ch client: `submissions.PROVIDER` is replaced with a recording fake,
+so every case asserts on the record the queue builds and on *how many times the provider
+was called*. The call count is the whole point - this module exists so that nothing
+reaches abuse.ch without an operator's approve().
 
 `storage.LOCAL_ROOT` - and with it both stores this module writes to, plus
-`submissions.SUBMISSION_DIR` / `QUARANTINE_DIR`, the local paths the operator CLI
-reads - is repointed at a temp tree for the entire run (`check_isolation` refuses to
-proceed otherwise, and checks the store roots themselves, not just the two module
-constants). The real `data/` holds live records and live malware and must never be
-touched by a test.
+`submissions.SUBMISSION_DIR` / `QUARANTINE_DIR`, the local paths the operator CLI reads -
+is repointed at a temp tree for the entire run; `check_isolation` refuses to proceed
+otherwise, and checks the store roots themselves, not just the two module constants. The
+real `data/` holds live records and live malware.
 """
 import hashlib
 import json
@@ -142,9 +141,8 @@ def queue_a_sample(provider=None, filename='invoice.doc.exe', **kwargs):
 def check_isolation():
     """Refuse to run against the real data directory under any circumstances.
 
-    Checks the store roots the module actually writes through as well as the two
-    local-path constants: repointing only one of them would send half the I/O into
-    the real `data/`.
+    Checks the store roots the module writes through as well as the two local-path
+    constants: repointing only one would send half the I/O into the real `data/`.
     """
     if storage.backend_name() != 'local':
         raise SystemExit('REFUSING TO RUN: these cases assert local-filesystem '

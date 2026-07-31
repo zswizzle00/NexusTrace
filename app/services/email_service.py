@@ -1,13 +1,12 @@
 """E-mail analysis orchestration: parse, enrich, score, persist.
 
-The parsing and scoring live in pure modules (`app/utils/email_parse.py`,
-`app/services/email_rules.py`); this module owns only the parts that can fail
-for environmental reasons - network lookups and the filesystem.
+Parsing and scoring live in pure modules (`app/utils/email_parse.py`,
+`app/services/email_rules.py`); this module owns only what can fail for environmental
+reasons - network lookups and the filesystem.
 
-**Nothing here may persist message content.** ``_assemble`` is an explicit
-allowlist: the body, the raw message, and attachment bytes have no path into
-the stored record. Attachment payloads are hashed inside
-``attachment_metadata`` and never leave it.
+**Nothing here may persist message content.** ``_assemble`` is an explicit allowlist:
+the body, the raw message and attachment bytes have no path into the stored record.
+Attachment payloads are hashed inside ``attachment_metadata`` and never leave it.
 """
 
 import ipaddress
@@ -40,26 +39,23 @@ from . import email_rules
 
 logger = logging.getLogger(__name__)
 
-# Enrichment caps. A phishing mail can carry dozens of indicators; enriching all
-# of them would exhaust VirusTotal's 4-req/min free tier and take tens of
-# seconds. Body URLs are never auto-enriched - they get pivot links instead.
+# A phishing mail can carry dozens of indicators; enriching all of them would exhaust
+# VirusTotal's 4-req/min free tier and take tens of seconds. Body URLs are never
+# auto-enriched; they get pivot links instead.
 MAX_ENRICH_IPS = 5
 # Do NOT raise this above 3. `hash_service.virustotal_limiter` is a process-wide
 # RateLimiter(max_requests=4, time_window=1 minute) whose acquire() *blocks* in
-# time.sleep rather than failing fast. At 4 hashes the whole free-tier minute is
-# consumed by one e-mail; at 5 the fifth task sleeps ~60s, which blows past
-# ENRICH_DEADLINE (20s), so `attachment_known_malware` - the only signal that
-# reaches `malicious` alone - silently misses. 3 leaves one slot per minute for
-# concurrent /hash_analysis and /api/file/analyze_file users.
+# time.sleep rather than failing fast. At 4 hashes one e-mail consumes the whole
+# free-tier minute; at 5 the fifth task sleeps ~60s, blowing past ENRICH_DEADLINE (20s),
+# so `attachment_known_malware` - the only signal that reaches `malicious` alone -
+# silently misses. 3 leaves a slot per minute for concurrent /hash_analysis users.
 MAX_ENRICH_HASHES = 3
 ENRICH_WORKERS = 8
 
-# Overall deadline for the whole enrichment fan-out. Individual sources have
-# their own per-request timeouts, but those bound a single HTTP call, not the
-# thread that runs it - a hung DNS resolution or a socket stuck in a half-open
-# state can still tie up a worker indefinitely. This is a second, outer bound:
-# any future not done by the deadline is treated as a failed source rather than
-# letting analyze_email() (and the Flask request it runs inside) block forever.
+# A second, outer bound on the whole fan-out. Per-source timeouts bound a single HTTP
+# call, not the thread running it; a hung DNS resolution or a half-open socket can still
+# tie up a worker indefinitely. Any future not done by the deadline is treated as a
+# failed source rather than letting analyze_email() - and its Flask request - block.
 ENRICH_DEADLINE = 20.0
 
 _DNSBL_PROVIDERS = ('zen.spamhaus.org', 'bl.spamcop.net', 'b.barracudacentral.org')
@@ -71,14 +67,11 @@ def _now():
 
 
 def dnsbl_lookup(ip):
-    """Query a small set of DNSBLs for an IPv4 address.
-
-    A provider that does not answer is a miss, not an error - blocklists are often
+    """A provider that does not answer is a miss, not an error: blocklists are often
     rate-limited or slow, and one unavailable provider must not fail the analysis.
 
-    IPv6 is skipped rather than queried: these providers publish reverse-octet IPv4
-    zones only, so a nibble-reversed IPv6 query is a guaranteed NXDOMAIN dressed up
-    as a clean result.
+    IPv6 is skipped rather than queried: these providers publish reverse-octet IPv4 zones
+    only, so a nibble-reversed IPv6 query is a guaranteed NXDOMAIN dressed up as clean.
     """
     try:
         parsed = ipaddress.ip_address(ip)
@@ -106,15 +99,12 @@ def dnsbl_lookup(ip):
 
 
 def is_enrichable_host(host):
-    """True when a hostname derived from message content may be looked up.
-
-    **Every host reachable from message content must pass through here first.**
-    The sender domain comes from an attacker-controlled ``From`` header, and
-    ``domain_service.get_domain_info_quick`` resolves it, queries internal DNS for
-    it, and opens ``socket.create_connection((domain, 443))`` to it - a blind SSRF
-    with an internal-liveness timing oracle whose answers get persisted. So it is
-    gated by the same choke point the URL scanner uses,
-    :func:`app.utils.url_guard.is_scannable`.
+    """**Every host reachable from message content must pass through here first.** The
+    sender domain comes from an attacker-controlled ``From`` header, and
+    ``domain_service.get_domain_info_quick`` resolves it, queries internal DNS for it, and
+    opens ``socket.create_connection((domain, 443))`` to it - a blind SSRF with an
+    internal-liveness timing oracle whose answers get persisted. Hence the same choke
+    point the URL scanner uses, :func:`app.utils.url_guard.is_scannable`.
 
     A host that fails the guard is simply **not enriched**; it must never fail the
     analysis - parsing, scoring and the verdict all still apply.
@@ -128,12 +118,9 @@ def is_enrichable_host(host):
 
 
 def _enrich(domain, ips, hashes):
-    """Fan out to the existing services concurrently. Never raises: a failing source
-    is logged and comes back None.
-
-    Bounded by ``ENRICH_DEADLINE`` overall - a source that has not finished by then
-    is treated the same as one that raised, so a single hung lookup degrades this to
-    a null result instead of blocking the request indefinitely.
+    """Never raises: a failing source is logged and comes back None. Bounded by
+    ``ENRICH_DEADLINE`` overall; a source unfinished by then is treated the same as one
+    that raised, so a single hung lookup degrades to a null result rather than blocking.
     """
     from .domain_service import get_domain_info_quick, get_whois_info
     from .hash_service import get_hash_info_quick
@@ -142,15 +129,14 @@ def _enrich(domain, ips, hashes):
     tasks = {}
     if domain and is_enrichable_host(domain):
         tasks[('sender_domain', domain)] = lambda d=domain: get_domain_info_quick(d)
-        # WHOIS is fetched separately because get_domain_info_quick does not return
-        # it, which leaves `young_sender_domain` (and its executable combo)
-        # permanently unreachable. Grafted onto sender_domain['whois'] below.
+        # Fetched separately because get_domain_info_quick does not return WHOIS, which
+        # leaves `young_sender_domain` (and its combo) permanently unreachable.
         tasks[('sender_whois', domain)] = lambda d=domain: get_whois_info(d)
     elif domain:
         logger.debug('Sender domain %r not enrichable (failed the SSRF guard)', domain)
     # `ips` is already filtered to globally-routable addresses by
-    # email_parse.public_ips_from_received. Hashes are locally computed digests sent
-    # as query parameters, not hosts - no fetch target is derived from them.
+    # email_parse.public_ips_from_received. Hashes are locally computed digests sent as
+    # query parameters, not hosts; no fetch target is derived from them.
     for ip in (ips or [])[:MAX_ENRICH_IPS]:
         tasks[('ip', ip)] = lambda i=ip: {
             'vpnapi': get_vpn_data(i),
@@ -187,15 +173,14 @@ def _enrich(domain, ips, hashes):
             results[(kind, ident)] = None
             future.cancel()
     finally:
-        # Do not block shutdown on stragglers past the deadline - the threads
-        # backing `not_done` futures may still be running (Python cannot force
-        # a thread to stop); let them finish in the background and detach.
+        # Do not block shutdown on stragglers past the deadline: the threads backing
+        # `not_done` futures may still be running (Python cannot force a thread to
+        # stop); let them finish in the background and detach.
         executor.shutdown(wait=False)
 
-    # Graft WHOIS onto the domain record so email_rules can read
-    # enrichment['sender_domain']['whois']['create_date'] without knowing two
-    # services produced it. Built even when the domain lookup failed, so a
-    # WHOIS-only result still feeds the age signal.
+    # Graft WHOIS on so email_rules can read sender_domain['whois']['create_date']
+    # without knowing two services produced it. Built even when the domain lookup
+    # failed, so a WHOIS-only result still feeds the age signal.
     sender = results.get(('sender_domain', domain))
     whois = results.get(('sender_whois', domain))
     if whois:
@@ -212,8 +197,8 @@ def _enrich(domain, ips, hashes):
 
 def _assemble(analysis_id, source, status, error, headers, domain, auth, spoofing,
               ambient, chain, ips, urls, attachments, iocs, enrichment, verdict):
-    """Build the persisted record. The ONLY place a record is shaped, naming every
-    field explicitly so message content cannot leak into storage by accident."""
+    """The ONLY place a record is shaped, naming every field explicitly so message
+    content cannot leak into storage by accident."""
     return {
         'id': analysis_id,
         'created_at': _now(),
@@ -236,9 +221,8 @@ def _assemble(analysis_id, source, status, error, headers, domain, auth, spoofin
 
 
 def analyze_email(raw, source='upload'):
-    """Parse, enrich, score and assemble. Never raises for bad input: an unparseable
-    message returns status='error' with an 'unknown' verdict, still savable and
-    renderable."""
+    """Never raises for bad input: an unparseable message returns status='error' with an
+    'unknown' verdict, still savable and renderable."""
     analysis_id = str(uuid.uuid4())
 
     try:
@@ -283,8 +267,8 @@ def analyze_email(raw, source='upload'):
         for item in live_urls
     ]
 
-    # Sender domain and Received IPs lead so they survive extract_iocs' budget
-    # ahead of the potentially hundreds of body URLs.
+    # Sender domain and Received IPs lead so they survive extract_iocs' budget ahead of
+    # the potentially hundreds of body URLs.
     corpus = '\n'.join(
         ([domain] if domain else []) + ips + [item['url'] for item in live_urls]
     )
@@ -324,8 +308,8 @@ def list_analyses(limit=100):
         except Exception:
             continue
         results.append({
-            # The key, not data['id']: a stored id disagreeing with its record
-            # name would produce links that 404.
+            # The key, not data['id']: a stored id disagreeing with its record name
+            # would produce links that 404.
             'id': entry['key'][:-len('.json')],
             'created_at': data.get('created_at'),
             'subject': (data.get('headers') or {}).get('subject'),

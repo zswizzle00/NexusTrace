@@ -4,8 +4,6 @@ No server, no browser, no network. `storage.LOCAL_ROOT` is repointed at a temp t
 before `create_app()` so nothing here can see or touch the real `data/`
 (`check_isolation` refuses to run otherwise), and the scan/analysis fixtures are
 written through the store rather than with open().
-
-Run: uv run python app/tests/test_governance.py
 """
 import os
 import re

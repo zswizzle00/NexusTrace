@@ -2,11 +2,9 @@
 
 Nothing in this module transmits. Both routes write a *pending* record through
 ``app.services.submissions`` and stop; publishing is a separate, deliberate act an
-operator performs with ``scripts/manage_submissions.py``. No abuse.ch client
-function is imported, referenced, or reachable from here - grep this file for
-``submit_ioc`` / ``upload_sample`` and you will find nothing.
-
-Registered without a URL prefix, like ``scan_bp`` and ``email_bp``.
+operator performs with ``scripts/manage_submissions.py``. No abuse.ch client function is
+imported, referenced, or reachable from here - grep for ``submit_ioc`` / ``upload_sample``
+and you will find nothing. Registered without a URL prefix, like ``scan_bp``.
 """
 import logging
 import re
@@ -21,9 +19,8 @@ logger = logging.getLogger(__name__)
 
 submission_bp = Blueprint('submission', __name__)
 
-# The store is built separately. When it is absent the buttons must not render at
-# all (a control that 500s is worse than no control), which is what the
-# `submissions_enabled` template global below gates on.
+# When the store is absent the buttons must not render at all - a control that 500s is
+# worse than no control - which is what the `submissions_enabled` global below gates on.
 try:
     from ..services.submissions import queue_ioc, queue_sample
 except Exception:
@@ -41,9 +38,8 @@ MAX_MALWARE_LENGTH = 64
 MAX_FILENAME_LENGTH = 255
 DEFAULT_CONFIDENCE = 50
 
-# Closed vocabularies. An unknown value is rejected rather than forwarded: the
-# store is a queue for a third party's API, and a value it will not accept is
-# better caught here than by an operator at approval time.
+# Closed vocabularies. The store is a queue for a third party's API, and a value it will
+# not accept is better rejected here than found by an operator at approval time.
 THREAT_TYPES = ('payload_delivery', 'payload', 'botnet_cc', 'unknown')
 IOC_TYPES = ('url', 'domain', 'ip:port', 'md5_hash', 'sha1_hash', 'sha256_hash',
              'email')
@@ -82,12 +78,10 @@ def _one_of(value, allowed, field):
 
 
 def _indicators(raw):
-    """One indicator per line, refanged, deduped, capped, and vetted.
-
-    Whitespace inside an indicator is rejected outright: no value in any of the
-    allowed ioc_types contains a space, so a line that has one is a paste error or
-    an attempt to smuggle a second value past the count cap.
-    """
+    """One indicator per line, refanged, deduped, capped, and vetted. Whitespace inside an
+    indicator is rejected outright: no value in any allowed ioc_type contains a space, so a
+    line that has one is a paste error or an attempt to smuggle a second value past the
+    count cap."""
     seen = []
     for line in str(raw or '').splitlines():
         candidate = refang(_CONTROL_RE.sub('', line).strip())
@@ -109,7 +103,7 @@ def _indicators(raw):
 
 def _tags(raw):
     """Comma-separated tags. The charset allows spaces, so commas are the only
-    separator - splitting on whitespace would shred a legitimate two-word tag."""
+    separator: splitting on whitespace would shred a legitimate two-word tag."""
     tags = []
     for chunk in str(raw or '').split(','):
         tag = _CONTROL_RE.sub('', chunk).strip()
@@ -172,21 +166,16 @@ def _source_analysis(raw):
 
 
 def _anonymous(form):
-    """Absent means anonymous.
-
-    An unchecked HTML checkbox sends nothing, so absence cannot by itself mean
-    "not anonymous" without making the control impossible to switch off. The form
-    therefore always submits `anonymous_choice=1`; when that marker is present the
-    checkbox's presence decides, and when it is absent - any programmatic POST -
-    the answer is the safe default, True.
-    """
+    """Absent means anonymous. An unchecked HTML checkbox sends nothing, so absence alone
+    cannot mean "not anonymous" without making the control impossible to switch off. The
+    form therefore always submits `anonymous_choice=1`: with that marker the checkbox
+    decides, without it (any programmatic POST) the answer is the safe default, True."""
     if form.get('anonymous_choice'):
         return form.get('anonymous') is not None
     return True
 
 
 def _record_view(record):
-    """Normalize whatever the store returned into {id, status} for the template."""
     if isinstance(record, dict):
         return {'id': record.get('id'), 'status': record.get('status') or 'pending'}
     return {'id': getattr(record, 'id', None),
@@ -236,12 +225,10 @@ def submit_queue():
 
 @submission_bp.route('/submit/sample', methods=['POST'])
 def submit_sample():
-    """Queue a re-attached sample. Writes a pending record; sends nothing.
-
-    The analyst re-attaches the file deliberately because no analysis path retains
-    sample bytes: uploads are unlinked in a `finally`, e-mail attachments are
-    hashed and dropped, and the scanner keeps only a dropper's digest.
-    """
+    """Queue a re-attached sample. Writes a pending record; sends nothing. The analyst
+    re-attaches the file because no analysis path retains sample bytes: uploads are
+    unlinked in a `finally`, e-mail attachments are hashed and dropped, and the scanner
+    keeps only a dropper's digest."""
     if queue_sample is None:
         return _error('The submission queue is unavailable on this deployment.', 503)
 
@@ -315,7 +302,7 @@ def _group(label, ioc_type, threat_type, values, hint=None):
             'indicators': values, 'hint': hint}
 
 
-_IP_HINT = 'abuse.ch expects host:port - append the port before queueing.'
+_IP_HINT = 'abuse.ch expects host:port; append the port before queueing.'
 
 
 def _scan_prefill(scan):
@@ -398,12 +385,10 @@ _PREFILL = {'scan': _scan_prefill, 'email': _email_prefill, 'file': _file_prefil
 
 @submission_bp.app_template_global()
 def submission_prefill(kind, record):
-    """Candidate indicators for a result page's queue form.
-
-    Every value here came out of a scanned page, an e-mail, or an uploaded file, so
-    it is attacker-controlled: the templates put it in form *values* and in a
-    tojson blob read by `.value =` assignment, never into markup.
-    """
+    """Candidate indicators for a result page's queue form. Every value came out of a
+    scanned page, an e-mail, or an uploaded file, so it is attacker-controlled: the
+    templates put it in form *values* and in a tojson blob read by `.value =` assignment,
+    never into markup."""
     builder = _PREFILL.get(kind)
     if builder is None or not isinstance(record, dict):
         return None

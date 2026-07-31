@@ -19,7 +19,6 @@ domain_bp = Blueprint('domain', __name__)
 
 @domain_bp.route('/check_domain', methods=['POST'])
 def check_domain():
-    """Domain information lookup (JSON)."""
     try:
         data = request.get_json(silent=True) or {}
         domain = data.get('domain', '').strip()
@@ -41,7 +40,6 @@ def check_domain():
 
 @domain_bp.route('/analyze', methods=['GET', 'POST'])
 def analyze_domain():
-    """Analyze a domain or URL with all available services."""
     error = None
     result_data = {}
     card_count = 0
@@ -105,7 +103,6 @@ def analyze_domain():
 
 @domain_bp.route('/analyze_url', methods=['POST'])
 def analyze_url_endpoint():
-    """URL analysis (JSON)."""
     try:
         data = request.get_json()
         url = data.get('url')

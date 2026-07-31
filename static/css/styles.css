@@ -1,12 +1,5 @@
-/* ==========================================================================
-   NexusTrace - Consolidated Stylesheet
-   Version: 2.0 (Refactored)
-   ========================================================================== */
-
-/* ==========================================================================
-   0. Self-hosted fonts (Inter). No external font CDN - faster, private, offline.
-   Files live in /static/fonts; paths are relative to this stylesheet.
-   ========================================================================== */
+/* Self-hosted Inter. No external font CDN: faster, private, works offline.
+   Paths are relative to this stylesheet, not to the page. */
 @font-face {
     font-family: 'Inter';
     font-style: normal;
@@ -29,12 +22,8 @@
     src: url('../fonts/inter-latin-700-normal.woff2') format('woff2');
 }
 
-/* ==========================================================================
-   0b. Submit-button loading state. mobile.js adds `.loading` + disables the
-   submit button on form submit; this gives the user feedback while a slow
-   OSINT lookup runs (the main flows are full-page POSTs, so the spinner shows
-   during server processing). Hides the label and overlays a centered spinner.
-   ========================================================================== */
+/* Submit-button loading state. mobile.js adds `.loading` and disables the button on
+   submit; the main flows are full-page POSTs, so this spinner covers server processing. */
 @keyframes nt-spin { to { transform: rotate(360deg); } }
 
 .btn.loading {
@@ -58,7 +47,6 @@
     animation: nt-spin 0.6s linear infinite;
 }
 
-/* Landing-page quick-pick example section */
 .example-heading {
     font-size: 0.6875rem;
     font-weight: 600;
@@ -78,7 +66,6 @@
 }
 
 .example-chip {
-    /* layout: center content both axes so the text is always centered in the button */
     display: inline-flex;
     flex-direction: column;
     align-items: center;
@@ -119,12 +106,9 @@
     color: var(--text-primary, #F3F4F6);
 }
 
-/* ==========================================================================
-   0c. Visible keyboard focus. The nav uses Tailwind `focus:outline-none`, which
-   strips the focus ring - bad for keyboard users. These rules out-specify it
-   (.main-header descendant + :focus-visible) so the ring returns for keyboard
-   navigation only (mouse clicks stay clean via :focus-visible).
-   ========================================================================== */
+/* Visible keyboard focus. The nav uses Tailwind `focus:outline-none`, which strips the
+   ring; these rules out-specify it (.main-header descendant + :focus-visible) so the ring
+   returns for keyboard navigation only. */
 .main-header a:focus-visible,
 .main-header button:focus-visible {
     outline: 2px solid var(--color-secondary, #60A5FA);
@@ -136,45 +120,35 @@
     outline-offset: -2px;
 }
 
-/* ==========================================================================
-   1. CSS Custom Properties (Design Tokens)
-   ========================================================================== */
 :root {
-    /* Colors - Primary */
     --color-primary: #3B82F6;
     --color-primary-dark: #2563EB;
     --color-primary-light: #60A5FA;
     --color-secondary: #60A5FA;
 
-    /* Colors - Semantic */
     --color-success: #10B981;
     --color-warning: #F59E0B;
     --color-danger: #EF4444;
     --color-info: #3B82F6;
 
-    /* Colors - Background */
     --bg-primary: #111827;
     --bg-secondary: #1F2937;
     --bg-tertiary: #374151;
     --bg-card: #232946;
     --bg-card-hover: #2d3654;
 
-    /* Colors - Text */
     --text-primary: #F3F4F6;
     --text-secondary: #9CA3AF;
     --text-muted: #6B7280;
     --text-label: #8ca0c7;
 
-    /* Colors - Border */
     --border-primary: #374151;
     --border-secondary: #4B5563;
     --border-card: #2d334a;
 
-    /* Colors - Accent */
     --accent-orange: #FF6A1A;
     --accent-cyan: #00fff7;
 
-    /* Spacing Scale */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
@@ -182,35 +156,29 @@
     --space-xl: 2rem;
     --space-2xl: 3rem;
 
-    /* Border Radius */
     --radius-sm: 0.25rem;
     --radius-md: 0.5rem;
     --radius-lg: 0.75rem;
     --radius-xl: 1rem;
     --radius-full: 9999px;
 
-    /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     --shadow-card: 0 2px 12px 0 rgba(0, 0, 0, 0.13);
     --shadow-card-hover: 0 8px 32px 0 rgba(37, 99, 235, 0.13);
 
-    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Layout */
     --max-width: 1200px;
     --header-height: 64px;
     --touch-target-min: 44px;
 
-    /* Typography */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'Share Tech Mono', 'Fira Mono', Consolas, monospace;
 
-    /* Z-Index Scale */
     --z-dropdown: 100;
     --z-sticky: 50;
     --z-overlay: 200;
@@ -218,9 +186,6 @@
     --z-toast: 400;
 }
 
-/* ==========================================================================
-   2. Base Styles & Reset
-   ========================================================================== */
 *,
 *::before,
 *::after {
@@ -269,11 +234,8 @@ img {
     height: auto;
 }
 
-/* ==========================================================================
-   3. Layout Components
-   ========================================================================== */
+/* Layout components */
 
-/* Main Content Container */
 .main-content {
     padding: var(--space-md);
     max-width: var(--max-width);
@@ -292,7 +254,6 @@ img {
     padding-right: 0;
 }
 
-/* Content Grid - for cards */
 .content-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -302,7 +263,6 @@ img {
     padding: 0 var(--space-md);
 }
 
-/* Results Layout */
 .results-stack {
     display: flex;
     flex-direction: column;
@@ -329,9 +289,7 @@ img {
     flex-direction: column;
 }
 
-/* ==========================================================================
-   4. Header & Navigation
-   ========================================================================== */
+/* Header & navigation */
 .main-header {
     display: flex;
     align-items: center;
@@ -397,7 +355,6 @@ img {
     gap: 12px;
 }
 
-/* Dropdown */
 .dropdown {
     position: relative;
     display: inline-block;
@@ -452,7 +409,6 @@ img {
     display: block;
 }
 
-/* Navigation Link */
 .nav-link {
     color: var(--text-secondary);
     padding: var(--space-sm) var(--space-md);
@@ -466,9 +422,7 @@ img {
     background: rgba(59, 130, 246, 0.1);
 }
 
-/* ==========================================================================
-   5. Cards
-   ========================================================================== */
+/* Cards */
 .card {
     background: var(--bg-card);
     border: 1px solid var(--border-card);
@@ -487,7 +441,6 @@ img {
     border-color: var(--color-primary);
 }
 
-/* Info Card - for data display */
 .info-card {
     background: var(--bg-card);
     border: 1px solid var(--border-card);
@@ -521,7 +474,6 @@ img {
     transition: color var(--transition-fast);
 }
 
-/* WHOIS Card */
 .whois-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-primary);
@@ -609,7 +561,6 @@ img {
     font-weight: 500;
 }
 
-/* Shodan Card */
 .shodan-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-primary);
@@ -679,7 +630,6 @@ img {
     word-break: break-word;
 }
 
-/* Port, Vulnerability, Service Items */
 .port-item,
 .vulnerability-item,
 .service-item {
@@ -709,7 +659,6 @@ img {
     overflow-x: auto;
 }
 
-/* Feature Card */
 .feature-card {
     display: flex;
     flex-direction: column;
@@ -766,7 +715,6 @@ img {
     right: 1.1rem;
 }
 
-/* Report Card */
 .report-card {
     background: var(--bg-primary);
     border-left: 4px solid var(--border-primary);
@@ -779,9 +727,7 @@ img {
     border-left-color: var(--border-secondary);
 }
 
-/* ==========================================================================
-   6. Buttons
-   ========================================================================== */
+/* Buttons */
 button,
 .btn,
 input[type="submit"],
@@ -840,7 +786,6 @@ a[role="button"],
     border-color: var(--color-primary);
 }
 
-/* Input Button */
 .input-btn {
     padding: var(--space-md) var(--space-lg);
     background: var(--color-primary);
@@ -865,7 +810,6 @@ a[role="button"],
     transform: translateY(-2px) scale(1.03);
 }
 
-/* Toolbar Link */
 .toolbar-link {
     display: inline-flex;
     align-items: center;
@@ -900,7 +844,6 @@ a[role="button"],
     color: var(--color-primary-light);
 }
 
-/* File Label */
 .file-label {
     cursor: pointer;
     display: inline-flex;
@@ -923,9 +866,7 @@ a[role="button"],
     border-color: var(--color-primary);
 }
 
-/* ==========================================================================
-   7. Forms & Inputs
-   ========================================================================== */
+/* Forms & inputs */
 input,
 textarea,
 select {
@@ -963,7 +904,6 @@ select {
     border-color: var(--color-primary);
 }
 
-/* Input Row */
 .input-row {
     display: flex;
     flex-direction: row;
@@ -999,7 +939,6 @@ select {
     box-shadow: 0 2px 8px 0 rgba(37, 99, 235, 0.2);
 }
 
-/* Search Form */
 .unified-search {
     width: 100%;
     display: flex;
@@ -1032,11 +971,8 @@ select {
     box-shadow: 0 4px 16px 0 rgba(37, 99, 235, 0.2);
 }
 
-/* ==========================================================================
-   8. Data Display Components
-   ========================================================================== */
+/* Data display components */
 
-/* Data Grid - for key-value pairs */
 .data-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
@@ -1089,7 +1025,6 @@ select {
     max-width: 100%;
 }
 
-/* Value Color Variants */
 .value-green {
     display: inline-block;
     padding: 0.15em 0.7em;
@@ -1150,7 +1085,6 @@ select {
     background: #78350f;
 }
 
-/* Data Table */
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -1180,7 +1114,6 @@ select {
     border: none;
 }
 
-/* Standard Tables */
 table,
 .horizontal-table {
     width: 100%;
@@ -1235,7 +1168,6 @@ table tr:nth-child(odd) td,
     background: transparent;
 }
 
-/* Lists */
 ul, ol {
     margin: 0.5em 0 0.5em 1.2em;
     padding: 0;
@@ -1243,7 +1175,6 @@ ul, ol {
     font-size: 0.98em;
 }
 
-/* Pre/Code */
 pre {
     background: #181f2a;
     color: var(--text-primary);
@@ -1254,9 +1185,7 @@ pre {
     margin: var(--space-sm) 0;
 }
 
-/* ==========================================================================
-   9. Status Indicators & Badges
-   ========================================================================== */
+/* Status indicators & badges */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -1283,7 +1212,6 @@ pre {
     color: var(--color-danger);
 }
 
-/* Badge */
 .badge {
     display: inline-block;
     padding: 0.25em 0.85em;
@@ -1324,7 +1252,6 @@ pre {
     border-color: var(--color-primary);
 }
 
-/* Score Colors */
 .score-high {
     color: var(--color-danger);
 }
@@ -1337,7 +1264,6 @@ pre {
     color: var(--color-success);
 }
 
-/* VPN Status */
 .vpn-yes {
     color: var(--color-success);
 }
@@ -1346,9 +1272,7 @@ pre {
     color: var(--color-danger);
 }
 
-/* ==========================================================================
-   10. Loading States
-   ========================================================================== */
+/* Loading states */
 .loading {
     position: relative;
     pointer-events: none;
@@ -1387,7 +1311,6 @@ pre {
     display: block;
 }
 
-/* Progress Bar */
 #progress-bar {
     position: relative;
     width: 100%;
@@ -1437,9 +1360,6 @@ pre {
     animation: progressIndeterminate 1.5s linear infinite;
 }
 
-/* ==========================================================================
-   11. Animations
-   ========================================================================== */
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
@@ -1467,9 +1387,7 @@ pre {
     animation: slideIn var(--transition-normal);
 }
 
-/* ==========================================================================
-   12. Sections & Containers
-   ========================================================================== */
+/* Sections & containers */
 .section {
     display: none;
     opacity: 0;
@@ -1501,7 +1419,6 @@ pre {
     gap: var(--space-sm);
 }
 
-/* Reports Section */
 .report-section {
     margin-top: var(--space-md);
 }
@@ -1544,13 +1461,11 @@ pre {
     transform: rotate(180deg);
 }
 
-/* Toolbar */
 .toolbar {
     background: linear-gradient(90deg, var(--bg-card) 0%, var(--color-primary) 100%);
     border-bottom: 1px solid var(--border-primary);
 }
 
-/* AlienVault Row */
 .alienvault-row {
     display: flex;
     flex-direction: row;
@@ -1579,9 +1494,6 @@ pre {
     white-space: normal;
 }
 
-/* ==========================================================================
-   13. Tabs
-   ========================================================================== */
 .tabs-container {
     margin-top: var(--space-xl);
     background: none;
@@ -1637,9 +1549,7 @@ pre {
     animation: fadeIn var(--transition-normal);
 }
 
-/* ==========================================================================
-   14. Feature & How It Works Sections
-   ========================================================================== */
+/* Feature & how-it-works sections */
 .feature-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -1698,7 +1608,6 @@ pre {
     font-size: 1rem;
 }
 
-/* How It Works */
 .howitworks-section {
     margin-top: var(--space-2xl);
     text-align: center;
@@ -1746,9 +1655,7 @@ pre {
     font-size: 1rem;
 }
 
-/* ==========================================================================
-   15. Enterprise/Home Page Styles
-   ========================================================================== */
+/* Home page */
 .tagline {
     text-align: center;
     font-size: 0.95rem;
@@ -1817,9 +1724,6 @@ pre {
     font-size: 1.5rem;
 }
 
-/* ==========================================================================
-   16. Footer
-   ========================================================================== */
 .footer {
     background: #20243a;
     border-top: 1px solid var(--bg-card);
@@ -1844,9 +1748,6 @@ pre {
     margin-top: var(--space-sm);
 }
 
-/* ==========================================================================
-   17. Utility Classes
-   ========================================================================== */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -1869,17 +1770,11 @@ pre {
     word-break: break-word;
 }
 
-/* ==========================================================================
-   18. Accessibility
-   ========================================================================== */
 :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 
-/* ==========================================================================
-   19. Scrollbar
-   ========================================================================== */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1898,11 +1793,8 @@ pre {
     background: var(--border-secondary);
 }
 
-/* ==========================================================================
-   20. Responsive Design
-   ========================================================================== */
+/* Responsive breakpoints */
 
-/* Small phones */
 @media (max-width: 480px) {
     .main-content {
         padding: var(--space-sm);
@@ -1951,7 +1843,6 @@ pre {
     }
 }
 
-/* Phones */
 @media (min-width: 480px) {
     .search-form {
         flex-direction: row;
@@ -1966,7 +1857,6 @@ pre {
     }
 }
 
-/* Small tablets */
 @media (max-width: 600px) {
     .main-header {
         flex-direction: column;
@@ -2004,7 +1894,6 @@ pre {
     }
 }
 
-/* Tablets */
 @media (min-width: 640px) {
     .main-content {
         padding: var(--space-lg);
@@ -2019,7 +1908,6 @@ pre {
     }
 }
 
-/* Small desktops */
 @media (max-width: 700px) {
     .section-header {
         flex-direction: column;
@@ -2100,7 +1988,6 @@ pre {
     }
 }
 
-/* Medium screens */
 @media (min-width: 768px) {
     .feature-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -2119,7 +2006,6 @@ pre {
     }
 }
 
-/* Tablets landscape */
 @media (min-width: 768px) and (max-width: 1023px) {
     .feature-card {
         min-height: 180px;
@@ -2134,7 +2020,6 @@ pre {
     }
 }
 
-/* Tablet/small desktop transition */
 @media (max-width: 900px) {
     .main-header {
         flex-direction: column;
@@ -2173,7 +2058,6 @@ pre {
     }
 }
 
-/* Desktop */
 @media (min-width: 1024px) {
     .feature-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -2189,7 +2073,6 @@ pre {
     }
 }
 
-/* Large results row breakpoint */
 @media (max-width: 1100px) {
     .results-row {
         flex-wrap: wrap;
@@ -2205,14 +2088,12 @@ pre {
     }
 }
 
-/* Large desktop */
 @media (min-width: 1280px) {
     .main-content {
         padding: var(--space-2xl);
     }
 }
 
-/* Landscape mobile */
 @media (max-height: 600px) and (orientation: landscape) {
     .main-header {
         padding: var(--space-sm) var(--space-md);
@@ -2228,7 +2109,6 @@ pre {
     }
 }
 
-/* High DPI displays */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
     .card,
     .feature-card {
@@ -2236,9 +2116,6 @@ pre {
     }
 }
 
-/* ==========================================================================
-   21. Reduced Motion
-   ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -2249,9 +2126,6 @@ pre {
     }
 }
 
-/* ==========================================================================
-   22. Light Mode Support
-   ========================================================================== */
 @media (prefers-color-scheme: light) {
     :root {
         --bg-primary: #ffffff;
@@ -2272,9 +2146,6 @@ pre {
     }
 }
 
-/* ==========================================================================
-   23. Print Styles
-   ========================================================================== */
 @media print {
     .main-header,
     .btn,
@@ -2293,9 +2164,6 @@ pre {
     }
 }
 
-/* ==========================================================================
-   24. Toast Notifications (New)
-   ========================================================================== */
 .toast-container {
     position: fixed;
     top: var(--space-xl);
@@ -2333,9 +2201,6 @@ pre {
     border-left-color: var(--color-info);
 }
 
-/* ==========================================================================
-   25. Skeleton Loaders
-   ========================================================================== */
 @keyframes skeleton-pulse {
     0%, 100% {
         opacity: 0.4;
@@ -2405,7 +2270,6 @@ pre {
     width: 80%;
 }
 
-/* Loading spinner */
 .loading-spinner {
     display: inline-block;
     width: 20px;
@@ -2436,9 +2300,6 @@ pre {
     z-index: 10;
 }
 
-/* ==========================================================================
-   26. Copy Button Styles
-   ========================================================================== */
 .copy-btn {
     display: inline-flex;
     align-items: center;
@@ -2467,29 +2328,23 @@ pre {
     color: var(--color-success);
 }
 
-/* Show copy button on row hover */
 tr:hover .copy-btn,
 .data-item:hover .copy-btn,
 .whois-item:hover .copy-btn {
     opacity: 1;
 }
 
-/* Copy button icon */
 .copy-btn svg {
     width: 14px;
     height: 14px;
 }
 
-/* Copyable value wrapper */
 .copyable-value {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
 }
 
-/* ==========================================================================
-   27. Loading States Enhancement
-   ========================================================================== */
 .btn-loading {
     position: relative;
     pointer-events: none;
@@ -2522,7 +2377,6 @@ tr:hover .copy-btn,
     font-size: var(--text-sm);
 }
 
-/* Progress indicator */
 .progress-ring {
     width: 40px;
     height: 40px;

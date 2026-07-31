@@ -1,13 +1,6 @@
-/* ==========================================================================
-   NexusTrace - App shell & component styles
-   --------------------------------------------------------------------------
-   Moved out of an inline <style> block in base.html. Loaded AFTER styles.css,
-   so these rules are the cascade "winners" for the shell/header/cards/nav -
-   exactly as the inline block was. Keep app-shell + component overrides here;
-   styles.css holds the larger base + result-page styles.
-   ========================================================================== */
+/* NexusTrace app shell & component styles. Loaded AFTER styles.css, so these rules
+   win the cascade for the shell/header/cards/nav. */
 
-/* CSS Reset for html and body */
 html, body {
     margin: 0;
     padding: 0;
@@ -16,7 +9,6 @@ html, body {
 }
 
 :root {
-    /* Base Colors */
     --color-primary: #3B82F6;
     --color-primary-dark: #2563EB;
     --color-secondary: #60A5FA;
@@ -25,48 +17,37 @@ html, body {
     --color-danger: #EF4444;
     --color-info: #3B82F6;
 
-    /* Background Colors */
     --bg-primary: #111827;
     --bg-secondary: #1F2937;
     --bg-tertiary: #374151;
     --bg-card: #232946;
 
-    /* Text Colors */
     --text-primary: #F3F4F6;
     --text-secondary: #9CA3AF;
     --text-muted: #6B7280;
 
-    /* Border Colors */
     --border-primary: #374151;
     --border-secondary: #4B5563;
 
-    /* Spacing */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
 
-    /* Border Radius */
     --radius-sm: 0.25rem;
     --radius-md: 0.5rem;
     --radius-lg: 1rem;
 
-    /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
-    /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Base Styles - Blueprint / Grid aesthetic
-   Flat dark backdrop with a static dot lattice. No drift, no glow, no gradient.
-   The dot grid is rendered via a single radial-gradient on background-image -
-   it is a STATIC pattern, not an animated effect. */
 body {
     font-family: 'Inter', sans-serif;
     background-color: #080c14;
@@ -79,7 +60,6 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* Layout Components */
 .app-container {
     display: flex;
     flex-direction: column;
@@ -106,7 +86,6 @@ body {
     width: 100%;
 }
 
-/* Card Components - flat, blueprint style */
 .card {
     background: #0f1624;
     border: 1px solid var(--border-primary);
@@ -119,7 +98,6 @@ body {
     border-color: var(--color-primary-dark);
 }
 
-/* Form Components */
 .input-group {
     display: flex;
     gap: var(--spacing-sm);
@@ -182,27 +160,25 @@ body {
     background: #1e40af;
 }
 
-/* Keep button icons from collapsing: as flex children they can otherwise shrink to
-   zero width when the button is squeezed next to a greedy w-full input (which is why
-   the search icon vanished on the domain/IP/hash search pages). */
+/* Keep button icons from collapsing: as flex children they shrink to zero width when
+   squeezed next to a greedy w-full input, which is why the search icon vanished on the
+   domain/IP/hash search pages. */
 .btn svg {
     flex-shrink: 0;
 }
 
-/* Navigation */
 .nav-link {
     position: relative;
     white-space: nowrap;
-    font-size: 0.8125rem;   /* 13px - compact but legible */
+    font-size: 0.8125rem;
     font-weight: 500;
     letter-spacing: 0.01em;
-    color: #7a90a8;          /* blue-tinted gray: muted but not neutral */
+    color: #7a90a8;
     padding: 0.375rem 0.6rem;
     border-radius: 4px;
     transition: color var(--transition-fast), background var(--transition-fast);
 }
 
-/* Underline that expands from center on hover/active */
 .nav-link::after {
     content: '';
     position: absolute;
@@ -231,7 +207,6 @@ body {
     background: rgba(37, 99, 235, 0.12);
 }
 
-/* Nav group structure: logical clusters separated by thin rule */
 .nav-group {
     display: flex;
     align-items: center;
@@ -246,11 +221,8 @@ body {
     align-self: center;
 }
 
-/* ==========================================================================
-   Responsive navigation. The full inline nav shows at 1200px+ (shortened labels
-   keep it from overflowing). Below 1200px a hamburger toggles a vertical mobile
-   panel, preventing horizontal overflow on phones/tablets.
-   ========================================================================== */
+/* The full inline nav shows at 1200px+; below that a hamburger toggles a vertical
+   panel, preventing horizontal overflow on phones/tablets. */
 .desktop-nav {
     display: none;
     align-items: center;
@@ -261,7 +233,7 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: auto; /* push the hamburger to the right edge (only visible below 1400px) */
+    margin-left: auto;
     color: var(--text-primary);
     background: transparent;
     border: 1px solid var(--border-secondary);
@@ -335,7 +307,6 @@ body {
     }
 }
 
-/* Dropdown Menus */
 .dropdown-menu {
     display: none;
     position: absolute;
@@ -354,7 +325,6 @@ body {
     z-index: 110;
 }
 
-/* Main dropdown opens downward; sits above the sticky header (z-index 50) */
 .group > .dropdown-menu:not(.submenu) {
     left: 0;
     right: auto;
@@ -378,12 +348,10 @@ body {
     transition-delay: 0s;
 }
 
-/* Ensure parent menu items have proper positioning */
 .group {
     position: relative;
 }
 
-/* Add hover effect for menu items */
 .dropdown-menu a {
     display: block;
     padding: 0.5rem 1rem;
@@ -396,7 +364,6 @@ body {
     color: white;
 }
 
-/* Data Display */
 .data-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -420,7 +387,6 @@ body {
     font-size: 1rem;
 }
 
-/* Status Indicators */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -445,7 +411,6 @@ body {
     color: var(--color-danger);
 }
 
-/* Responsive Design */
 @media (max-width: 1024px) {
     .main-header {
         padding: var(--spacing-sm) var(--spacing-lg);
@@ -471,7 +436,6 @@ body {
     }
 }
 
-/* Animations */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -490,7 +454,6 @@ body {
     animation: slideIn var(--transition-normal);
 }
 
-/* Add arrow indicator and hover delay styles */
 .arrow {
     margin-left: 0.5em;
     font-size: 0.8em;
@@ -509,7 +472,6 @@ body {
     transition-delay: 0s;
 }
 
-/* Submenu animation */
 @keyframes slideRight {
     from { opacity: 0; transform: translateX(-10px);}
     to { opacity: 1; transform: translateX(0);}
@@ -524,12 +486,10 @@ body {
     background: var(--bg-secondary);
 }
 
-/* Main dropdown should allow overflow for submenus */
 .dropdown-menu {
     overflow: visible !important;
 }
 
-/* Menu item hover */
 .dropdown-menu a:hover {
     background: var(--color-primary);
     color: #fff;
@@ -546,11 +506,6 @@ body {
     margin: 0 !important;
 }
 
-/* ==========================================================================
-   Verdict summary bar (result pages). A faint left-to-right severity tint over
-   the gray band makes malicious/suspicious/clean readable at a glance, beyond
-   just the left accent border.
-   ========================================================================== */
 .verdict-bar {
     background: #0f1624;
     border-left: 4px solid #6b7280;
@@ -568,22 +523,10 @@ body {
     border-left-color: #10b981;
 }
 
-/* Consistent label column in result-card key/value tables so values line up and
-   sit close to their labels across every card. nowrap lets the rare long label
-   expand rather than wrap. */
+/* Consistent label column so values line up across every card. nowrap lets the rare
+   long label expand rather than wrap. */
 .tailwind-tables th.text-gray-400 { width: 9rem; }
 
-/* ==========================================================================
-   ★ NexusTrace Design System v2 ★
-   --------------------------------------------------------------------------
-   A more elevated, intentional visual language. Dark/blue identity retained,
-   but the homepage now reads as a proper hero, results pages lead with a
-   clear verdict, and individual data points (risk score, VPN/Proxy/Tor,
-   ports, security headers) get dedicated visual treatments instead of
-   flat label-value tables.
-   ========================================================================== */
-
-/* ---------- Design tokens layered on top of the existing palette ---------- */
 :root {
     --nt-blue-50:  #eff6ff;
     --nt-blue-100: #dbeafe;
@@ -595,7 +538,7 @@ body {
     --nt-blue-700: #1d4ed8;
     --nt-cyan:     #22d3ee;
 
-    --nt-ink-950:  #07091a;   /* deepest backdrop */
+    --nt-ink-950:  #07091a;
     --nt-ink-900:  #0b1023;
     --nt-ink-850:  #0f1530;
     --nt-ink-800:  #131a39;
@@ -610,18 +553,9 @@ body {
     --nt-radius-pill: 999px;
 }
 
-/* ---------- Decorative layers removed ----------
-   The previous version painted animated cosmic orbs (body::before) and a soft
-   grid lattice (body::after). Both have been removed in favor of the body's
-   own static dot-grid background. No animation, no drift, no orbs.
-   .app-container still owns its stacking context for predictable z-index. */
+/* Owns a stacking context so the header/dropdown z-indexes below stay predictable. */
 .app-container { position: relative; z-index: 1; }
 
-/* ==========================================================================
-   HOMEPAGE - Hero / search / chips
-   ========================================================================== */
-
-/* Hero - blueprint style. Position + spacing only, no decorative background. */
 .nt-hero {
     position: relative;
     padding: 5rem 1.5rem 3rem;
@@ -630,7 +564,6 @@ body {
     margin: 0 auto;
 }
 
-/* Eyebrow pill - sharp corners, static dot (no pulse) */
 .nt-hero__eyebrow {
     display: inline-flex;
     align-items: center;
@@ -651,10 +584,8 @@ body {
     height: 6px;
     border-radius: 50%;
     background: #2563EB;
-    /* No animation - static accent dot only */
 }
 
-/* Title - solid white, no gradient text */
 .nt-hero__title {
     font-size: clamp(2.4rem, 6vw, 3.8rem);
     font-weight: 800;
@@ -680,8 +611,6 @@ body {
     line-height: 1.55;
 }
 
-/* Rectangular search bar with attached submit button. Focus = solid blue
-   border on input. No shimmer, no glow, no animation. */
 .nt-search {
     position: relative;
     width: 100%;
@@ -751,7 +680,6 @@ body {
     }
 }
 
-/* Feature pills - flat, sharp corners */
 .nt-feature-pills {
     display: flex;
     flex-wrap: wrap;
@@ -778,7 +706,6 @@ body {
     flex-shrink: 0;
 }
 
-/* Example chips - flat panels with blue left border accent on hover */
 .example-chip {
     background: #0f1624 !important;
     border: 1px solid #1a2744 !important;
@@ -814,10 +741,6 @@ body {
     line-height: 1.2;
 }
 
-/* ==========================================================================
-   RESULTS PAGE - verdict hero, cards, badges, gauges
-   ========================================================================== */
-
 .nt-results-title {
     text-align: center;
     font-size: 0.78rem;
@@ -828,7 +751,6 @@ body {
     margin-bottom: 1.5rem;
 }
 
-/* Slim results-page search form (sits at top, doesn't dominate) */
 .nt-results-search {
     max-width: 720px;
     margin: 0 auto;
@@ -882,9 +804,7 @@ body {
     background: #1d4ed8 !important;
 }
 
-/* ---------- Verdict hero (top of results page) ----------
-   Flat blueprint card: solid background + 3px left-border accent driven by
-   --accent. No radial halos, no shadows, no shimmer. */
+/* Verdict hero: 3px left-border accent driven by --accent. */
 .nt-verdict {
     position: relative;
     display: grid;
@@ -956,7 +876,6 @@ body {
 .nt-verdict.is-info       .nt-verdict__badge { background: rgba(37,99,235,.20); color: #bfdbfe; border-color: rgba(37,99,235,.45); }
 .nt-verdict.is-unknown    .nt-verdict__badge { background: rgba(100,116,139,.20); color: #cbd5e1; border-color: rgba(100,116,139,.45); }
 
-/* Right-rail stats grid in the verdict hero (Geo / ASN / Abuse / Pulses) */
 .nt-verdict__stats {
     display: grid;
     grid-auto-flow: column;
@@ -1015,9 +934,8 @@ body {
     .nt-verdict__stat-value { max-width: none; }
 }
 
-/* ---------- Risk gauge (AbuseIPDB) ----------
-   The conic-gradient here is the data viz itself (a radial progress meter),
-   not decoration. Kept; surrounding shadow/glow removed. */
+/* The conic-gradient here is the data viz itself (a radial progress meter), not
+   decoration. */
 .nt-gauge {
     --val: 0;
     --size: 96px;
@@ -1085,7 +1003,6 @@ body {
 }
 .nt-gauge-meta__text strong { color: #f8fafc; }
 
-/* ---------- Pill badges for VPN/Proxy/Tor/Relay detection ---------- */
 .nt-pills {
     display: flex;
     flex-wrap: wrap;
@@ -1134,9 +1051,6 @@ body {
     border-color: rgba(100,116,139,.35);
 }
 
-/* ---------- Card shell - blueprint style ----------
-   Solid #0f1624 background, 3px blue left-border. No gradients, no shadow,
-   no hover-lift. Hover just brightens the left accent. */
 .nt-card {
     position: relative;
     background: #0f1624;
@@ -1189,7 +1103,6 @@ body {
     color: rgba(148,163,184,.7);
 }
 
-/* Card-source color variants by service - flat tints, no gradients */
 .nt-card.is-otx       .nt-card__icon { background: rgba(251,146,60,.18); border-color: rgba(251,146,60,.40); color: #fed7aa; }
 .nt-card.is-abuse     .nt-card__icon { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.40); color: #fecaca; }
 .nt-card.is-shodan    .nt-card__icon { background: rgba(168,85,247,.18); border-color: rgba(168,85,247,.40); color: #e9d5ff; }
@@ -1198,7 +1111,6 @@ body {
 .nt-card.is-phishtank .nt-card__icon { background: rgba(248,113,113,.18); border-color: rgba(248,113,113,.40); color: #fecaca; }
 .nt-card.is-talos     .nt-card__icon { background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.40); color: #bae6fd; }
 
-/* ---------- AlienVault OTX empty state ---------- */
 .nt-otx-empty {
     display: flex;
     align-items: center;
@@ -1214,7 +1126,6 @@ body {
 }
 .nt-otx-empty svg { color: #4ade80; flex-shrink: 0; }
 
-/* ---------- Stub-card status row (PhishTank / Talos) ---------- */
 .nt-stub-status {
     margin: 0 0 0.85rem;
     display: flex;
@@ -1222,7 +1133,6 @@ body {
     gap: 0.4rem;
 }
 
-/* ---------- CTA button (stub cards, external links) ---------- */
 .nt-cta-button {
     display: inline-flex;
     align-items: center;
@@ -1247,7 +1157,6 @@ body {
 }
 .nt-cta-button svg { flex-shrink: 0; }
 
-/* ---------- "View on X" small inline external link inside cards ---------- */
 .nt-card__external-link {
     display: inline-flex;
     align-items: center;
@@ -1267,12 +1176,10 @@ body {
 }
 .nt-card__external-link svg { opacity: 0.75; }
 
-/* ---------- AbuseIPDB reports table - comment column truncation ---------- */
 .nt-reports-table { table-layout: fixed; width: 100%; }
 /* DATE col: YYYY-MM-DD = 10 chars */
 .nt-reports-table th:nth-child(1),
 .nt-reports-table td:nth-child(1) { width: 25%; overflow: hidden; }
-/* COUNTRY col: clip long names cleanly */
 .nt-reports-table th:nth-child(3),
 .nt-reports-table td:nth-child(3) { width: 27%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-reports-table__comment {
@@ -1283,7 +1190,6 @@ body {
     color: #cbd5e1;
 }
 
-/* Key/value rows inside cards - replace the cramped <table> look */
 .nt-kv {
     display: grid;
     grid-template-columns: minmax(6.5rem, auto) 1fr;
@@ -1317,7 +1223,6 @@ body {
     color: #cbd5e1;
 }
 
-/* Section heading inside cards */
 .nt-card__section-title {
     font-size: 0.7rem;
     letter-spacing: 0.16em;
@@ -1328,7 +1233,6 @@ body {
     font-weight: 600;
 }
 
-/* ---------- Port tag cloud (Shodan) ---------- */
 .nt-port-cloud {
     display: flex;
     flex-wrap: wrap;
@@ -1354,7 +1258,6 @@ body {
 .nt-port__num { font-weight: 700; color: #f3e8ff; }
 .nt-port__svc { color: rgba(233,213,255,.70); font-size: 0.72rem; }
 
-/* ---------- CVE chips (Shodan vulns) ---------- */
 .nt-cves { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
 .nt-cve {
     display: inline-flex;
@@ -1370,7 +1273,6 @@ body {
     font-weight: 600;
 }
 
-/* ---------- Security-header grade badges ---------- */
 .nt-headers-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1427,7 +1329,6 @@ body {
     .nt-headers-grid { grid-template-columns: 1fr; }
 }
 
-/* ---------- DNS-record type tags ---------- */
 .nt-dns-tag {
     display: inline-flex;
     align-items: center;
@@ -1443,20 +1344,16 @@ body {
     font-family: var(--font-mono, ui-monospace, monospace);
 }
 
-/* ---------- Card grid layout ---------- */
-/* The grid lives inside .nt-results-wrap which already constrains width
-   and provides horizontal padding, so the grid itself stays full-width
-   with no padding to maximize usable space. auto-fill (not auto-fit)
-   keeps card sizes consistent. Min 300px lets 4 columns fit on
-   ~1300px viewports, eliminating the 3-col orphan-card problem. */
+/* .nt-results-wrap already constrains width and supplies horizontal padding, so the
+   grid stays full-width. auto-fill (not auto-fit) keeps card sizes consistent; min
+   300px lets 4 columns fit on ~1300px viewports, avoiding a 3-col orphan card. */
 .nt-card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 2rem;
     margin: 0 0 1.25rem;
 }
-/* If the last card is the only one on its row (orphan), stretch it across all columns
-   so it doesn't float alone at 1/3 width. Targets: last child that starts a new row. */
+/* Stretch a lone last card across all columns so it doesn't float at 1/3 width. */
 .nt-card-grid > .nt-card:last-child:nth-child(3n+1) {
     grid-column: 1 / -1;
     max-width: 520px; /* cap width so it doesn't span the full 1350px */
@@ -1467,7 +1364,6 @@ body {
     .nt-card-grid > .nt-card:last-child:nth-child(3n+1) { max-width: 100%; }
 }
 
-/* Constrain the verdict + search to the same max-width as the card grid */
 .nt-results-wrap {
     max-width: 1400px;
     margin: 0 auto;
@@ -1477,7 +1373,6 @@ body {
     .nt-results-wrap { padding: 1.5rem 1rem 2rem; }
 }
 
-/* "Show raw data" toggle restyle */
 .nt-raw {
     margin-top: 1.25rem;
     padding-top: 1.25rem;
@@ -1512,7 +1407,6 @@ body {
     overflow: auto;
 }
 
-/* Return-to-home button - flat, sharp corners */
 .nt-back-home {
     display: inline-flex;
     align-items: center;
@@ -1530,11 +1424,9 @@ body {
     color: #ffffff;
 }
 
-/* ---------- Subtle row stripes for table-style content (DNS, SSL, ports) ---------- */
 .nt-card table tr { transition: background 150ms ease; }
 .nt-card table tr:hover { background: rgba(96,165,250,.04); }
 
-/* Polish the SSL/DNS in-card tables (used by analyze_result's existing markup) */
 .nt-card table th { color: rgba(148,163,184,.85); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .nt-card table td { color: #e2e8f0; font-size: 0.88rem; }
 .nt-card table th,
@@ -1544,15 +1436,11 @@ body {
     line-height: 1.5;
 }
 
-/* Improve focus ring on the legacy form-input inside results page */
 .nt-results-search input[type="text"]:focus { outline: none !important; }
 
 /* Make the legacy "card" hover-lift not double-trigger when wrapped in .nt-card */
 .nt-card .card:hover { transform: none; box-shadow: none; border-color: inherit; }
 
-/* ==========================================================================
-   No-results / empty state polish
-   ========================================================================== */
 .nt-empty {
     text-align: center;
     padding: 3.5rem 1.5rem;

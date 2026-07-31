@@ -4,9 +4,8 @@
 #
 #   sudo deploy/systemd/install.sh [unix-user]
 #
-# The unit is templated on the user so it does not hardcode one: the sweep runs as the
-# account that owns /opt/NexusTrace, because it deletes files there. Defaults to the
-# owner of the checkout.
+# Templated on the unix user rather than hardcoding one: the sweep deletes files under
+# /opt/NexusTrace, so it runs as the account that owns them (default: the checkout owner).
 #
 # Report-only is NOT the default: the shipped unit passes --yes and will delete. Run the
 # dry-run command this script prints at the end before trusting it.
@@ -27,7 +26,7 @@ command -v uv >/dev/null 2>&1 || echo "WARNING: uv not on root's PATH; check Exe
 
 echo "Installing retention timer: repo=$REPO_DIR user=$RUN_AS"
 
-# %i is the instance name, so one unit file serves any user. Installed as a template.
+# Installed as a template: %i is the instance name, so one unit file serves any user.
 sed "s|/opt/NexusTrace|$REPO_DIR|g" "$SRC/nexustrace-purge.service" \
     > "$UNIT_DIR/nexustrace-purge@.service"
 sed "s|/opt/NexusTrace|$REPO_DIR|g" "$SRC/nexustrace-purge.timer" \

@@ -6,7 +6,12 @@ import importlib
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL = 1800  # 30 minutes
+# How often the background thread flushes every cache in clear_caches(). This is NOT a
+# TTL: each cached function carries its own via timed_lru_cache(seconds=...), and those
+# range from 600 to 3600. Because the sweep clears all of them unconditionally, it is a
+# ceiling on every one, so the four functions declaring 3600 effectively expire at 1800.
+# Raise this before raising any per-function TTL past it, or the longer TTL does nothing.
+CLEAR_INTERVAL_SECONDS = 1800
 MAX_CACHE_SIZE = 1000
 
 _cache_lock = threading.Lock()
@@ -16,7 +21,6 @@ _cache_thread_lock = threading.Lock()
 
 
 def setup_cache(app):
-    """Setup caching for the application."""
     start_cache_clearing_thread()
 
 
@@ -52,7 +56,8 @@ def timed_lru_cache(seconds: int, maxsize: int = MAX_CACHE_SIZE):
 
 
 def clear_caches():
-    """Clear all cached functions periodically."""
+    """Every cached function in the app, listed explicitly below: a function decorated
+    with timed_lru_cache is not cleared until it is added here."""
     with _cache_lock:
         try:
             ip_service = importlib.import_module('app.services.ip_service')
@@ -115,14 +120,12 @@ def clear_caches():
 
 
 def schedule_cache_clearing():
-    """Schedule cache clearing every 30 minutes."""
     while True:
-        time.sleep(CACHE_TTL)
+        time.sleep(CLEAR_INTERVAL_SECONDS)
         clear_caches()
 
 
 def start_cache_clearing_thread():
-    """Start the cache clearing thread (only once)."""
     global _cache_thread_started
 
     with _cache_thread_lock:

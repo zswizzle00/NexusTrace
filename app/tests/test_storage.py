@@ -1,11 +1,11 @@
 """Pins app/utils/storage.py - the local/GCS record-store abstraction.
 
-No network and no real `data/`: `storage.LOCAL_ROOT` is repointed at a temp tree for
-the whole run (`check_isolation` refuses to proceed otherwise), and the GCS backend is
-driven through `storage.GCS_CLIENT_FACTORY` with a recording fake, so
-`google.cloud.storage` is never imported and does not need to be installed.
+No network and no real `data/`: `storage.LOCAL_ROOT` is repointed at a temp tree for the
+whole run (`check_isolation` refuses to proceed otherwise), and the GCS backend is driven
+through `storage.GCS_CLIENT_FACTORY` with a recording fake, so `google.cloud.storage` is
+never imported and need not be installed.
 
-The traversal battery is the point of most of this file. One key allowlist is the
+The traversal battery is the point of most of this file: one key allowlist is the
 path-traversal boundary for five stores at once, so every rejected key is asserted
 against every method that takes one, and asserted to have created and read nothing.
 """
@@ -60,8 +60,6 @@ def fresh(name='scans'):
     shutil.rmtree(st.root, ignore_errors=True)
     return st
 
-
-# ---------------------------------------------------------------- local backend
 
 def test_backend_selection():
     check(storage.backend_name() == 'local', 'default backend should be local')
@@ -257,14 +255,11 @@ def test_listing():
     check(len(st.list(limit='nonsense')) == 4, 'an unparseable limit should mean no limit')
     check(len(st.list(limit=None)) == 4, 'limit=None should mean no limit')
 
-    # A temp artefact or a dotfile in the directory is not a record.
     Path(st.root, '.tmp-leftover.part').write_text('junk', encoding='utf-8')
     Path(st.root, 'has space.json').write_text('junk', encoding='utf-8')
     (Path(st.root) / 'subdir').mkdir()
     check(len(st.list()) == 4, 'list must skip artefacts, dotfiles and directories')
 
-
-# ------------------------------------------------------------- key validation
 
 BAD_KEYS = (
     '../etc/passwd', '/etc/passwd', 'a/b', 'a\\b', '..', '.hidden', 'x\x00y', '',
@@ -312,9 +307,6 @@ def test_key_validation():
         check(storage.validate_key(key) == key, f'validate_key({key!r}) should pass')
     check(raises(ValueError, storage.validate_key, 'x' * 256),
           'a 256-character key must be rejected')
-
-
-# ------------------------------------------------------------------ gcs backend
 
 
 class FakeNotFound(Exception):

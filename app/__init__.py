@@ -108,8 +108,21 @@ def create_app():
         session_cookie_http_only=True,
     )
 
-    from app.routes import register_routes
+    from app.routes import ROLE_ADMIN, admin_rules, register_routes
     register_routes(app)
+
+    # register_routes() already skips the admin blueprint on the public role. This
+    # re-checks the built url_map, so an admin route smuggled onto some other blueprint
+    # cannot quietly ship to the internet-facing process: absence is the whole control,
+    # and it is worth asserting rather than assuming.
+    if app.config['NEXUSTRACE_ROLE'] != ROLE_ADMIN:
+        exposed = admin_rules(app)
+        if exposed:
+            raise RuntimeError(
+                'refusing to start: the public role registered admin routes '
+                f'{exposed}. Serve these from a NEXUSTRACE_ROLE=admin process bound '
+                'to loopback instead.'
+            )
 
     # The enrichment API authenticates with X-API-Key instead of CSRF.
     from app.routes.enrichment_routes import enrichment_bp

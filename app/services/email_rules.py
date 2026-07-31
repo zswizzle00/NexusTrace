@@ -1,19 +1,19 @@
 """Heuristic scoring for a parsed e-mail. Pure; no network, no I/O.
 
-Additive weights over named signals, clamped to [0, 1], then banded. Combos add
-on top of their constituents because the combination is the tell, not either
-half - a brand name in a display line is nothing, a brand name plus a reply-to
-on someone else's domain is business e-mail compromise.
+Additive weights over named signals, clamped to [0, 1], then banded. Combos add on top
+of their constituents because the combination is the tell, not either half: a brand
+name in a display line is nothing, a brand name plus a reply-to on someone else's
+domain is business e-mail compromise.
 
-**The band floor is the important design property.** The four ambient header
-signals sum to 0.20, below the 0.30 suspicious floor, so no combination of weak
-header quirks can produce a verdict on its own. The URL scanner's engine shipped
-without that property and flagged ordinary sites whose only sins were thin
-security headers and a recently-renewed certificate.
+**The band floor is the important design property.** The four ambient header signals
+sum to 0.20, below the 0.30 suspicious floor, so no combination of weak header quirks
+can produce a verdict on its own. The URL scanner's engine shipped without that
+property and flagged ordinary sites whose only sins were thin security headers and a
+recently-renewed certificate.
 
 `attachment_known_malware` is weighted at exactly MALICIOUS_THRESHOLD: a positive
-hash-reputation hit must reach `malicious` alone, including for a malicious
-*document*, which earns no `executable_attachment` weight.
+hash-reputation hit must reach `malicious` alone, including for a malicious *document*,
+which earns no `executable_attachment` weight.
 """
 
 import logging
@@ -36,7 +36,7 @@ WEIGHTS = {
     'dkim_fail': 0.15,
     'return_path_mismatch': 0.10,
     'archive_attachment': 0.10,
-    # Ambient - individually meaningless, and capped below the band floor
+    # Ambient: individually meaningless, and capped below the band floor
     'missing_message_id': 0.05,
     'missing_mime_version': 0.05,
     'date_anomaly': 0.05,
@@ -53,8 +53,8 @@ MALICIOUS_THRESHOLD = 0.75
 
 YOUNG_DOMAIN_MAX_DAYS = 30
 
-# SPF verdicts that count as a failure. 'softfail' is included; 'none' and the
-# temp/perm errors are not - an absent or broken SPF record is not evidence.
+# 'softfail' counts; 'none' and the temp/perm errors do not - an absent or broken SPF
+# record is not evidence.
 _SPF_FAIL_VERDICTS = frozenset({'fail', 'softfail'})
 
 _DATE_FORMATS = (
@@ -79,7 +79,6 @@ def _age_days(value):
 
 
 def _known_malware(attachments, hashes):
-    """True when any attachment's hash lookup reports it malicious."""
     for attachment in attachments or []:
         digest = (attachment or {}).get('sha256')
         if not digest:
@@ -91,7 +90,6 @@ def _known_malware(attachments, hashes):
 
 
 def score(findings):
-    """Score a parsed e-mail. Pure. Returns {'level', 'score', 'signals'}."""
     auth = findings.get('authentication') or {}
     spoofing = set(findings.get('spoofing') or [])
     ambient = set(findings.get('suspicious_headers') or [])

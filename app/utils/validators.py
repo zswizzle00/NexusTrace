@@ -45,7 +45,6 @@ def is_valid_domain(domain, allow_single_label=False):
 
 
 def is_valid_url(url):
-    """Return True if url has a valid http/https scheme and netloc."""
     if not url or not isinstance(url, str):
         return False
     try:
@@ -55,26 +54,24 @@ def is_valid_url(url):
         return False
 
 
-# Mozilla's PSL via the `publicsuffixlist` package, which ships a dated snapshot
-# and never touches the network at import or call time - registrable_domain()
-# runs inside URL scans and .eml parsing. Refreshing the list is a deliberate
-# version bump; see the note in pyproject.toml. Built once at import and then
-# immutable, so it is safe to share across gunicorn's worker threads.
+# Mozilla's PSL via `publicsuffixlist`, which ships a dated snapshot and never touches
+# the network at import or call time; registrable_domain() runs inside URL scans and
+# .eml parsing. Refreshing the list is a deliberate version bump (see pyproject.toml).
+# Built once at import and then immutable, so sharing it across gunicorn's threads is safe.
 #
-# The PRIVATE section is included (privatesuffix, not publicsuffix): both callers
-# are ownership-boundary detectors, so `evil.github.io` and `victim.github.io`
-# must not collapse to one domain.
+# The PRIVATE section is included (privatesuffix, not publicsuffix): both callers are
+# ownership-boundary detectors, so `evil.github.io` and `victim.github.io` must not
+# collapse to one domain.
 _PSL = PublicSuffixList()
 
 
 def registrable_domain(host):
     """Best-effort eTLD+1 for a hostname. Never raises; junk in, junk out.
 
-    Inputs with no registrable part - a bare public suffix (``com``, ``co.uk``),
-    a single-label host (``localhost``), an unknown TLD's suffix - return the
-    normalized host itself, NOT ``''``. Callers treat ``''`` as "no opinion" and
-    skip their check, so collapsing these to empty would silently disable the
-    comparison instead of making it. An IP literal is returned normalized.
+    Input with no registrable part (a bare public suffix, a single-label host, an
+    unknown TLD's suffix) returns the normalized host itself, NOT ``''``. Callers treat
+    ``''`` as "no opinion" and skip their check, so collapsing these to empty would
+    silently disable the comparison instead of making it.
     """
     if not isinstance(host, str):
         return ''

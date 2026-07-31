@@ -20,12 +20,11 @@
   {% endif %}
 {% endmacro %}
 
-{# Country code → flag emoji; returns '' unless given a 2-letter string. #}
 {% macro flag(code) -%}
   {%- if code and code is string and code|length == 2 -%}
     {%- set up = code|upper -%}
     {%- set table = {'A':'🇦','B':'🇧','C':'🇨','D':'🇩','E':'🇪','F':'🇫','G':'🇬','H':'🇭','I':'🇮','J':'🇯','K':'🇰','L':'🇱','M':'🇲','N':'🇳','O':'🇴','P':'🇵','Q':'🇶','R':'🇷','S':'🇸','T':'🇹','U':'🇺','V':'🇻','W':'🇼','X':'🇽','Y':'🇾','Z':'🇿'} -%}
-    {# Regional indicators only render correctly when paired - build with two chars from the table #}
+    {# Regional indicators only render correctly when paired; build with two chars from the table #}
     {{- table.get(up[0], '') -}}{{- table.get(up[1], '') -}}
   {%- endif -%}
 {%- endmacro %}
@@ -48,8 +47,7 @@
 
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
 
-  {# abuse.ch envelopes arrive from a third-party client and are normalised defensively:
-     a missing or non-mapping `summary` must render an empty card, never raise. #}
+  {# abuse.ch envelopes come from a third-party client: a missing or non-mapping `summary` must render an empty card, never raise. #}
   {% set tf_env = threatfox if (threatfox is defined and threatfox is mapping) else none %}
   {% set uh_env = urlhaus if (urlhaus is defined and urlhaus is mapping) else none %}
   {% set tf_state = tf_env.get('state') if (tf_env and tf_env.get('state') is string) else '' %}
@@ -57,10 +55,9 @@
   {% set tf_sum = tf_env.get('summary') if (tf_env and tf_env.get('summary') is mapping) else {} %}
   {% set uh_sum = uh_env.get('summary') if (uh_env and uh_env.get('summary') is mapping) else {} %}
 
-  {# ipapi included: it is keyless, so on a deployment with no API keys at all it is
-     often the only source that answers. Leaving it out rendered a bare page.
-     abuse.ch counts too, but only when nothing identifies this as a domain report -
-     an IP that is known solely to ThreatFox/URLhaus must still get the IP verdict. #}
+  {# ipapi is included because it is keyless: on a deployment with no API keys it is often
+     the only source that answers, and leaving it out rendered a bare page. abuse.ch counts
+     only when nothing identifies this as a domain report. #}
   {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb
                         or ((tf_env or uh_env) and not has_domain_cards) %}
 
@@ -73,7 +70,7 @@
     {% set is_relay = (vpnapi.security.relay if vpnapi and vpnapi.security else false) | default(false, true) %}
     {# Which reputation sources actually answered. Geolocation sources are excluded:
        knowing where an IP is says nothing about whether it is hostile. `is defined`
-       matters - an absent key is Undefined, and `Undefined is not none` is true. #}
+       matters: an absent key is Undefined, and `Undefined is not none` is true. #}
     {% set rep_answered = [] %}
     {% if abuseipdb and abuseipdb.summary and abuseipdb.summary.risk_score is defined
           and abuseipdb.summary.risk_score is not none %}
@@ -98,11 +95,10 @@
       {% set _ = rep_answered.append('URLhaus') %}
     {% endif %}
 
-    {# ThreatFox names the malware family behind an IOC, so a `found` with a printable
-       family is a positive attribution, not an ambient signal; a high-confidence
-       botnet_cc IOC is live C2 infrastructure and bands as malicious on its own.
-       URLhaus counts only URLs still serving (`online_url_count`) - a host whose
-       payloads are all dead is history, not a live finding. #}
+    {# ThreatFox names the malware family behind an IOC, so a `found` with a printable family
+       is a positive attribution rather than an ambient signal, and a high-confidence
+       botnet_cc IOC bands as malicious alone. URLhaus counts only URLs still serving
+       (`online_url_count`): a host whose payloads are all dead is history, not a finding. #}
     {% set _tf_fam = tf_sum.get('malware') %}
     {% set tf_families = ([_tf_fam] if _tf_fam is string
                           else (_tf_fam | list if (_tf_fam is sequence and _tf_fam is not mapping) else []))
@@ -120,9 +116,8 @@
     {% set tf_live_c2 = tf_state == 'found' and tf_botnet_hits | length > 0 and tf_conf >= 75 %}
     {% set uh_live = uh_state == 'found' and (uh_sum.get('online_url_count') | int) > 0 %}
 
-    {# 'clean' is only honest when something was actually consulted. With every source
-       silent, abuse_score/pulses default to 0 and the anonymizer flags to false, which
-       previously rendered a green CLEAN badge for an IP nothing was known about. #}
+    {# 'clean' is only honest when something was actually consulted: with every source silent,
+       the defaults previously rendered a green CLEAN badge for an unknown IP. #}
     {% set verdict = 'malicious' if (abuse_score >= 50 or pulses >= 3 or is_tor or tf_live_c2)
                      else ('suspicious' if (abuse_score >= 1 or pulses >= 1 or is_vpn or is_proxy
                                             or tf_attributed or uh_live)
@@ -130,10 +125,9 @@
     {% set verdict_label = {'malicious': 'High Risk', 'suspicious': 'Suspicious',
                             'clean': 'Clean', 'unknown': 'No Reputation Data'} %}
 
-    {# Geo and ASN fall back across every source that carries them, rather than depending
-       on IPinfo alone. ip-api.com (`ipapi`) needs no key, so these render even with zero
-       API keys configured. Note parse_abuseipdb emits summary.country - the old fallback
-       read summary.countryName/country_code, which the parser never produces. #}
+    {# Geo and ASN fall back across every source that carries them, not IPinfo alone, so they
+       render with zero API keys (ip-api needs none). parse_abuseipdb emits summary.country;
+       the old fallback read summary.countryName/country_code, which the parser never produces. #}
     {% set cc = (ipinfo.country_code if ipinfo and ipinfo.country_code is defined else None)
               or (ipinfo.country if ipinfo and ipinfo.country and ipinfo.country|length == 2 else None)
               or (ipapi.countryCode if ipapi and ipapi.countryCode is defined else None)
@@ -182,8 +176,7 @@
           <div class="nt-verdict__stat">
             <span class="nt-verdict__stat-label">Network</span>
             <span class="nt-verdict__stat-value" title="{{ asn_name }}{% if asn_num %} ({{ asn_num }}){% endif %}">
-              {# nbsp after the separator so "· AS13335" wraps as one unit instead of
-                 leaving a dangling middot at the end of a line. #}
+              {# nbsp after the separator so "· AS13335" wraps as one unit instead of leaving a dangling middot. #}
               {% if asn_name %}{{ asn_name }}{% if asn_num %} ·&nbsp;{% endif %}{% endif %}{{ asn_num }}
             </span>
           </div>
@@ -472,7 +465,7 @@
           <p class="nt-card__section-title">Open Ports ({{ shodan.raw.ports|length }})</p>
           <div class="nt-port-cloud">
             {% for port in shodan.raw.ports %}
-              <span class="nt-port" title="{{ port.product or '' }} {{ port.version or '' }}{% if port.banner %} - {{ port.banner[:120] }}{% endif %}">
+              <span class="nt-port" title="{{ port.product or '' }} {{ port.version or '' }}{% if port.banner %}: {{ port.banner[:120] }}{% endif %}">
                 <span class="nt-port__num">{{ port.port }}</span>
                 {% if port.service %}<span class="nt-port__svc">{{ port.service }}</span>{% endif %}
               </span>
@@ -967,7 +960,7 @@
             <h3 class="nt-card__title">Reverse IP Domains</h3>
             <span class="nt-card__source">Rate Limited</span>
           </div>
-          <span class="text-yellow-400 text-sm">API count exceeded - increase quota with a paid plan or try again later.</span>
+          <span class="text-yellow-400 text-sm">API count exceeded. Increase quota with a paid plan or try again later.</span>
         </div>
       {% else %}
         <div class="nt-card">
@@ -1099,7 +1092,7 @@
 </div>
 {% endblock %}
 
-{# AlienVault OTX card - shared between IP and domain grids. #}
+{# AlienVault OTX card, shared between IP and domain grids. #}
 {% macro render_alienvault(alienvault) %}
   <div class="nt-card is-otx">
     <div class="nt-card__head">
@@ -1211,21 +1204,20 @@
   {% elif state == 'skipped' %}
     <div class="nt-otx-empty">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
-      <span>ABUSECH_AUTH_KEY not configured &mdash; this source was never queried</span>
+      <span>ABUSECH_AUTH_KEY not configured, so this source was never queried</span>
     </div>
   {% elif state != 'found' %}
     <div class="nt-otx-empty">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
-      <span>Lookup failed or the key was rejected &mdash; treat as no information</span>
+      <span>Lookup failed or the key was rejected; treat as no information</span>
     </div>
   {% endif %}
 {% endmacro %}
 
-{# abuse.ch ThreatFox - IOC attribution for an IP, domain or URL.
-   Every displayed string (family, threat type, tag, reference) is attacker-influenced
-   third-party text: it is escaped by autoescape and never marked |safe, and the
-   reference only becomes an anchor when it is http(s), so a `javascript:` reference
-   cannot execute in this app's origin (whose CSP allows 'unsafe-inline'). #}
+{# abuse.ch ThreatFox: IOC attribution for an IP, domain or URL. Every displayed string
+   (family, threat type, tag, reference) is attacker-influenced third-party text: escaped,
+   never |safe, and the reference only becomes an anchor when it is http(s), so a
+   `javascript:` reference cannot execute in this origin (whose CSP allows 'unsafe-inline'). #}
 {% macro render_threatfox(env) %}
   {% set e = env if env is mapping else {} %}
   {% set state = e.get('state') if e.get('state') is string else 'unavailable' %}
@@ -1301,7 +1293,7 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
     {% elif ref %}
-      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme - not rendered as a link">Reference: {{ ref }}</p>
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme, not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
     <details class="nt-raw"><summary>Show Raw Data</summary>
@@ -1310,7 +1302,7 @@
   </div>
 {% endmacro %}
 
-{# abuse.ch URLhaus - malware-distribution URLs seen on a host (IPv4 or domain).
+{# abuse.ch URLhaus: malware-distribution URLs seen on a host (IPv4 or domain).
    Same escaping rules as render_threatfox. #}
 {% macro render_urlhaus(env) %}
   {% set e = env if env is mapping else {} %}
@@ -1383,7 +1375,7 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
     {% elif ref %}
-      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme - not rendered as a link">Reference: {{ ref }}</p>
+      <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme, not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
     <details class="nt-raw"><summary>Show Raw Data</summary>

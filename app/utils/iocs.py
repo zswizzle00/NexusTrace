@@ -1,11 +1,10 @@
 """IOC extraction and defanging. Pure functions, stdlib only, no network.
 
-:func:`defang` / :func:`refang` convert an indicator between its live form
-(``http://evil.com``) and its report-safe form (``hxxp://evil[.]com``); defanging
-is idempotent because it refangs to a canonical form first.
-
-:func:`extract_iocs` errs toward precision over recall: prose ("e.g."), filenames
-("index.html"), and version strings ("1.2.3.4.5") must not become indicators.
+:func:`defang` / :func:`refang` convert an indicator between its live form and its
+report-safe form (``hxxp://evil[.]com``); defanging is idempotent because it refangs
+to a canonical form first. :func:`extract_iocs` errs toward precision over recall:
+prose ("e.g."), filenames ("index.html"), and version strings ("1.2.3.4.5") must not
+become indicators.
 """
 
 import ipaddress
@@ -91,14 +90,10 @@ _IOC_TYPES = ('url', 'ipv4', 'domain')
 
 
 def extract_iocs(text: str, *, limit: int = 200) -> list:
-    """Extract URLs, domains, and IPv4 addresses from ``text``, refanging first so
-    already-defanged text is still recognized. Returns at most ``limit`` deduped
-    ``{'type': 'url'|'domain'|'ipv4', 'value': <defanged>}`` items.
-
-    ``limit`` is shared round-robin between the types: filling it type-by-type let
-    a page with 250 links yield 200 URLs and zero domains or IPs, dropping the
-    contacted C2 host and address.
-    """
+    """URLs, domains and IPv4 addresses from ``text``, refanged first so already-defanged
+    text is still recognized; at most ``limit`` deduped, defanged ``{type, value}`` items.
+    ``limit`` is shared round-robin between the types: filling it type-by-type let a page
+    with 250 links yield 200 URLs and zero domains or IPs, dropping the contacted C2."""
     if not text:
         return []
 

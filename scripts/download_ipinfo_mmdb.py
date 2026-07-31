@@ -8,7 +8,6 @@ import shutil
 from pathlib import Path
 
 def download_ipinfo_mmdb():
-    """Download and extract the IPinfo Lite MMDB database."""
     data_dir = Path(__file__).parent.parent / "data"
     data_dir.mkdir(exist_ok=True)
 
@@ -18,7 +17,7 @@ def download_ipinfo_mmdb():
         print(f"MMDB database already exists at {mmdb_path}")
         return str(mmdb_path)
     
-    # Placeholder: the real URL comes from an IPinfo Lite plan dashboard.
+    # A placeholder: the real URL comes from an IPinfo Lite plan dashboard.
     download_url = "https://ipinfo.io/data/free/country_asn.mmdb.gz"
     
     print("Downloading IPinfo Lite MMDB database...")

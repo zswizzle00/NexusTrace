@@ -26,8 +26,7 @@ MOBILE_UA = (
     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 )
 
-# Consent/cookie-wall dismissal: click at most one control whose accessible name
-# matches. Deliberately narrow - we dismiss a wall, we do not explore the page.
+# Deliberately narrow: one click to dismiss a consent wall, not page exploration.
 _CONSENT_NAME = re.compile(r'accept|agree|consent|allow|got it|i understand', re.I)
 
 
@@ -43,8 +42,7 @@ def get_scan(scan_id: str) -> dict | None:
     try:
         raw = store('scans').read_text(_scan_key(scan_id))
     except ValueError:
-        # A scan_id the store's key allowlist rejects is a lookup miss, not a
-        # server error: this id comes straight off the URL path.
+        # scan_id comes off the URL path: a rejected key is a miss, not a 500.
         return None
     if raw is None:
         return None
@@ -54,8 +52,7 @@ def get_scan(scan_id: str) -> dict | None:
         return None
     if not isinstance(data, dict):
         return None
-    # Templates reach through `scan.page.get(...)` in a dozen places, so a null or
-    # non-dict `page` must be normalised here rather than guarded there.
+    # Normalised here, not at each of a dozen `scan.page.get(...)` template reads.
     page = data.get('page')
     data['page'] = page if isinstance(page, dict) else {}
     return data
@@ -63,8 +60,7 @@ def get_scan(scan_id: str) -> dict | None:
 
 def list_scans(limit: int = 100) -> list:
     scans = store('scans')
-    # One screenshot listing rather than an existence check per scan: on GCS that
-    # is one request instead of `limit` of them.
+    # One listing, not an existence check per scan: on GCS that is 1 request, not `limit`.
     shot_keys = {entry['key'] for entry in store('screenshots').list(suffix='.png')}
     result = []
     for entry in scans.list(suffix='.json', limit=limit):
@@ -91,17 +87,15 @@ def list_scans(limit: int = 100) -> list:
 
 
 def screenshot_key(scan_id: str, label: str | None = None) -> str:
-    """Store key for a scan's screenshot. ``label=None`` is the full-page shot and
-    keeps the original ``<id>.png`` name, so pre-staged-capture scans and
-    ``list_scans``' has_screenshot check keep working."""
+    """``label=None`` is the full-page shot and keeps the original ``<id>.png`` name,
+    so pre-staged-capture scans and ``list_scans``' has_screenshot check keep working."""
     if label:
         return f'{scan_id}-{label}.png'
     return f'{scan_id}.png'
 
 
 def screenshot_local_path(scan_id: str, label: str | None = None):
-    """The screenshot's filesystem path, or None when there is none to serve from
-    disk - either the key is absent or the backend is not local."""
+    """None when the key is absent *or* the backend is not local."""
     try:
         return store('screenshots').local_path(screenshot_key(scan_id, label))
     except ValueError:
@@ -109,7 +103,6 @@ def screenshot_local_path(scan_id: str, label: str | None = None):
 
 
 def screenshot_stream(scan_id: str, label: str | None = None):
-    """The screenshot's bytes as a file object, or None when absent."""
     try:
         return store('screenshots').open_stream(screenshot_key(scan_id, label))
     except ValueError:
@@ -157,12 +150,11 @@ def reverse_ptr(ip: str) -> list:
 
 def lookup_asn(ip: str) -> dict | None:
     try:
-        # Team Cymru DNS-based ASN lookup - no API key needed
         parts = ip.split('.')
         if len(parts) == 4:
             query = '.'.join(reversed(parts)) + '.origin.asn.cymru.com'
         else:
-            # IPv6 - skip for now
+            # Cymru's origin zone is IPv4-only.
             return None
         res = dns.resolver.Resolver()
         res.lifetime = 4
@@ -218,7 +210,7 @@ def inspect_certificate(host: str, port: int = 443) -> dict | None:
             with ctx.wrap_socket(raw, server_hostname=host) as sock:
                 cert = sock.getpeercert()
                 authorized = bool(cert)
-                # A second, verifying connection: the first one only proves a cert
+                # A second, verifying connection: the first proves only that a cert
                 # was *offered*, not that it validates.
                 try:
                     ctx2 = ssl.create_default_context()
@@ -268,12 +260,10 @@ _SECURITY_RULES = [
 ]
 
 
-# Content types that mean "an executable or archive was served", not "a page to
-# read". An *absent* type is deliberately NOT a payload - too many ordinary
-# misconfigured servers omit it. Formats browsers render inline and that are
-# overwhelmingly benign (notably application/pdf) are excluded too: including PDF
-# made every site with one read as "suspicious". A genuinely malicious download is
-# still caught by the browser download path, which hashes whatever arrives.
+# An *absent* content type is deliberately NOT a payload - too many misconfigured
+# servers omit it. Inline-rendered benign formats are excluded too: including
+# application/pdf made every site hosting one read as "suspicious". A genuinely malicious
+# download is still caught by the browser download path.
 _PAYLOAD_CONTENT_TYPES = (
     'application/octet-stream',
     'application/x-msdownload',
@@ -302,18 +292,15 @@ def _is_payload_content_type(content_type: str | None) -> bool:
     return base in _PAYLOAD_CONTENT_TYPES
 
 
-# Largest response body we will pull into memory to hash. The body arrives as one
-# bytes object (Playwright's APIResponse has no streaming read) at a size the
-# target chooses, so without a cap one hostile multi-GB application/zip can OOM
-# the whole process - which serves every scan, the deployment being one worker
-# with eight threads. Above the cap sha256 stays None: a missing hash beats a dead
-# server.
+# The body arrives as one bytes object (Playwright's APIResponse has no streaming read)
+# at a size the target chooses, so without a cap one hostile multi-GB zip can OOM the
+# single-worker process serving every scan. Above it sha256 stays None: a missing hash
+# beats a dead server.
 MAX_PAYLOAD_HASH_BYTES = 25 * 1024 * 1024
 
-# A dropper navigation legitimately raises in page.goto(): Chromium turns it into
-# a download and aborts the navigation. These markers distinguish that expected
-# abort from a real failure (timeout, DNS, TLS) so a genuine navigation failure is
-# not erased just because a download also fired.
+# A dropper navigation legitimately raises in page.goto(): Chromium turns it into a
+# download and aborts. These markers separate that expected abort from a real
+# failure (timeout, DNS, TLS), so a genuine failure is not erased by a download.
 _DOWNLOAD_ABORT_MARKERS = (
     'download is starting',
     'net::err_aborted',
@@ -335,12 +322,11 @@ def _declared_content_length(headers: dict) -> int | None:
 
 
 def _hash_response_body(response, headers: dict, label: str):
-    """``(sha256, size_bytes)`` for a payload response, subject to a size cap.
+    """``(sha256, size_bytes)``; never raises, ``sha256=None`` above the cap.
 
-    Never raises; returns ``sha256=None`` above :data:`MAX_PAYLOAD_HASH_BYTES`. The
-    declared ``content-length`` is checked *first*, so a hostile multi-gigabyte body
-    is never pulled into memory at all; ``len(body)`` is re-checked as a backstop for
-    chunked responses, which declare no length.
+    The declared ``content-length`` is checked *first*, so a hostile multi-gigabyte
+    body is never pulled into memory at all; ``len(body)`` is re-checked as a backstop
+    for chunked responses, which declare no length.
     """
     declared = _declared_content_length(headers)
     if declared is not None and declared > MAX_PAYLOAD_HASH_BYTES:
@@ -522,22 +508,16 @@ MAX_REDIRECT_HOPS = 20
 
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
-# `context.route_web_socket` needs its own scheme check because
-# `validate_target`/`normalize` are scoped to http(s) - see `_validate_ws_target`.
 _WS_SCHEME_MAP = {'ws': 'http', 'wss': 'https'}
 
 
 def _record_block(scan: dict, seen: set, url: str, reason: str, kind: str = 'blocked') -> None:
-    """Append one entry to ``scan['blocked_requests']``.
+    """Deduped because `page.goto`'s retry re-walks and re-validates the whole chain on
+    the same URL, which would otherwise double every entry.
 
-    Deduped: `page.goto`'s internal retry (see `run_scan`) re-walks and re-validates
-    the whole chain on the same URL, which would otherwise double every entry.
-
-    ``kind`` distinguishes an actual security block (``'blocked'``) from a transport
-    failure (``'network_error'`` - DNS, connection refused, TLS, per-hop timeout) so
-    the two are not presented to the analyst as the same thing. ``reason`` is capped
-    independently of ``url`` - an exception message can be arbitrarily long where a
-    URL is naturally bounded.
+    ``kind`` separates a security block from a transport failure (``'network_error'``) so
+    the two are not shown to the analyst as the same thing. ``reason`` is capped
+    independently of ``url``: an exception message can be arbitrarily long.
     """
     url = (url or '')[:500]
     reason = (reason or '')[:300]
@@ -560,9 +540,8 @@ def _same_origin(url_a: str, url_b: str) -> bool:
 
 def _strip_cross_origin_secrets(headers: dict | None, from_url: str, to_url: str) -> dict | None:
     """A browser drops ``Authorization``/``Cookie`` when a redirect crosses origins;
-    Playwright's ``Route.fetch`` / ``APIRequestContext.fetch`` do not - they forward
-    whatever headers were passed (or the original request's headers, verbatim) to
-    *any* URL handed to them. So strip them here rather than rely on the library.
+    Playwright's ``Route.fetch``/``APIRequestContext.fetch`` do not - they forward the
+    original request's headers verbatim to *any* URL handed to them.
     """
     if not headers or _same_origin(from_url, to_url):
         return headers
@@ -570,11 +549,9 @@ def _strip_cross_origin_secrets(headers: dict | None, from_url: str, to_url: str
 
 
 def _resolve_display_ip(host: str | None, resolver) -> str | None:
-    """Best-effort: the address ``validate_target`` actually judged ``host`` by.
-
-    A fulfilled response has no ``server_addr()``, so this is the only way left to
-    know the main document's real IP. ``resolver`` is the per-scan
-    ``caching_resolver``, so for a just-validated host this is a memoized lookup.
+    """The address ``validate_target`` actually judged ``host`` by. A fulfilled
+    response has no ``server_addr()``, so this is the only way left to know the main
+    document's real IP; ``resolver`` is the per-scan cache, so it is a memoized lookup.
     """
     if not host:
         return None
@@ -590,21 +567,19 @@ def _resolve_display_ip(host: str | None, resolver) -> str | None:
 
 
 def _is_main_frame_navigation(request, page) -> bool:
-    """Only the frame we actually drive may write ``nav_state``.
-
-    Two confirmed bypasses, both of which falsify the page's reported
-    DNS/TLS/ASN/PTR/WHOIS (and the ``cross_domain_redirect`` verdict signal) by
-    pointing ``primary_host`` at an attacker-chosen host:
+    """Only the frame we actually drive may write ``nav_state``. Two confirmed bypasses,
+    both falsifying the page's reported DNS/TLS/ASN/PTR/WHOIS (and the
+    ``cross_domain_redirect`` signal) by pointing ``primary_host`` at an attacker's host:
 
     * a hostile ``<iframe src="...">`` - its document request is also
       ``resource_type == 'document'``;
-    * a ``window.open`` popup - its main frame also has ``parent_frame is None``,
-      so a parent check alone lets a popup that navigates itself, or one opened at
+    * a ``window.open`` popup - its main frame also has ``parent_frame is None``, so a
+      parent check alone lets a popup that navigates itself, or one opened at
       ``about:blank`` and then steered by its opener, write ``nav_state``.
 
-    Identity against the driven page's main frame is what separates them. Fails
-    closed: a missing ``page`` or any raising attribute (service-worker requests,
-    popup navigations issued before their frame exists) means "not main frame".
+    Identity against the driven page's main frame is what separates them. Fails closed: a
+    missing ``page`` or any raising attribute (service-worker requests, popup navigations
+    issued before their frame exists) means "not main frame".
     """
     try:
         if page is None or not request.is_navigation_request():
@@ -615,33 +590,24 @@ def _is_main_frame_navigation(request, page) -> bool:
 
 
 def _chase_redirects(fetch_one, start_url: str, resolver, *, method='GET', headers=None, post_data=None):
-    """Validate and follow a redirect chain one hop at a time, so every ``Location``
-    is checked *before* it is ever handed to Chromium. Deliberately the single
-    implementation of "validate every hop" - ``run_scan``'s pre-flight and
-    ``_install_fetch_guard``'s backstop both call this rather than duplicating it.
+    """Follow a redirect chain one hop at a time so every ``Location`` is validated
+    *before* it is handed to Chromium. Deliberately the single implementation of "validate
+    every hop": ``run_scan``'s pre-flight and ``_install_fetch_guard``'s backstop both
+    call this rather than duplicating it.
 
-    ``fetch_one(url, method, headers, post_data)`` must perform one hop with redirects
-    disabled and return a Playwright response-like object exposing ``.status`` (int)
-    and ``.headers`` (a ``str -> str`` mapping with ``.get``). ``Route.fetch`` and
-    ``APIRequestContext.fetch`` both satisfy it through a small adapter closure at
-    each call site, since their parameter names/positions differ.
-
-    Redirect semantics: a 301/302/303 downgrades the method to GET and drops the body,
-    matching a real browser on those three codes (307/308 preserve both). Headers are
-    stripped of ``Authorization``/``Cookie`` on any origin-crossing hop (see
-    ``_strip_cross_origin_secrets``) - browsers always do this; Playwright's fetch
+    ``fetch_one(url, method, headers, post_data)`` performs one hop with redirects
+    disabled, returning an object with ``.status`` and ``.headers``; ``Route.fetch`` and
+    ``APIRequestContext.fetch`` each satisfy it via an adapter closure, their parameter
+    names differing. A 301/302/303 downgrades the method to GET and drops the body,
+    matching a browser (307/308 preserve both), and ``Authorization``/``Cookie`` are
+    stripped on any origin-crossing hop - browsers always do this, Playwright's fetch
     does not.
 
-    Returns ``(outcome, payload)``:
-
-    - ``('ok', {'final_url', 'final_response', 'chain', 'final_ip'})`` - the final,
-      non-redirect response, plus every hop walked to reach it.
-    - ``('blocked', {'url', 'reason', 'chain'})`` - a hop failed SSRF validation, the
-      hop cap was hit, or a redirect status carried no ``Location`` to follow.
-    - ``('error', {'url', 'reason', 'chain'})`` - a hop transport-failed (DNS,
-      connection refused, TLS, per-hop timeout). Deliberately distinct from
-      ``'blocked'`` so callers do not present "the site was unreachable" as "this
-      target is unsafe".
+    Returns ``(outcome, payload)``: ``('ok', {'final_url', 'final_response', 'chain',
+    'final_ip'})``; ``('blocked', {'url', 'reason', 'chain'})`` for failed SSRF
+    validation, the hop cap, or a redirect with no ``Location``; or ``('error', ...)`` for
+    a transport failure - deliberately distinct from ``'blocked'`` so callers do not
+    present "unreachable" as "unsafe".
     """
     current_url = start_url
     current_method = method
@@ -690,55 +656,49 @@ def _chase_redirects(fetch_one, start_url: str, resolver, *, method='GET', heade
 
 
 def _install_fetch_guard(context, scan: dict, resolver, seen_blocks: set, page_ref: dict) -> dict:
-    """Re-validate every request Chromium makes, not just the URL we were given.
+    """Re-validate every request Chromium makes, not just the URL we were given. Closes
+    two vectors: a **redirect** to 127.0.0.1 or 169.254.169.254, which Chromium follows
+    itself after ``is_scannable`` vetted only the submitted URL; and **subresources** like
+    ``<img src="http://10.0.0.5:8080/">``, whose status and ``server_ip`` ``on_response``
+    records into the rendered ``scan['transactions']``, leaking internal liveness.
 
-    ``page_ref`` is a one-key holder the caller fills with ``{'page': page}`` after
+    ``page_ref`` is a holder the caller fills with ``{'page': page}`` after
     ``context.new_page()``: the guard installs before the page exists, but
     ``_is_main_frame_navigation`` needs page identity. Until filled it fails closed.
 
-    Two vectors this closes: a **redirect** to 127.0.0.1 or 169.254.169.254, which
-    Chromium follows itself after ``is_scannable`` vetted only the submitted URL; and
-    **subresources** like ``<img src="http://10.0.0.5:8080/">``, whose status and
-    ``server_ip`` ``on_response`` records into the rendered ``scan['transactions']``,
-    leaking internal service liveness.
-
-    **Why navigations are chased manually (`_chase_redirects`), not
-    `route.continue_()`.** `route.continue_()` invokes this handler once per *request
-    object*: when a routed request's response is itself a redirect, Chromium follows
-    it internally and the redirected URL never reaches the handler again (verified
-    against Playwright 1.61 / Chromium 149; tracked upstream in
-    microsoft/playwright#34994 and #13817). Re-emitting the redirect verbatim via
-    `route.fulfill()` was tried and rejected: `page.url` stays correct, but Chromium
-    follows *that* redirect the same unrouted way, so the target is never revalidated.
+    **Why navigations are chased manually (`_chase_redirects`), not `route.continue_()`.**
+    `route.continue_()` invokes this handler once per *request object*: when a routed
+    request's response is itself a redirect, Chromium follows it internally and the
+    redirected URL never reaches the handler again (verified against Playwright 1.61 /
+    Chromium 149; tracked upstream in microsoft/playwright#34994 and #13817). Re-emitting
+    the redirect verbatim via `route.fulfill()` was tried and rejected: `page.url` stays
+    correct, but Chromium follows *that* redirect the same unrouted way, so the target is
+    never revalidated.
 
     **Why `run_scan` pre-flights the chain and this handler is only a backstop.**
     Fulfilling the *original* request with a *later* hop's body pinned `page.url`,
-    `document.baseURI`, the page's origin/secure-context, relative subresource
-    resolution, and `Secure` cookies to the pre-redirect URL - wrong for the common
-    bare-domain scan that redirects to https. `run_scan` walks the chain itself (via
-    `context.request`, before `page.goto`) and navigates straight to the validated
-    final URL. Still not simplified away: a server can vary redirects by cookie, UA,
-    or time, and this is what catches and validates a second redirect.
+    `document.baseURI`, the page's origin/secure-context, relative subresource resolution
+    and `Secure` cookies to the pre-redirect URL - wrong for the common bare-domain scan
+    that redirects to https. `run_scan` walks the chain itself (via `context.request`,
+    before `page.goto`) and navigates straight to the validated final URL. Still not
+    simplified away: a server can vary redirects by cookie, UA or time, and this is what
+    catches and validates a second redirect.
 
-    **Iframes and popups.** A subframe's *and* a popup's main document request are
-    also `resource_type == 'document'`, so both run the chase-and-fulfill path (their
-    own safety matters), but only the driven page's own main frame may write
-    `nav_state` - see `_is_main_frame_navigation`. Without that check, `<iframe
-    src="...">` or `window.open` could make the guard report the attacker's URL as the
-    page's own and, through `primary_host`, falsify its DNS/TLS/ASN/PTR/WHOIS.
+    A subframe's *and* a popup's main document request are also `resource_type ==
+    'document'`, so both run the chase-and-fulfill path (their own safety matters), but
+    only the driven page's own main frame may write `nav_state` - see
+    `_is_main_frame_navigation` for what that check prevents.
 
-    Non-document resource types keep the simpler validate-then-`continue_()` path:
-    their *own* URL is validated, but a subresource whose URL redirects to a blocked
-    target is not re-validated on that hop, for the same upstream reason above. That
-    gap is closed at the persistence boundary in `run_scan`, by filtering
-    `transactions`/`domains`/`ips` before they are stored. Fetching every subresource
-    here instead would double-buffer every asset and spread the origin problem above
-    to each of them.
+    Non-document resource types keep the simpler validate-then-`continue_()` path: their
+    *own* URL is validated, but a subresource whose URL redirects to a blocked target is
+    not re-validated on that hop, for the same upstream reason above. That gap is closed
+    at the persistence boundary in `run_scan`, by filtering `transactions`/`domains`/`ips`
+    before they are stored. Fetching every subresource here instead would double-buffer
+    every asset and spread the origin problem above to each of them.
 
-    **WebSockets are not covered here at all.** `context.route`/`Route.fetch` never
-    see a WebSocket handshake - verified: a page's own
-    `new WebSocket('ws://internal-host/')` reaches the target without this handler
-    running. `_install_websocket_guard`, installed alongside it in `run_scan`, uses
+    **WebSockets are not covered here at all.** `context.route`/`Route.fetch` never see a
+    WebSocket handshake - verified: a page's own `new WebSocket('ws://internal-host/')`
+    reaches the target without this handler running. `_install_websocket_guard` uses
     Playwright's separate `BrowserContext.route_web_socket` for `ws(s)://`.
     """
     nav_state = {'final_url': None, 'chain': [], 'final_ip': None}
@@ -759,8 +719,7 @@ def _install_fetch_guard(context, scan: dict, resolver, seen_blocks: set, page_r
             try:
                 route.continue_()
             except Exception:
-                # The page may have navigated away before we resumed this
-                # route; a dead route is not an error worth failing the scan.
+                # The page may have navigated away; a dead route is not worth failing on.
                 pass
             return
 
@@ -804,13 +763,10 @@ def _install_fetch_guard(context, scan: dict, resolver, seen_blocks: set, page_r
 
 
 def _validate_ws_target(url: str, resolver) -> None:
-    """Validate a WebSocket URL's host/port with the same SSRF rules as
-    `validate_target`, minus `url_guard`'s http(s)-only scheme gate.
-
-    That module is deliberately scoped to http(s), so calling `validate_target` on a
-    `ws(s)://` URL directly would reject every WebSocket on scheme alone regardless
-    of host/port safety. Remapping `ws`->`http` and `wss`->`https` reuses the exact
-    same host/IP logic without touching `url_guard`.
+    """Same SSRF rules as `validate_target`, minus `url_guard`'s http(s)-only scheme
+    gate: that module is deliberately scoped to http(s), so passing a `ws(s)://` URL
+    straight in would reject every WebSocket on scheme alone regardless of host/port
+    safety. Remapping the scheme reuses the same host/IP logic untouched.
     """
     scheme, sep, rest = (url or '').partition('://')
     mapped = _WS_SCHEME_MAP.get(scheme.lower())
@@ -820,9 +776,9 @@ def _validate_ws_target(url: str, resolver) -> None:
 
 
 def _install_websocket_guard(context, scan: dict, resolver, seen_blocks: set) -> None:
-    """Close the WebSocket gap `_install_fetch_guard` cannot reach (see its
-    docstring). Blocking means never calling `connect_to_server()` - the outbound
-    connection is only made once that is called, so an unsafe target is never dialed.
+    """Close the WebSocket gap `_install_fetch_guard` cannot reach. Blocking means never
+    calling `connect_to_server()` - the outbound connection is made only once that is
+    called, so an unsafe target is never dialed.
     """
     def ws_handler(ws_route):
         try:
@@ -848,8 +804,8 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
     scan_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat() + 'Z'
 
-    # Full scaffold up front so templates rendering an early error scan (one that
-    # never reached playwright) see the same shape as a mid-flight failure.
+    # Full scaffold up front so a scan that errored before playwright renders with the
+    # same shape as a mid-flight failure.
     scan = {
         'id': scan_id,
         'url': raw_url.strip(),
@@ -890,8 +846,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
         scan['error'] = str(exc)
         return scan
 
-    # The canonical normalized form, not the raw input, so everything downstream
-    # (navigation, hostname extraction, rendering) agrees on one URL.
+    # Normalized, not raw, so navigation/hostname/rendering all agree on one URL.
     scan['url'] = target.url
     url = target.url
 
@@ -909,20 +864,16 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
             )
             # One resolver per scan: hosts resolve once, and the cache dies with the scan.
             guard_resolver = caching_resolver()
-            # Shared across both guards and the pre-flight so a retried navigation
-            # does not double every blocked_requests entry.
+            # Shared by both guards and the pre-flight so a retried navigation does not
+            # double every blocked_requests entry.
             seen_blocks: set = set()
-            # Filled right after context.new_page(); the guard must be installed
-            # first, and fails closed until then.
+            # Filled right after new_page(); the guard installs first and fails closed.
             page_ref: dict = {}
             nav_state = _install_fetch_guard(context, scan, guard_resolver, seen_blocks, page_ref)
             _install_websocket_guard(context, scan, guard_resolver, seen_blocks)
 
-            # Pre-flight: validate and follow the redirect chain via the context's
-            # own request API - no page/frame involved yet - so page.goto() below
-            # navigates straight to the validated final URL. See
-            # _install_fetch_guard's docstring for why this fixes the origin/baseURI
-            # mismatch, and why the in-handler chase stays installed as a backstop.
+            # Pre-flight via the context's own request API - no page/frame yet - so
+            # page.goto() navigates straight to the validated final URL; see below.
             def preflight_fetch_one(hop_url, hop_method, hop_headers, hop_post_data):
                 return context.request.fetch(
                     hop_url, method=hop_method, headers=hop_headers,
@@ -946,10 +897,9 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
             goto_url = preflight_payload['final_url']
             preflight_chain = preflight_payload['chain']
             preflight_final_ip = preflight_payload['final_ip']
-            # An already-fetched context.request response for goto_url. Unlike
-            # main_response below it is never None - a dropper navigation makes
+            # Unlike main_response below, never None: a dropper navigation makes
             # page.goto() raise "Download is starting", leaving main_response None for
-            # exactly the case payload capture exists for - so content-type, body and
+            # exactly the case payload capture exists for. So content-type, body and
             # sha256 are sourced from here, not from main_response.
             preflight_final_response = preflight_payload['final_response']
 
@@ -993,9 +943,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                     console_msgs.append({'type': msg.type, 'text': msg.text[:500]})
             page.on('console', on_console)
 
-            # A dropper URL never renders: Chromium turns it into a download and
-            # page.goto raises. Capture the file itself - its hash is the only
-            # useful evidence, and it pivots straight into the hash lookup.
+            # A dropper never renders (page.goto raises); its hash is the evidence.
             downloads = []
 
             def on_download(download):
@@ -1032,35 +980,28 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
 
             page.wait_for_timeout(1500)
 
-            # Snapshot nav_state now that navigation has settled, and use only the
-            # snapshot from here on: nav_state is mutable and the fetch guard keeps
-            # updating it for the life of the page, including during the staged
-            # screenshots below (which wait seconds and click a consent button). A
-            # late main-frame navigation there would leave main_ip/ASN/PTR describing
-            # host B while final_url/DNS/TLS/WHOIS describe host A.
+            # Use only the snapshot from here on: the guard keeps mutating nav_state for
+            # the life of the page, including during the staged screenshots below. A late
+            # main-frame navigation would leave main_ip/ASN/PTR on host B while
+            # final_url/DNS/TLS/WHOIS describe host A.
             nav_snapshot = {
                 'final_url': nav_state.get('final_url'),
                 'final_ip': nav_state.get('final_ip'),
                 'chain': list(nav_state.get('chain') or []),
             }
 
-            # The pre-flight already walked and validated every hop up to `goto_url`.
-            # `nav_snapshot['chain']` comes from the in-handler backstop on the real
-            # navigation: ordinarily one non-redirecting hop at `goto_url`, which
-            # replaces the pre-flight's terminal entry for the same URL - that is what
-            # `[:-1] + chain` does. If the real navigation redirected *again*, the
-            # chain starts at `goto_url` and correctly extends past it.
+            # `nav_snapshot['chain']` is the backstop's view of the real navigation:
+            # ordinarily one non-redirecting hop at `goto_url`, replacing the pre-flight's
+            # terminal entry for the same URL - hence `[:-1] + chain`. A second redirect
+            # correctly extends past it.
             if nav_snapshot['chain']:
                 scan['redirects'] = preflight_chain[:-1] + nav_snapshot['chain']
             else:
                 scan['redirects'] = preflight_chain
 
-            # Staged screenshots: on load, after scrolling (lazy content), and after
-            # dismissing a consent wall - frequently the only frame showing a phish's
-            # real content. Deliberately *before* the in-page extraction below: the
-            # post-consent DOM is the one worth analysing. Extracting meta first meant
-            # the verdict, forms and IOCs were computed from the consent wall rather
-            # than the page it hid, and a consent-click download never became a payload.
+            # Deliberately *before* the in-page extraction below: extracting meta first
+            # computed the verdict, forms and IOCs from the consent wall rather than the
+            # page it hid, and a consent-click download never became a payload.
             def _capture(label, full_page=False):
                 try:
                     shot = page.screenshot(full_page=full_page, type='png')
@@ -1091,8 +1032,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 # No consent wall, or it did not yield to one narrow click. Fine.
                 pass
 
-            # Full-page shot last, under the original unlabeled name, so the existing
-            # template and list_scans keep working unchanged.
+            # Last, and unlabeled, so the template and list_scans keep working unchanged.
             full_page_screenshot_url = None
             try:
                 shot_bytes = page.screenshot(full_page=True, type='png')
@@ -1101,7 +1041,6 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
             except Exception as exc:
                 logger.debug('Full-page screenshot failed: %s', exc)
 
-            # In-page metadata (post-consent DOM - see the note above)
             meta = page.evaluate('''() => {
                 const attr = (sel, a) => { const el = document.querySelector(sel); return el ? el.getAttribute(a) : null; };
                 const icon = document.querySelector('link[rel~="icon"]');
@@ -1124,14 +1063,12 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 };
             }''')
 
-            # The pre-flight/backstop's validated URL is what was actually navigated
-            # to and rendered; page.url is only a fallback for the should-not-happen
-            # case where neither ran.
+            # The validated URL is what was navigated to and rendered; page.url is only
+            # a fallback for the should-not-happen case where neither guard ran.
             final_url = nav_snapshot['final_url'] or goto_url or page.url
-            # A download navigation leaves main_response None, so header-derived
-            # analysis (security grading, tech fingerprinting) reported "few or no
-            # security headers" and zero technologies for every dropper URL despite
-            # the pre-flight response for the same URL being in hand. Fall back to it.
+            # A download navigation leaves main_response None, which made header-derived
+            # analysis (security grading, tech fingerprinting) report "no security
+            # headers" and zero technologies for every dropper URL. Fall back to these.
             preflight_headers = dict(preflight_final_response.headers or {})
             scan['page'] = {
                 'final_url': final_url,
@@ -1147,15 +1084,12 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 'screenshot_url': full_page_screenshot_url,
             }
 
-            # Evidence for the brand-impersonation heuristic, capped so a giant page
-            # cannot bloat the stored scan.
+            # Brand-impersonation evidence, capped so a giant page cannot bloat the scan.
             scan['visible_text'] = (meta.get('visible_text') or '')[:20000]
 
-            # An explicit download wins; otherwise a main response whose content-type
-            # is a file rather than a document. Sourced from the pre-flight's
-            # final_response, not main_response: a genuine dropper makes page.goto()
-            # raise, leaving main_response None in exactly the case this exists for,
-            # while the pre-flight response was already fetched successfully.
+            # Sourced from the pre-flight's final_response, not main_response: a genuine
+            # dropper makes page.goto() raise, leaving main_response None in exactly the
+            # case this exists for, while the pre-flight response was already fetched.
             main_content_type = preflight_headers.get('content-type')
 
             payload = None
@@ -1168,10 +1102,8 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                     'filename': first['filename'],
                     'is_payload': True,
                 }
-                # page.goto() raising ("Download is starting" / net::ERR_ABORTED) on a
-                # captured download is expected, not a scan failure. Clear *only* that
-                # error: blanket-clearing scan['error'] whenever a download appeared
-                # reported a genuine coincident double-timeout as status='done'.
+                # Clear *only* a download abort: blanket-clearing scan['error'] whenever
+                # a download appeared reported a coincident double-timeout as 'done'.
                 if nav_error is not None and _is_download_abort(nav_error):
                     scan['error'] = None
             elif _is_payload_content_type(main_content_type):
@@ -1201,8 +1133,6 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 for c in context.cookies()
             ]
 
-            # Forms are phishing evidence: a password field on an unexpected host is
-            # the strongest single tell the rule engine has (see scan_rules.py).
             scan['forms'] = [
                 {
                     'action': (f.get('action') or None),
@@ -1215,14 +1145,12 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 for f in (meta.get('forms') or [])
             ]
 
-            # Drop any transaction whose own URL, or resolved server IP, would not
-            # pass the guard. A subresource redirect is not re-validated on its own
-            # hop by the per-request guard (see _install_fetch_guard's docstring) -
-            # the connection has already happened by the time it reaches on_response,
-            # but its status/server_ip was still landing in the rendered report,
-            # turning the scanner into an internal port/liveness oracle. This does not
-            # stop the connection (nothing short of egress control does); it stops the
-            # report from repeating the answer.
+            # A subresource redirect is not re-validated on its own hop by the
+            # per-request guard (see _install_fetch_guard) - the connection has already
+            # happened by the time it reaches on_response, but its status/server_ip still
+            # landed in the report, making the scanner an internal port/liveness oracle.
+            # This does not stop the connection (nothing short of egress control does); it
+            # stops the report repeating the answer.
             def _passes_report_guard(txn: dict) -> bool:
                 if not is_scannable(txn.get('url'), resolver=guard_resolver):
                     return False
@@ -1284,13 +1212,11 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                     if final_url.startswith('https'):
                         scan['tls'] = inspect_certificate(primary_host)
 
-            # Prefer the address the guard itself validated for the final hop: a
-            # fulfilled response has no server_addr(), so the main document's
-            # transaction carries server_ip=None on every scan, and the fallbacks
-            # below would silently pick the lowest-sorted *subresource* IP (a CDN, an
-            # analytics host) and compute ASN/PTR from that wrong address. The
-            # fallbacks stay, in order, for what nav_state/pre-flight cannot populate
-            # (an IP-literal target, or a scan that errored before either ran).
+            # Prefer the address the guard validated for the final hop: a fulfilled
+            # response has no server_addr(), so the main document's transaction carries
+            # server_ip=None on every scan, and the fallbacks would silently pick the
+            # lowest-sorted *subresource* IP (a CDN) and compute ASN/PTR from it. They stay,
+            # in order, for what nav_state/pre-flight cannot populate (an IP literal).
             primary_txn = next(
                 (t for t in transactions if _safe_hostname(t['url']) == primary_host and t.get('server_ip')),
                 None,
@@ -1316,11 +1242,9 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
 
             scan['verdict'] = score_scan(scan)
 
-            # IOCs from what the page said and where it went, defanged by extract_iocs
-            # so nothing in the report is clickable by accident. Order matters:
-            # extract_iocs takes each type in the order it appears, so the small,
-            # high-value set of hosts/addresses actually *contacted* leads, ahead of
-            # the potentially hundreds of links merely advertised.
+            # Order matters: extract_iocs takes each type in the order it appears, so the
+            # small, high-value set of hosts actually *contacted* must lead, ahead of the
+            # potentially hundreds of links merely advertised.
             ioc_corpus = '\n'.join(
                 [d['domain'] for d in (scan.get('domains') or [])]
                 + (scan.get('ips') or [])

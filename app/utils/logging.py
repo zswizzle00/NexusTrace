@@ -3,7 +3,6 @@ import logging.handlers
 import os
 
 def setup_logging(app):
-    """Setup logging for the application."""
     if not os.path.exists('logs'):
         os.makedirs('logs')
 

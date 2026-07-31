@@ -4,15 +4,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 def setup_health_services(app):
-    """Setup health check services."""
     pass
 
 def check_health():
-    """Liveness check polled by orchestrators / load balancers.
-
-    Must stay fast and self-contained: no external network calls, and no failing on
-    optional config. Every API key is optional, so configured integrations are
-    informational only and never flip the status to unhealthy.
+    """Polled by orchestrators / load balancers, so it must stay fast and
+    self-contained: no external network calls, and no failing on optional config. Every
+    API key is optional, so configured integrations never flip the status to unhealthy.
     """
     optional_keys = [
         'VPNAPI_KEY', 'IPINFO_TOKEN', 'SHODAN_KEY', 'ABUSEIPDB_KEY',

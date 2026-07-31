@@ -1,4 +1,3 @@
-"""URL scanner routes."""
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, send_file, abort, flash
 from ..services.scan_service import (
@@ -30,7 +29,7 @@ def _scan_record_key(scan_id):
 def _screenshot_keys(scan_id):
     """Every screenshot stored for a scan: the full-page `<id>.png` plus each staged
     `<id>-<stage>.png`. Enumerated from the store, not from the record's
-    `screenshots` list - a frame the record never mentioned still has to go."""
+    `screenshots` list; a frame the record never mentioned still has to go."""
     full = screenshot_key(scan_id)
     prefix = f'{scan_id}-'
     return [entry['key'] for entry in store('screenshots').list(suffix='.png')
@@ -112,7 +111,7 @@ def url_scan_screenshot(scan_id):
     stage = request.args.get('stage')
     if stage is not None and stage not in ('load', 'after-scroll', 'after-consent'):
         abort(404)
-    # Served from disk when the store is local, and from its bytes otherwise -
+    # Served from disk when the store is local, and from its bytes otherwise;
     # a GCS-backed screenshot has no filesystem path.
     path = screenshot_local_path(scan_id, stage)
     if path is not None:

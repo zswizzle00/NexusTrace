@@ -83,7 +83,7 @@
   </div>
 
   <div class="mb-3 flex items-center justify-between">
-    <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Requests &mdash; last {{ days }} day{{ '' if days == 1 else 's' }}</h2>
+    <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Requests, last {{ days }} day{{ '' if days == 1 else 's' }}</h2>
     <span class="text-xs text-gray-500 font-mono">{{ total }} record{{ '' if total == 1 else 's' }}</span>
   </div>
 
@@ -106,8 +106,7 @@
       <tbody>
         {% for e in entries %}
         {% set status = e.get('status') or 0 %}
-        {# The user agent is recorded but given no column: it is long, low-signal at a
-           glance, and would push the table into horizontal scrolling. Hover a row. #}
+        {# User agent is recorded but given no column: long, low-signal, and it would force horizontal scrolling. Hover a row. #}
         <tr class="border-b border-gray-800" title="{{ e.get('ua') or '' }}">
           <td class="py-1.5 pr-4 text-gray-400 whitespace-nowrap">{{ e.get('ts') or '-' }}</td>
           <td class="py-1.5 pr-4 text-gray-400 break-all">{{ e.get('user') or '-' }}</td>

@@ -1,12 +1,9 @@
-"""Pins app/services/file_rules.py:score(), the uploaded-file heuristic engine.
+"""Pins app/services/file_rules.py:score(). Pure - no filesystem, no network, no
+sample files; every fixture is built inline from make_record(**overrides).
 
-Pure function over an inspection record - no filesystem, no network, no sample
-files. Every fixture is built inline from make_record(**overrides).
-
-The case table is the source of truth for both band values; see the derivation in
-the module docstring. The invariants at the bottom re-check that derivation
-arithmetically, so changing a weight fails here rather than silently re-banding
-every verdict the app renders.
+The case table is the source of truth for both band values, and
+check_band_derivation() re-derives them arithmetically, so changing a weight fails
+here rather than silently re-banding every verdict the app renders.
 """
 import base64
 import os
@@ -92,7 +89,6 @@ def make_record(**overrides):
 
 
 def lnk(*keys):
-    """A parsed-.lnk block carrying exactly these lnk_parse signal keys."""
     return {
         'parsed': {'parsed_ok': True},
         'signals': [{'key': key, 'label': LNK_SIGNAL_LABELS[key], 'detail': None}
@@ -449,8 +445,7 @@ def check_garbage(failures):
 
 def check_skipped_reputation(failures):
     """The IP-report lesson: a record nothing could be learned from must not
-    claim CLEAN. An inert file whose every lookup was skipped scores exactly 0.0
-    and reports unknown."""
+    claim CLEAN."""
     result = score(make_record(reputation=SKIPPED_REPUTATION))
     if result['level'] != 'unknown':
         failures.append(f'all-skipped reputation -> {result["level"]!r}, must be unknown')
@@ -582,7 +577,6 @@ def check_base64_is_not_a_wallet(failures):
 
 
 def check_determinism(failures):
-    """Same record in, same verdict out - no clock, no environment, no ordering."""
     for name, record, _level, _must in CASES:
         first, second = score(record), score(record)
         if first != second:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusTrace - operator review queue for outbound abuse.ch submissions.
+"""NexusTrace: operator review queue for outbound abuse.ch submissions.
 
 Nothing NexusTrace collects is published automatically. An analyst proposing a
 submission only writes data/submissions/<uuid>.json with status `pending`, and any
@@ -16,26 +16,25 @@ Usage:
     python3 scripts/manage_submissions.py reject <id> --reason "known-good CDN host"
     python3 scripts/manage_submissions.py purge [--max-age-days 30] [--yes]
 
-approve prints the complete publication preview first - every indicator verbatim,
-the malware family, threat and IOC type, tags, comment, reference, the attached
-sample's name, size and SHA-256, and whether the record goes out anonymously or
-attributed to your abuse.ch account - and then asks you to type `yes`. You should
-never have to open the JSON to know what leaves the box. Sample bytes are never
-printed; name, size and digest only. --yes skips the question for unattended runs.
+approve prints the complete publication preview first, so you never have to open the
+JSON to know what leaves the box: every indicator verbatim, the malware family, threat
+and IOC type, tags, comment, reference, the attached sample's name, size and SHA-256,
+and whether the record goes out anonymously or attributed to your abuse.ch account.
+Sample bytes are never printed. It then asks you to type `yes`; --yes skips that
+question for unattended runs.
 
---yes does not skip the question when the record is flagged `fp_listed`. That means
-the indicator is on abuse.ch's own false-positive list: publishing it pollutes a
-public dataset other defenders act on, so that confirmation is always interactive
-and wants the word PUBLISH. Approval is one-way - nothing in this tool can retract a
-submission once it has been sent.
+--yes does not skip the question when the record is flagged `fp_listed`, meaning the
+indicator is on abuse.ch's own false-positive list: publishing it pollutes a public
+dataset other defenders act on, so that confirmation is always interactive and wants
+the word PUBLISH. Approval is one-way; nothing here can retract a sent submission.
 
 reject requires --reason, and the service deletes the record's quarantined bytes as
 it writes the decision.
 
-purge is a dry run unless --yes is passed, matching scripts/purge_data.py. It ages
-out quarantined samples only, and it will not delete the bytes of a submission that
-is still pending or approved however old they are - that would leave an approval
-that can no longer be honoured. Those are listed for you to decide instead. For the
+purge is a dry run unless --yes is passed, matching scripts/purge_data.py. It ages out
+quarantined samples only, and it will not delete the bytes of a submission that is
+still pending or approved however old they are; that would leave an approval that can
+no longer be honoured. Those are listed for you to decide instead. For the
 whole-application retention sweep, including the submission records themselves, use
 scripts/purge_data.py.
 
@@ -69,8 +68,8 @@ EXIT_FAIL = 1
 EXIT_NOT_FOUND = 2
 EXIT_DECLINED = 3
 
-# Statuses approve() would silently no-op on. Refusing up front is clearer than
-# printing a publication preview for something that will not be published.
+# Statuses approve() would silently no-op on. Refusing up front beats printing a
+# publication preview for something that will not be published.
 ALREADY_DECIDED = ('sent', 'rejected')
 
 DESTINATION_NAMES = {
@@ -108,7 +107,7 @@ def _joined(values):
 
 
 def _sample_summary(record):
-    """Name, size and digest of the attached sample - never its bytes."""
+    """Name, size and digest of the attached sample, never its bytes."""
     quarantine = _dict(record.get('quarantine'))
     if not quarantine:
         return None
@@ -133,11 +132,11 @@ def print_publication(record):
     _line('kind', record.get('kind') or '-')
     _line('destination', DESTINATION_NAMES.get(destination, destination or 'unknown'))
     if anonymous is True:
-        _line('attribution', 'ANONYMOUS - not published under your account name')
+        _line('attribution', 'ANONYMOUS: not published under your account name')
     elif anonymous is False:
-        _line('attribution', 'ATTRIBUTED - published under your abuse.ch account')
+        _line('attribution', 'ATTRIBUTED: published under your abuse.ch account')
     else:
-        _line('attribution', 'UNKNOWN - the record does not say; assume ATTRIBUTED')
+        _line('attribution', 'UNKNOWN: the record does not say, so assume ATTRIBUTED')
 
     indicators = record.get('indicators') or []
     print(f'  {"indicators":<16}: {len(indicators)}')
@@ -157,7 +156,7 @@ def print_publication(record):
 
     sample = _sample_summary(record)
     if sample is None:
-        _line('sample file', 'none - indicators only')
+        _line('sample file', 'none (indicators only)')
     else:
         _line('sample file', f"{sample['filename']}  ({sample['size']})")
         _line('sample sha256', sample['sha256'])
@@ -185,9 +184,9 @@ def print_fp_warning(record):
 
 
 def fetch(svc, sid):
-    """One record, or None with the reason already reported. A record file that
-    exists but will not load is a different problem from a typo'd id, and an
-    operator chasing a queued submission needs to be told which one it is."""
+    """One record, or None with the reason already reported. A record that exists but
+    will not load is a different problem from a typo'd id, and an operator chasing a
+    queued submission needs to be told which one it is."""
     record = svc.get_submission(sid)
     if record is not None:
         return record
@@ -292,7 +291,7 @@ def cmd_approve(args):
         return EXIT_FAIL
 
     print(RULE)
-    print('  ABOUT TO PUBLISH TO abuse.ch - THIS CANNOT BE UNDONE')
+    print('  ABOUT TO PUBLISH TO abuse.ch: THIS CANNOT BE UNDONE')
     print(RULE)
     print_publication(record)
     if status and status != 'pending':
@@ -357,9 +356,9 @@ def cmd_reject(args):
 def _owning_status(svc, name):
     """(submission id, status) for one quarantine filename.
 
-    A name this script cannot parse, or a record it cannot read, comes back as
-    'unreadable' - which the caller treats as awaiting a decision, so the failure
-    mode is keeping malware bytes rather than deleting a live submission's sample.
+    An unparseable name or an unreadable record comes back as 'unreadable', which the
+    caller treats as awaiting a decision, so the failure mode is keeping malware bytes
+    rather than deleting a live submission's sample.
     """
     match = SAMPLE_RE.match(name)
     if not match:
@@ -375,9 +374,8 @@ def _owning_status(svc, name):
 
 def cmd_purge(args):
     svc = _service()
-    # The service's own sweep has no awaiting-decision rule, so it is only ever
-    # called in report mode here; this command applies that rule and then deletes
-    # what survives it.
+    # The service's own sweep has no awaiting-decision rule, so it is only ever called
+    # in report mode here; this command applies that rule, then deletes what survives it.
     stats = svc.purge_quarantine(args.max_age_days, apply=False)
 
     doomed, held = [], []
@@ -386,7 +384,7 @@ def cmd_purge(args):
         (doomed if status in ('sent', 'rejected', 'failed', 'orphan') else held).append(
             (name, sid, status))
 
-    mode = 'APPLY - files will be deleted' if args.apply else 'DRY RUN - nothing will be deleted'
+    mode = 'APPLY: files will be deleted' if args.apply else 'DRY RUN: nothing will be deleted'
     print(f'NexusTrace quarantine purge  [{mode}]')
     print(f'  directory : {svc.QUARANTINE_DIR}')
     print(f'  retention : {args.max_age_days:g} days')
@@ -398,7 +396,7 @@ def cmd_purge(args):
     for name, sid, status in doomed:
         print(f'    - {name}  [{status}]')
     if held:
-        print(f'\n  held - submission still awaiting a decision: {len(held)}')
+        print(f'\n  held (still awaiting a decision): {len(held)}')
         for name, sid, status in held:
             print(f'    ~ {name}  [{status}]  decide with: '
                   f'manage_submissions.py show {sid}')

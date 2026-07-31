@@ -6,7 +6,6 @@ from .health_service import setup_health_services
 from .cyberchef import setup_cyberchef
 
 def setup_services(app):
-    """Setup all services for the application."""
     setup_ip_services(app)
     setup_domain_services(app)
     setup_url_services(app)

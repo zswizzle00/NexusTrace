@@ -51,7 +51,7 @@
                     <div id="progressContainer" class="hidden w-full max-w-md mx-auto text-center">
                         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                         <p class="text-sm text-gray-400 mt-3">
-                            Querying providers at about 2 IPs per second &mdash;
+                            Querying providers at about 2 IPs per second,
                             <span id="elapsedText" class="font-mono text-gray-300">0s</span> elapsed
                         </p>
                     </div>
@@ -170,12 +170,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.URL.revokeObjectURL(url);
                 a.remove();
 
-                showMessage('Analysis complete. ip_report.csv downloaded - check its error column for addresses that returned no data.', 'success');
+                showMessage('Analysis complete. ip_report.csv downloaded. Check its error column for addresses that returned no data.', 'success');
             } else if (contentType.includes('json')) {
                 const payload = await response.json().catch(() => ({}));
                 showMessage(payload.error || `Analysis failed (HTTP ${response.status}).`, 'error');
             } else {
-                showMessage(`The server returned ${contentType || 'an unknown content type'} instead of a CSV (HTTP ${response.status}). Your session may have expired - reload the page and try again.`, 'error');
+                showMessage(`The server returned ${contentType || 'an unknown content type'} instead of a CSV (HTTP ${response.status}). Your session may have expired; reload the page and try again.`, 'error');
             }
         } catch (error) {
             showMessage('Network error. Please try again.', 'error');

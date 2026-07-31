@@ -10,7 +10,7 @@ priority and the key technical decisions involved. This is a living document.
 **Goal:** let users sign in and store their own API keys (encrypted), instead of one
 global set of keys in `.env`. This is the foundation for multi-user use and history.
 
-### Phase 1 - Introduce a database
+### Phase 1: Introduce a database
 - Add **SQLAlchemy** (ORM) + **Alembic** (migrations). SQLite for local dev, **PostgreSQL**
   for production (swap via `DATABASE_URL`).
 - Initial models:
@@ -20,13 +20,13 @@ global set of keys in `.env`. This is the foundation for multi-user use and hist
 - Run via the existing Docker stack; add a `db` service (postgres) to `docker-compose.yml`
   and a one-shot migration step.
 
-### Phase 2 - Authentication
+### Phase 2: Authentication
 - **Flask-Login** for session management + **argon2-cffi** (or werkzeug) for password hashing.
 - Registration, login, logout, password reset. CSRF is already enabled globally.
 - Gate per-user features behind `@login_required`; keep anonymous use working with env keys.
 - Consider optional OAuth/SSO (Google/Microsoft) later for SOC team adoption.
 
-### Phase 3 - Per-user encrypted API key vault
+### Phase 3: Per-user encrypted API key vault
 - Encrypt keys at rest with **Fernet** (`cryptography`); the master key comes from an env
   var / secrets manager (NEVER stored in the DB).
 - Resolve keys at request time: **use the logged-in user's key if present, else fall back to
@@ -34,7 +34,7 @@ global set of keys in `.env`. This is the foundation for multi-user use and hist
 - A settings page to add/test/revoke keys per provider, with a "test key" button that does a
   cheap live call to validate.
 
-**Security notes:** keys are secrets - never log them, never return them to the client after
+**Security notes:** keys are secrets; never log them, never return them to the client after
 save (write-only), and scope DB access least-privilege. Add per-user rate limiting once the
 shared cache/limiter (section 2) lands.
 
@@ -90,25 +90,25 @@ Goal: broaden enrichment using **free APIs and scriptable techniques** that do n
 paid tooling. Grouped by indicator type. (* = no API key required.)
 
 ### IP
-- **RDAP*** (`rdap.org` / RIR RDAP) - structured registration/ASN data, replaces legacy WHOIS.
-- **Team Cymru IP-to-ASN*** - bulk ASN/BGP origin via DNS/whois, very fast, no key.
-- **GreyNoise Community API** - is this IP internet background-noise / a known scanner (free tier).
-- **ISC / DShield API*** - attack/report counts for an IP.
-- **Public blocklists*** - Spamhaus DROP/EDROP, FireHOL aggregated lists, Tor exit-node list,
+- **RDAP*** (`rdap.org` / RIR RDAP): structured registration/ASN data, replaces legacy WHOIS.
+- **Team Cymru IP-to-ASN***: bulk ASN/BGP origin via DNS/whois, very fast, no key.
+- **GreyNoise Community API**: is this IP internet background-noise / a known scanner (free tier).
+- **ISC / DShield API***: attack/report counts for an IP.
+- **Public blocklists***: Spamhaus DROP/EDROP, FireHOL aggregated lists, Tor exit-node list,
   Feodo Tracker (abuse.ch). Download + cache locally, then do O(1) membership checks.
 
 ### Domain / URL
 - **RDAP*** for domain registration (free, structured).
-- **URLhaus + abuse.ch feeds*** - known malicious URLs/domains (free).
-- **OpenPhish / PhishTank*** - phishing feeds.
-- **Certificate Transparency*** (crt.sh, already used) - subdomains + cert history.
-- **Google Safe Browsing** (free API key) - malware/phishing verdict.
+- **URLhaus + abuse.ch feeds***: known malicious URLs/domains (free).
+- **OpenPhish / PhishTank***: phishing feeds.
+- **Certificate Transparency*** (crt.sh, already used): subdomains + cert history.
+- **Google Safe Browsing** (free API key): malware/phishing verdict.
 - DNS-based blocklists (Spamhaus DBL) via simple DNS queries*.
 
 ### File / Hash
 - **abuse.ch MalwareBazaar / ThreatFox*** (already integrated, free).
-- **CIRCL hashlookup*** - is this hash known-good (NSRL) or known-bad, free API.
-- **Local YARA scanning*** - run YARA rules over uploaded files, fully offline/scriptable.
+- **CIRCL hashlookup***: is this hash known-good (NSRL) or known-bad, free API.
+- **Local YARA scanning***: run YARA rules over uploaded files, fully offline/scriptable.
 - File hashing locally (already done for the file endpoint after the Intezer removal).
 
 ### General threat-intel feeds (scriptable, free)
@@ -130,7 +130,7 @@ no-key sources (RDAP, Team Cymru, abuse.ch feeds, blocklists, hashlookup) for im
 
 ## Suggested order
 
-1. Shared cache + Redis rate limiting (section 2) - unblocks correct scaling and speeds up repeats.
-2. Free no-key enrichment sources (section 4) - high analyst value, low risk, no auth needed.
-3. Database + accounts + per-user key vault (section 1) - larger effort, enables multi-user.
-4. CyberChef refresh + automated version check (section 3) - small, do alongside the above.
+1. Shared cache + Redis rate limiting (section 2): unblocks correct scaling and speeds up repeats.
+2. Free no-key enrichment sources (section 4): high analyst value, low risk, no auth needed.
+3. Database + accounts + per-user key vault (section 1): larger effort, enables multi-user.
+4. CyberChef refresh + automated version check (section 3): small, do alongside the above.

@@ -1,19 +1,18 @@
 """Integration smoke tests for every HTTP surface NexusTrace exposes.
 
 Requires a running server (default http://localhost:5050, override with
-NEXUSTRACE_BASE_URL): ./start.sh && uv run python app/tests/test_endpoints.py
+NEXUSTRACE_BASE_URL).
 
-Ground rules, because breaking any of them makes the suite useless or destructive:
-1. No API keys assumed - assert HTTP status and page identity, never enrichment
-   content. Only /api/ip/check_ip's status genuinely depends on a key.
-2. Nothing here starts a Playwright/Chromium scan (30s+ and live network).
-3. CSRF is satisfied, never disabled; /api/enrich/* uses X-API-Key instead.
-4. Only files this run created under data/ are ever deleted.
+Ground rules, because breaking any makes the suite useless or destructive: no API keys
+assumed, so assert HTTP status and page identity rather than enrichment content (only
+/api/ip/check_ip's status genuinely depends on a key); nothing here starts a
+Playwright/Chromium scan (30s+ and live network); CSRF is satisfied, never disabled, and
+/api/enrich/* uses X-API-Key instead; only files this run created under data/ are deleted.
 
-Deliberately NOT covered: POST /url_scan and scanner-bound domain/URL indicators
-(rule 2); the authenticated /api/enrich/* success path (needs a provisioned key in
-data/api_keys.json, so only the 401/403 gates are asserted); the
-/api/ip/check_ips success path (no usable rows without provider keys).
+Deliberately NOT covered: POST /url_scan and scanner-bound domain/URL indicators (no
+Chromium); the authenticated /api/enrich/* success path (needs a provisioned key in
+data/api_keys.json, so only the 401/403 gates are asserted); the /api/ip/check_ips
+success path (no usable rows without provider keys).
 """
 import hashlib
 import os
@@ -63,8 +62,7 @@ def title_of(html):
 
 
 def session_with_csrf():
-    """Session cookie plus the matching CSRF token, scraped from base.html's
-    <meta name="csrf-token">."""
+    """Session cookie plus the token scraped from base.html's <meta name="csrf-token">."""
     s = requests.Session()
     r = s.get(f'{BASE_URL}/', timeout=30)
     r.raise_for_status()

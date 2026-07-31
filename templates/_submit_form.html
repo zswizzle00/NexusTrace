@@ -1,12 +1,9 @@
 {# abuse.ch submission forms, shared by scan_result / email_result / file_analysis.
 
-   Every pre-filled value originates in a scanned page, an e-mail, or an uploaded
-   file. It is rendered escaped into form *values* and into a |tojson blob that
-   JavaScript assigns with `.value =`; nothing here is ever `|safe`, and no
-   indicator becomes a live anchor.
-
-   Neither form transmits anything. Both POST to a route that writes a pending
-   record an operator must approve before it is published. #}
+   Pre-filled values originate in a scanned page, an e-mail or an uploaded file. They
+   are rendered escaped into form values and a |tojson blob; nothing is ever `|safe`
+   and no indicator becomes a live anchor. Neither form transmits: both POST to a route
+   that writes a pending record an operator must approve. #}
 
 {% set nt_input = 'w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500' %}
 {% set nt_label = 'text-xs text-gray-500 uppercase tracking-wide' %}
@@ -50,8 +47,8 @@
 {% endmacro %}
 
 {% macro _anonymous_field(uid) %}
-  {# `anonymous_choice` is always submitted so an unchecked box can mean "not
-     anonymous". Without it, absence would be indistinguishable from the default. #}
+  {# `anonymous_choice` is always submitted so an unchecked box can mean "not anonymous";
+     absence would otherwise be indistinguishable from the default. #}
   <input type="hidden" name="anonymous_choice" value="1">
   <label class="text-xs text-gray-400 flex items-center gap-2 mt-4" for="{{ uid }}-anon">
     <input type="checkbox" id="{{ uid }}-anon" name="anonymous" value="yes" checked
@@ -160,7 +157,7 @@
     <summary class="nt-card-title cursor-pointer select-none">Submit this sample to MalwareBazaar</summary>
 
     <p class="text-xs text-gray-500 mt-3">
-      NexusTrace never retains sample bytes - the upload above was deleted after analysis.
+      NexusTrace never retains sample bytes. The upload above was deleted after analysis.
       Re-attach the file here to queue it for publication.
     </p>
     {{ _pending_notice() }}

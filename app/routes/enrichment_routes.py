@@ -203,8 +203,8 @@ def _enrich_domain(indicator, indicator_type):
         'created_date': whois.get('create_date'),
         'expires_date': whois.get('expire_date'),
         'ip_address': domain_info.get('ip_address'),
-        # bool(ssl), not `is not None`: line 178 coalesces to {}, so the old test was
-        # always True and shipped a constant field to SIEM/SOAR consumers.
+        # bool(ssl), not `is not None`: ssl is coalesced to {} above, which made the old
+        # test always True and shipped a constant field to SIEM/SOAR consumers.
         'ssl_valid': bool(ssl),
         'ssl_expires': ssl.get('not_after') if ssl else None,
         'threat_pulse_count': threat_pulse_count,
@@ -228,7 +228,6 @@ def _enrich_domain(indicator, indicator_type):
 
 
 def _enrich_indicator(indicator):
-    """Enrich a single indicator; returns result dict (may contain 'error')."""
     try:
         itype, normalized = _detect_type(indicator)
         if itype == 'ip':

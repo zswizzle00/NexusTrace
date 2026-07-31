@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusTrace - retention / purge tool for stored analyst data.
+"""NexusTrace: retention / purge tool for stored analyst data.
 
 Trims real analyst data (scanned URLs, sender addresses, subjects, Received-chain
 IPs, queued abuse.ch submissions) to a retention window:
@@ -9,6 +9,7 @@ IPs, queued abuse.ch submissions) to a retention window:
     data/analyses/<uuid>.json
     data/submissions/<uuid>.json
     data/quarantine/<sha256>-<submission-uuid>.bin        queued abuse.ch sample bytes
+    data/activity/<YYYY-MM-DD>.jsonl                      per-request log, client IPs
 
 Usage:
     python3 scripts/purge_data.py                        # dry run, 30-day retention
@@ -18,34 +19,26 @@ Usage:
 
 Nothing is deleted without --yes; a bare run only reports what would go.
 
-Age comes from file mtime - the same ordering ``list_scans()`` / ``list_analyses()``
-use - never from a ``created_at`` field inside the JSON, so a malformed record can
-neither make itself immortal nor make anything else deletable.
+Age comes from file mtime, never from a ``created_at`` field inside the JSON, so a
+malformed record can neither make itself immortal nor make anything else deletable.
 
-A scan's screenshots are always removed together with its record, so --store scans
-still deletes the screenshots belonging to the records it purges. Screenshots with
-no scan record ("orphaned") are reported, and are purged on age only when the
-screenshots store is in scope. Quarantined samples travel with their submission
-record the same way.
+Screenshots and quarantined samples travel with the record that owns them, so --store
+scans still deletes the screenshots of the records it purges. A file whose record is
+gone ("orphaned") is reported, and age-purged only when its own store is in scope.
+With the submissions store missing entirely nothing in quarantine can be attributed,
+so nothing there is treated as orphaned.
 
-Submissions are a live review queue, not only aged data, so they carry one extra
-rule on top of ageing: a submission still awaiting an operator decision (``pending``
-or ``approved``) is never purged, and neither are its quarantined bytes, however old
-they are. Purging those would silently gut a submission awaiting approval, or leave
-an approval that can no longer be honoured. They are reported instead. ``sent``,
-``rejected`` and ``failed`` records age out normally - a month-old failed send is
-not a live decision, and holding its sample indefinitely is a liability, so the
-retry it forfeits is the intended trade.
+Submissions are a live review queue, so they carry one rule on top of ageing: a
+submission still awaiting an operator decision (``pending`` or ``approved``) is never
+purged, and neither are its quarantined bytes, however old. Purging those would gut a
+submission awaiting approval, or leave an approval that can no longer be honoured;
+they are reported instead. ``sent``, ``rejected`` and ``failed`` age out normally. A
+month-old failed send is not a live decision, and holding its sample indefinitely is a
+liability, so the retry it forfeits is the intended trade.
 
 ``status`` is the only thing ever read out of a record, it can only keep a file and
-never condemn one, and a record that will not parse counts as awaiting a decision -
-so the "content cannot make anything deletable" invariant above still holds, and age
-still comes from mtime alone.
-
-A quarantine filename carries the id of the submission that owns it, which is what
-links the two stores; a sample with no matching record is an orphan and is
-age-purged like an orphaned screenshot. When the submissions store is missing
-entirely nothing can be attributed, so nothing in quarantine is treated as orphaned.
+never condemn one, and a record that will not parse counts as awaiting a decision, so
+the "content cannot make anything deletable" invariant above still holds.
 
 An operator tool: deliberately not wired into the app, a cron, the Dockerfile, or
 start.sh.
@@ -68,17 +61,16 @@ STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'acti
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 RECORD_RE = re.compile(rf'^({_UUID})\.json$')
 SHOT_RE = re.compile(rf'^({_UUID})(?:-([A-Za-z0-9_-]{{1,32}}))?\.png$')
-# submissions.py names a quarantined sample <sha256>-<submission-uuid>.bin. The
-# digest is not captured: the submission id is what links the file to its record,
-# and it is the only group collect() keeps. Its own pattern rather than a loosened
-# shared one, so adding this store does not widen what the other stores accept.
+# The submission id, not the digest, is the capture group: it is what links a quarantined
+# sample to its record, and collect() keeps only group 1. Its own pattern rather than a
+# loosened shared one, so adding this store does not widen what the other stores accept.
 SAMPLE_RE = re.compile(rf'^[0-9a-f]{{64}}-({_UUID})\.bin$')
-# activity.py writes one JSONL file per UTC day. Its own pattern for the same reason as
-# SAMPLE_RE: a date is not a UUID, and loosening RECORD_RE to fit would widen what every
-# other store accepts. The day is the capture group, so it doubles as the entry key.
+# One JSONL file per UTC day, with the day as the capture group so it doubles as the entry
+# key. Its own pattern for the same reason as SAMPLE_RE: loosening RECORD_RE to admit a
+# date would widen what every other store accepts.
 ACTIVITY_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})\.jsonl$')
 
-# A submission in any other state - or in no state this script recognises - is still
+# A submission in any other state (or in no state this script recognises) is still
 # waiting for an operator and is kept regardless of age.
 DECIDED_STATUSES = frozenset({'sent', 'rejected', 'failed'})
 
@@ -99,12 +91,11 @@ def fmt_time(ts):
 
 
 def awaiting_decision(path):
-    """True when this submission record still needs an operator - which is the only
-    thing that survives being read out of a record here.
+    """True when this submission record still needs an operator.
 
     Fails safe in every direction: an unreadable record, an unparseable one, and one
-    carrying a status this script has never heard of all count as awaiting a
-    decision, so the failure mode is retention rather than deletion.
+    carrying an unrecognised status all count as awaiting a decision, so the failure mode
+    is retention rather than deletion.
     """
     try:
         text = path.read_text(encoding='utf-8', errors='replace')
@@ -116,8 +107,8 @@ def awaiting_decision(path):
 
 
 def collect(directory, pattern):
-    """List the store's recognised files. Anything else is returned as 'unexpected'
-    and never touched - an unrecognised file is not assumed to be junk."""
+    """List the store's recognised files. Anything else comes back as 'unexpected' and is
+    never touched: an unrecognised file is not assumed to be junk."""
     entries, unexpected = [], []
     if not directory.is_dir():
         return entries, unexpected
@@ -236,9 +227,9 @@ def main():
     retained_shots = [e for e in shots if e.path not in doomed_shot_paths]
     retained_orphans = [e for e in orphans if e.path not in doomed_shot_paths]
 
-    # The request log has no owning record, so it ages purely on mtime. The per-day cap in
-    # activity.py bounds a single file, not the directory, so without this the store grows
-    # without limit.
+    # The request log has no owning record, so it ages purely on mtime. activity.py's
+    # per-day cap bounds a single file, not the directory, so without this sweep the store
+    # grows without limit.
     doomed_activity = [e for e in activity if e.mtime < cutoff] if 'activity' in stores else []
     doomed_activity_paths = {e.path for e in doomed_activity}
     retained_activity = [e for e in activity if e.path not in doomed_activity_paths]
@@ -280,7 +271,7 @@ def main():
     retained_sample_orphans = [e for e in sample_orphans
                                if e.path not in doomed_sample_paths]
 
-    mode = 'APPLY - files will be deleted' if args.apply else 'DRY RUN - nothing will be deleted'
+    mode = 'APPLY: files will be deleted' if args.apply else 'DRY RUN: nothing will be deleted'
     print(f'NexusTrace data purge  [{mode}]')
     print(f'  data directory : {data_dir}')
     print(f'  retention      : {args.max_age_days:g} days (cutoff {fmt_time(cutoff)})')
@@ -300,7 +291,7 @@ def main():
     if held_subs:
         names = ', '.join(e.path.name for e in held_subs[:5])
         sub_notes.append(f'past retention but awaiting a decision (kept): '
-                         f'{len(held_subs)} - {names}'
+                         f'{len(held_subs)}: {names}'
                          + (' ...' if len(held_subs) > 5 else ''))
     if doomed_sub_ids and 'quarantine' not in stores:
         sub_notes.append('quarantined samples of purged submissions are removed with '
@@ -308,7 +299,7 @@ def main():
 
     sample_notes = []
     if samples and not submissions_present:
-        sample_notes.append('submissions store absent - nothing here can be attributed, '
+        sample_notes.append('submissions store absent, so nothing here can be attributed, '
                             'so nothing is treated as orphaned')
     if held_samples:
         sample_notes.append('held for a submission awaiting a decision (never purged): '

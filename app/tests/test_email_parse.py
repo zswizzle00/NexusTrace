@@ -28,7 +28,6 @@ from app.utils.email_parse import (
 
 
 def msg(headers, body='Hello.\n'):
-    """Build a raw message from a dict-ish list of (name, value) pairs."""
     head = '\r\n'.join(f'{k}: {v}' for k, v in headers)
     return (head + '\r\n\r\n' + body).encode('utf-8')
 
@@ -386,14 +385,12 @@ def main():
     except Exception as exc:
         failures.append(f'headers-only message should parse, raised {type(exc).__name__}')
 
-    # header_summary must expose exactly the spec's allowlisted keys.
     expected_keys = {'from', 'from_display', 'to', 'subject', 'date', 'message_id',
                      'reply_to', 'return_path', 'x_mailer'}
     got_keys = set(header_summary(parse_message(msg(BENIGN))).keys())
     if got_keys != expected_keys:
         failures.append(f'header_summary keys {sorted(got_keys)}, expected {sorted(expected_keys)}')
 
-    # is_list_mail must key off the list/bulk markers and nothing else.
     for headers, expected in (
         (BENIGN, False),
         (BENIGN + [('List-Id', '<a.b.test>')], True),

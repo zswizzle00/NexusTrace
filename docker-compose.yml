@@ -9,10 +9,13 @@ services:
     env_file:
       - .env
     environment:
+      # Pinned explicitly so a NEXUSTRACE_ROLE left in .env cannot promote the
+      # internet-facing process to the admin role. `environment` beats `env_file`.
+      - NEXUSTRACE_ROLE=public
       - FLASK_HOST=0.0.0.0
       - FLASK_PORT=5050
     restart: always
-    # Liveness check against the app itself (slim image has no curl, so use Python).
+    # Python, not curl: the slim image has none.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5050/api/health', timeout=5).status==200 else 1)"]
       interval: 30s
@@ -21,6 +24,44 @@ services:
       start_period: 20s
     networks:
       - app_network
+
+  # The same image as `web`, run again with NEXUSTRACE_ROLE=admin. The admin blueprint is
+  # registered only here; on `web` there is no /admin rule in the url_map at all, so there
+  # is nothing on the public process to probe or brute-force.
+  admin:
+    build: .
+    ports:
+      # LOOPBACK ONLY, the most important line in this file. A bare "5051:5051" publishes
+      # on 0.0.0.0 and puts the admin UI on the LAN, which defeats the entire split: a
+      # home LAN includes IoT devices and anything else on it that gets compromised. Reach
+      # it over an SSH tunnel from the workstation instead:
+      #   ssh -L 5051:127.0.0.1:5051 <homelab-host>
+      - "127.0.0.1:5051:5051"
+    volumes:
+      - app_logs:/app/logs
+      # The same records as `web`. This container is less REACHABLE, not less privileged:
+      # it has full read/write access to every stored record, which is why ADMIN_TOKEN and
+      # Cloudflare Access still apply inside it.
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NEXUSTRACE_ROLE=admin
+      # No FLASK_HOST: the Dockerfile CMD always binds 0.0.0.0 inside the container, and
+      # the loopback publish above is what limits who can connect.
+      - FLASK_PORT=5051
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5051/api/health', timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      # Deliberately NOT app_network. nginx is the one container published to the LAN, and
+      # keeping it off this network means it cannot reach the admin service even if its
+      # config later grows a stray proxy_pass.
+      - admin_network
 
   nginx:
     image: nginx:latest
@@ -43,6 +84,8 @@ services:
 
 networks:
   app_network:
+    driver: bridge
+  admin_network:
     driver: bridge
 
 volumes:

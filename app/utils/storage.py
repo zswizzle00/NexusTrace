@@ -1,36 +1,26 @@
 """Record storage for the five filesystem-backed stores, on local disk or GCS.
 
-NexusTrace persists five kinds of record as flat files named after a UUID (or, for
-quarantine, a digest plus a UUID):
-
     scans        data/scans/<uuid>.json
     screenshots  data/screenshots/<uuid>[-<stage>].png
     analyses     data/analyses/<uuid>.json
     submissions  data/submissions/<uuid>.json
     quarantine   data/quarantine/<sha256>-<uuid>.bin
 
-On Docker and in dev that filesystem is real and shared. On Cloud Run it is an
-in-memory tmpfs that is per-instance and evaporates with the container, so a scan
-written by one instance is invisible to the next request. This module is the seam:
-one flat key/value interface with a local backend that keeps the current on-disk
-semantics exactly, and a GCS backend for Cloud Run.
-
-Backend selection is by environment, read once per process:
-
-    STORAGE_BACKEND=local   (default)
-    STORAGE_BACKEND=gcs     requires GCS_BUCKET
+On Docker and in dev that filesystem is real and shared. On Cloud Run it is a
+per-instance tmpfs that evaporates with the container, so a scan written by one
+instance is invisible to the next request. This module is the seam: one flat key/value
+interface, a local backend keeping the previous on-disk semantics exactly, and a GCS
+backend for Cloud Run, selected by `STORAGE_BACKEND`. `google-cloud-storage` is
+imported lazily inside the GCS backend only, so the local path never needs it.
 
 **A `gcs` backend with no `GCS_BUCKET` raises instead of falling back to local.**
 On Cloud Run a silent fallback writes to tmpfs and loses the data with no error
-anywhere - the loud failure is the whole point of the check.
-
-`google-cloud-storage` is an optional dependency, imported lazily inside the GCS
-backend only, so nothing on the local/Docker path needs it installed.
+anywhere; the loud failure is the whole point of the check.
 
 **Keys are untrusted.** They arrive from URL path segments (`/url_scan/<scan_id>`,
 `?stage=`) and are the path-traversal boundary for all five stores at once, so
-`validate_key()` is a strict allowlist - `[A-Za-z0-9._-]`, no separators, no leading
-dot - and every method funnels through it before touching a backend.
+`validate_key()` is a strict allowlist (`[A-Za-z0-9._-]`, no separators, no leading
+dot, no `..`, max 255), and every method funnels through it before touching a backend.
 """
 
 import io
@@ -47,8 +37,7 @@ STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine')
 
 BACKENDS = ('local', 'gcs')
 
-# Long enough for every name the app generates (a quarantine key is 101 chars) and
-# short enough to stay under every filesystem's per-component limit.
+# Fits every name the app generates (a quarantine key is 101 chars) and every filesystem.
 MAX_KEY_LENGTH = 255
 
 # Matched with fullmatch(), not match(): `$` also matches before a trailing newline,
@@ -57,13 +46,11 @@ _KEY_RE = re.compile(r'[A-Za-z0-9._-]+')
 
 _BASE = Path(__file__).resolve().parent.parent.parent
 
-# Read on every access, not captured at construction, so tests can repoint the whole
-# local tree at a temp directory the same way test_submissions.py repoints its stores.
+# Re-read on every access, not captured at construction, so tests can repoint the tree.
 LOCAL_ROOT = _BASE / 'data'
 
-# Test seam. When set to a zero-argument callable, the GCS backend calls it instead of
-# importing google.cloud.storage, which is how test_storage.py exercises the GCS paths
-# without the dependency installed and without a network.
+# Test seam: called instead of importing google.cloud.storage, so the GCS paths are
+# exercisable without the dependency installed.
 GCS_CLIENT_FACTORY = None
 
 _CONTENT_TYPES = {
@@ -78,14 +65,11 @@ _cache_lock = threading.Lock()
 
 
 def validate_key(key):
-    """Return `key` unchanged, or raise ValueError.
-
-    Rejects anything that is not a single flat filename: separators (`/`, `\\`),
-    `..`, a leading dot, NUL, absolute paths, and every character outside
-    `[A-Za-z0-9._-]`. The allowlist is what makes the rest of this module free of
-    per-call traversal reasoning - there is no way to express a parent directory,
-    a hidden file, or a device name in an accepted key.
-    """
+    """Return `key` unchanged, or raise ValueError. Rejects anything that is not a single
+    flat filename: separators, `..`, a leading dot, NUL, absolute paths, and every
+    character outside `[A-Za-z0-9._-]`. The allowlist frees the rest of this module from
+    per-call traversal reasoning - an accepted key cannot express a parent directory, a
+    hidden file, or a device name."""
     if not isinstance(key, str):
         raise ValueError(f'storage key must be a str, got {type(key).__name__}')
     if not key:
@@ -106,9 +90,9 @@ def _content_type(key, default='application/octet-stream'):
 
 
 def backend_name():
-    """'local' or 'gcs'. An unrecognised STORAGE_BACKEND raises rather than
-    defaulting, for the same reason a missing GCS_BUCKET does: a typo that silently
-    means "local" on Cloud Run is data loss with no signal."""
+    """'local' or 'gcs'. An unrecognised STORAGE_BACKEND raises rather than defaulting,
+    for the same reason a missing GCS_BUCKET does: a typo that silently means "local" on
+    Cloud Run is data loss with no signal."""
     name = (os.environ.get('STORAGE_BACKEND') or 'local').strip().lower()
     if name not in BACKENDS:
         raise ValueError(f'unknown STORAGE_BACKEND {name!r}; expected one of '
@@ -117,7 +101,6 @@ def backend_name():
 
 
 def store(name):
-    """The Store for one of STORES. Raises ValueError for an unknown name."""
     if not isinstance(name, str) or name not in STORES:
         raise ValueError(f'unknown store {name!r}; expected one of '
                          f'{", ".join(STORES)}')
@@ -131,19 +114,17 @@ def store(name):
 
 
 def reset_cache():
-    """Drop memoised Store objects. Needed only after changing STORAGE_BACKEND or
-    GCS_BUCKET inside a running process, which in practice means tests."""
+    """Drop memoised Store objects. Only needed after changing STORAGE_BACKEND or GCS_BUCKET
+    inside a running process."""
     with _cache_lock:
         _cache.clear()
 
 
 class Store:
     """Flat key/value store. `key` is a single filename, validated on every call.
-
-    `list()` entries are `{'key', 'size', 'modified'}` where `modified` is a POSIX
-    timestamp (float, UTC) - `st_mtime` locally, `blob.updated.timestamp()` on GCS -
-    so newest-first ordering means the same thing on both backends.
-    """
+    `list()` entries are `{'key', 'size', 'modified'}`, `modified` being a POSIX
+    timestamp (`st_mtime` locally, `blob.updated.timestamp()` on GCS) so newest-first
+    ordering means the same thing on both backends."""
 
     name = None
     backend = None
@@ -197,9 +178,9 @@ def _apply_listing(entries, suffix, limit):
 
 
 class LocalStore(Store):
-    """The filesystem backend. Preserves the semantics the services had before this
-    module existed: `os.replace` for record writes, `O_CREAT|O_EXCL|O_NOFOLLOW` plus
-    an explicit chmod for quarantined samples, and mtime-ordered listings."""
+    """The filesystem backend, preserving the semantics the services had before this module
+    existed: `os.replace` for record writes, `O_CREAT|O_EXCL|O_NOFOLLOW` plus an explicit
+    chmod for quarantined samples, mtime-ordered listings."""
 
     backend = 'local'
 
@@ -214,12 +195,10 @@ class LocalStore(Store):
         validate_key(key)
         root = self.root
         path = root / key
-        # Defence in depth against the two things validate_key() cannot see: a future
-        # edit that loosens the allowlist, and a symlink planted in the store
-        # directory that points outside it. realpath() resolves the final component,
-        # so a link that leaves the store is refused for *reads* too - O_NOFOLLOW only
-        # guards the exclusive-create path, and plain open()/read_bytes() would
-        # otherwise follow it.
+        # Defence in depth against what validate_key() cannot see: a future edit that
+        # loosens the allowlist, and a symlink planted in the store directory pointing
+        # outside it. realpath() resolves the final component, so a link that leaves the
+        # store is refused for *reads* too - O_NOFOLLOW only guards exclusive create.
         if os.path.dirname(os.path.realpath(path)) != os.path.realpath(root):
             raise ValueError(f'storage key {key!r} escapes {self.name}')
         return path
@@ -230,21 +209,17 @@ class LocalStore(Store):
         return root
 
     def _atomic_write(self, key, data, mode):
-        """Write via a temp file in the same directory, then `os.replace`.
-
-        Same-directory means same filesystem, which is what makes the replace atomic:
-        a concurrent reader sees either the whole previous file or the whole new one,
-        never a truncated record. The temp name starts with a dot, so it can never
-        collide with a valid key and never appears in `list()`.
-        """
+        """Same-directory temp file, then `os.replace`. Same directory means same
+        filesystem, which is what makes the replace atomic: a concurrent reader sees the
+        whole previous file or the whole new one, never a truncated record. The temp name
+        starts with a dot, so it can never collide with a valid key nor appear in `list()`."""
         path = self._path(key)
         root = self._ensure_root()
         fd, tmp = tempfile.mkstemp(dir=str(root), prefix='.tmp-', suffix='.part')
         try:
             with os.fdopen(fd, 'wb') as handle:
                 handle.write(data)
-            # mkstemp creates 0600; set the intended mode explicitly rather than
-            # letting it depend on the process umask.
+            # Explicit, so the final mode does not depend on the process umask.
             os.chmod(tmp, mode)
             os.replace(tmp, path)
         except BaseException:
@@ -266,12 +241,10 @@ class LocalStore(Store):
         if not exclusive:
             self._atomic_write(key, data, mode)
             return
-        # Exclusive creation cannot go through the temp-and-replace path: replace
-        # would overwrite. These are the flags the quarantine store was written and
-        # mutation-tested with - O_EXCL because a pre-existing file under a name only
-        # this app can derive means something is wrong and truncating it would destroy
-        # a sample, O_NOFOLLOW so a planted symlink cannot redirect the write out of
-        # the store.
+        # Cannot go through temp-and-replace: replace would overwrite. O_EXCL because a
+        # pre-existing file under a name only this app can derive means something is wrong
+        # and truncating it would destroy a sample; O_NOFOLLOW so a planted symlink cannot
+        # redirect the write out of the store.
         path = self._path(key)
         self._ensure_root()
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -321,8 +294,8 @@ class LocalStore(Store):
                 try:
                     validate_key(item.name)
                 except ValueError:
-                    # Temp artefacts and anything hand-dropped in the directory are
-                    # not records; a name this store could not have written is skipped.
+                    # A name this store could not have written is not a record: temp
+                    # artefacts and anything hand-dropped into the directory.
                     continue
                 try:
                     if not item.is_file(follow_symlinks=False):
@@ -342,23 +315,19 @@ class LocalStore(Store):
             return None
 
     def local_path(self, key):
-        """The real path, or None when the key is absent.
-
-        Existence-checked on purpose: the caller's fallback for "no path" is
-        `open_stream()`, which also returns None for a missing key, so a route can
-        try `local_path` then `open_stream` then 404 without a third branch. This is
-        not a write handle - use `write_bytes()`.
-        """
+        """The real path, or None when the key is absent. Existence-checked on purpose: the
+        caller's fallback for "no path" is `open_stream()`, which also returns None for a
+        missing key, so a route is `local_path()` -> `open_stream()` -> 404 with no third
+        branch. Not a write handle."""
         path = self._path(key)
         return path if path.is_file() else None
 
 
 class GCSStore(Store):
-    """The Google Cloud Storage backend, for Cloud Run.
-
-    Objects live at `<store>/<key>` in one bucket. `google.cloud.storage` is imported
-    lazily here and nowhere else, so the local path never needs the dependency.
-    """
+    """The Google Cloud Storage backend, for Cloud Run. Objects live at `<store>/<key>`
+    in one bucket. Atomicity is inherent, exclusivity is an `ifGenerationMatch=0`
+    precondition, and POSIX mode is meaningless - bucket IAM is the control that `0600`
+    provided locally."""
 
     backend = 'gcs'
 
@@ -366,8 +335,7 @@ class GCSStore(Store):
         self.name = name
         bucket = (os.environ.get('GCS_BUCKET') or '').strip()
         if not bucket:
-            # Loud, at construction. Falling back to local here would write Cloud Run
-            # records to a per-instance tmpfs and lose them with no error anywhere.
+            # Loud, at construction: see the module docstring.
             raise RuntimeError('STORAGE_BACKEND=gcs requires GCS_BUCKET to be set')
         self.bucket_name = bucket
         self._client = None
@@ -385,8 +353,8 @@ class GCSStore(Store):
                 from google.cloud import storage as gcs
                 self._client = gcs.Client()
             self._bucket = self._client.bucket(self.bucket_name)
-            # Logged once per store: when records go missing on Cloud Run, the first
-            # question is always whether this instance was on GCS or on tmpfs.
+            # Once per store: when records go missing on Cloud Run the first question is
+            # always whether this instance was on GCS or on tmpfs.
             logger.info('Store %s -> gs://%s/%s/', self.name, self.bucket_name,
                         self.name)
         return self._bucket
@@ -412,9 +380,8 @@ class GCSStore(Store):
                 or type(exc).__name__ in ('PreconditionFailed', 'FailedPrecondition'))
 
     def write_text(self, key, text):
-        # GCS object writes are atomic by construction: an upload either completes and
-        # becomes the new generation or it does not, and a reader never observes a
-        # partial object. There is no temp-and-replace equivalent to perform.
+        # No temp-and-replace equivalent to perform: an upload either becomes the new
+        # generation or it does not, and a reader never observes a partial object.
         self._blob(key).upload_from_string(
             str(text).encode('utf-8'),
             content_type=_content_type(key, 'text/plain'))
@@ -424,14 +391,13 @@ class GCSStore(Store):
             data = bytes(data)
         if not isinstance(data, bytes):
             raise TypeError('data must be bytes')
-        # `private` is meaningless here: GCS objects have no POSIX mode, and with
-        # uniform bucket-level access their ACLs are IAM-controlled. Confidentiality
-        # of the quarantine store on GCS is bucket IAM, nothing this call can set.
+        # `private` is deliberately ignored: GCS objects have no POSIX mode, so
+        # confidentiality of the quarantine store is bucket IAM, not anything set here.
         blob = self._blob(key)
         kwargs = {'content_type': _content_type(key)}
         if exclusive:
-            # The GCS equivalent of O_EXCL: generation 0 means "only if this object
-            # does not exist yet". Server-side, so it is not a check-then-write race.
+            # The GCS O_EXCL: generation 0 is "only if this object does not exist yet",
+            # evaluated server-side, so it is not a check-then-write race.
             kwargs['if_generation_match'] = 0
         try:
             blob.upload_from_string(data, **kwargs)
@@ -485,17 +451,14 @@ class GCSStore(Store):
         return _apply_listing(entries, suffix, limit)
 
     def open_stream(self, key):
-        """A file object over the object's bytes, or None when it is absent.
-
-        Buffered in memory rather than streamed: the only consumer is `send_file` for
-        screenshots and quarantined samples, both already bounded, and a BytesIO
-        behaves identically on both backends with no open connection to leak.
-        """
+        """A file object over the object's bytes, or None when absent. Buffered in memory
+        rather than streamed: the only consumer is `send_file` for screenshots and
+        quarantined samples, both already bounded, and a BytesIO leaks no connection."""
         data = self.read_bytes(key)
         return None if data is None else io.BytesIO(data)
 
     def local_path(self, key):
-        """Always None - a GCS object has no filesystem path. Callers that need to
-        hand bytes to `send_file` use `open_stream()`."""
+        """Always None: a GCS object has no filesystem path, so callers fall through to
+        `open_stream()`."""
         validate_key(key)
         return None

@@ -1,16 +1,15 @@
 """Pins POST /api/ip/check_ips - the bulk IP analyzer.
 
-Uses the Flask test client, so no server, network, or browser is needed: every provider
-function is stubbed at its defining module (app.services.ip_service), which is also where
-the enrichment routes' function-local imports resolve.
+Flask test client, so no server, network, or browser: every provider function is stubbed
+at its defining module (app.services.ip_service), which is also where the enrichment
+routes' function-local imports resolve.
 
-The invariants under test, in the order they were broken:
-  - a tokenless POST is rejected and a token-bearing one is accepted (CSRF)
-  - a row is never dropped: an unqueryable or unanswered IP still appears, with `error`
-  - no source is a hard dependency, so a keyless environment returns rows, not a 400
-  - a private / link-local IP is reported, never shipped to a provider
-  - a headerless CSV/XLSX keeps its first address
-  - an empty or non-UTF-8 upload is a 400 with no pandas or codec internals
+The invariants under test, in the order they were broken: CSRF is enforced; a row is
+never dropped, so an unqueryable or unanswered IP still appears with `error`; no source
+is a hard dependency, so a keyless environment returns rows rather than a 400; a private
+or link-local IP is reported, never shipped to a provider; a headerless CSV/XLSX keeps
+its first address; an empty or non-UTF-8 upload is a 400 with no pandas or codec
+internals.
 """
 import csv
 import io
@@ -42,8 +41,7 @@ def check(label, condition, detail=''):
 
 
 def csrf_token(client):
-    """Scraped from base.html's <meta name="csrf-token">, exactly as the page's own JS
-    reads it."""
+    """Scraped from base.html's <meta name="csrf-token">, as the page's own JS does."""
     page = client.get('/').get_data(as_text=True)
     match = re.search(r'name="csrf-token" content="([^"]+)"', page)
     if not match:

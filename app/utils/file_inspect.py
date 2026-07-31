@@ -2,18 +2,17 @@
 subprocess.
 
 Every function is ``bytes``-in / plain-data-out and **never retains or returns the
-payload** - callers hand over a buffer and get back names, offsets, digests, and
-numbers. That property is what lets both the upload path and
-:func:`app.utils.email_parse.attachment_metadata` share this module while still
-guaranteeing attachment content has no code path into storage or a response.
+payload** - callers get back names, offsets, digests and numbers. That is what lets the
+upload path and :func:`app.utils.email_parse.attachment_metadata` share this module
+while still guaranteeing attachment content has no code path into storage or a response.
 
-:func:`extract_strings` replaces the ``strings`` binary, which is not installed in
-the Docker image. Shelling out to it would also be wrong here: a filename-
-interpolated ``shell=True`` command is injectable, and redirecting to a temp file
-in the process CWD corrupts concurrent uploads under ``gunicorn --threads 8``.
+:func:`extract_strings` replaces the ``strings`` binary, which is not installed in the
+Docker image. Shelling out would also be wrong: a filename-interpolated ``shell=True``
+command is injectable, and a temp file in the process CWD corrupts concurrent uploads
+under ``gunicorn --threads 8``.
 
-Nothing here raises on bad input. A triage helper handed ``None``, a ``str``, or a
-truncated buffer must degrade to an empty/zero answer, not 500 an upload route.
+Nothing here raises on bad input: ``None``, a ``str``, or a truncated buffer must
+degrade to an empty/zero answer, not 500 an upload route.
 """
 
 import hashlib
@@ -22,33 +21,29 @@ import re
 from collections import Counter
 from functools import lru_cache
 
-# Per-string and total caps on :func:`extract_strings`. A 50 MB upload of printable
-# bytes would otherwise produce either one 50 MB string or ~12M four-byte ones.
-# 2000 x 512 bounds the worst case at ~1 MB, which is the same order as the
-# persisted-record budget email_parse already caps itself to; 512 chars is longer
-# than any URL, path, or registry key worth triaging, and a high-entropy blob is
-# better characterised by :func:`shannon_entropy` than by its truncated text.
+# Caps on :func:`extract_strings`. A 50 MB upload of printable bytes would otherwise
+# produce one 50 MB string or ~12M four-byte ones; 2000 x 512 bounds the worst case at
+# ~1 MB, and 512 chars is longer than any URL, path or registry key worth triaging.
 MIN_STRING_LENGTH = 4
 MAX_STRING_LENGTH = 512
 MAX_STRINGS = 2000
 
-# 32 hits is far past the point where "this file has executables appended to it" is
-# established. The candidate cap bounds the scan itself: ``MZ`` is two ordinary
-# ASCII letters, so a 50 MB buffer can hold ~25M candidate offsets, and iterating
-# them all in Python takes seconds. Honest tradeoff: a real embedded PE sitting
-# after 100,000 bogus ``MZ`` candidates is missed.
+# 32 hits is far past the point where "this file has executables appended" is established.
+# The candidate cap bounds the scan itself: ``MZ`` is two ordinary ASCII letters, so a
+# 50 MB buffer can hold ~25M candidate offsets and iterating them all takes seconds.
+# Honest tradeoff: a real embedded PE after 100,000 bogus ``MZ`` candidates is missed.
 MAX_EMBEDDED_HITS = 32
 MAX_EMBEDDED_CANDIDATES = 100_000
 
-# A PE header cannot start before 0x40 - e_lfanew itself lives at 0x3c.
+# A PE header cannot start before 0x40; e_lfanew itself lives at 0x3c.
 _PE_LFANEW_OFFSET = 0x3C
 _PE_MIN_HEADER_OFFSET = 0x40
 
 
 def _as_bytes(data):
-    """``bytes`` for any bytes-like input, ``b''`` for anything else. ``bytes`` is
-    the zero-copy path; ``bytearray``/``memoryview`` are copied so downstream
-    slice comparisons against byte literals behave."""
+    """``bytes`` for any bytes-like input, ``b''`` for anything else. ``bytearray`` and
+    ``memoryview`` are copied so downstream slice comparisons against byte literals
+    behave."""
     if isinstance(data, bytes):
         return data
     if isinstance(data, (bytearray, memoryview)):
@@ -56,18 +51,13 @@ def _as_bytes(data):
     return b''
 
 
-# Byte-signature comparison, not a libmagic binding, so this adds no dependency.
-# Entries are ``(offset, signature, name)`` and are tested in declared order, so a
-# more specific signature must be declared before one it shares a prefix with.
-#
-# Two deliberate limits of prefix sniffing, stated so nobody "fixes" them:
-#   - OOXML (docx/xlsx/pptx) is a ZIP container and reports as ``ZIP``. The bytes
-#     that would discriminate it (local-header version/flags) vary by producer, so
-#     a prefix rule would both misreport real documents and silently change the
-#     persisted ``magic_type``/``is_archive`` of every existing e-mail record.
-#     Legacy Office is genuinely distinguishable and reports as ``OLE``.
-#   - ``CAFEBABE`` is both a Mach-O fat binary and a Java ``.class``; it reports as
-#     ``MACHO``, matching the pre-existing behaviour this table replaced.
+# ``(offset, signature, name)``, tested in declared order, so a more specific signature
+# must be declared before one it shares a prefix with. Two deliberate limits of prefix
+# sniffing, stated so nobody "fixes" them: OOXML is a ZIP container and reports as
+# ``ZIP`` (the discriminating bytes vary by producer, so a prefix rule would misreport
+# real documents and silently change the persisted ``magic_type``/``is_archive`` of every
+# existing record); and ``CAFEBABE`` is both a Mach-O fat binary and a Java ``.class``,
+# reported as ``MACHO``.
 MAGIC_SIGNATURES = (
     (0, b'MZ', 'PE'),
     (0, b'\x7fELF', 'ELF'),
@@ -94,8 +84,8 @@ MAGIC_SIGNATURES = (
     (0, b'GIF87a', 'GIF'),
     (0, b'GIF89a', 'GIF'),
     (0, b'#!', 'SCRIPT'),
-    # Not prefixes: ustar sits in the tar header, and ISO 9660 puts its volume
-    # descriptor after a 32 KB system area.
+    # Not prefixes: ustar sits in the tar header, ISO 9660 puts its volume descriptor
+    # after a 32 KB system area.
     (257, b'ustar', 'TAR'),
     (0x8001, b'CD001', 'ISO'),
 )
@@ -103,18 +93,11 @@ MAGIC_SIGNATURES = (
 # How much of the buffer sniffing needs, from the deepest offset above.
 _MAGIC_WINDOW = 0x8001 + 5
 
-# All six Mach-O magics are listed. The last three (MH_MAGIC ``ce fa ed fe`` -
-# 32-bit LE and the most common - MH_CIGAM_64, FAT_CIGAM) were missing before
-# 2026-07-30, so a Mach-O attachment was not classified executable and scored as an
-# ordinary document. Enabling them raises `is_executable`, which changes
-# `email_rules` scoring for *new* analyses only: verdicts are computed once in
-# `analyze_email` and persisted, and the result route reads the stored record rather
-# than re-scoring.
-
-# Classification sets. Kept narrow on purpose: widening either one changes the
-# persisted ``is_executable``/``is_archive`` of existing records, so a new
-# MAGIC_SIGNATURES entry is a *reporting* improvement only until that is a
-# deliberate, separately-verified decision.
+# All six Mach-O magics are listed on purpose; a missing one classifies a Mach-O
+# attachment as an ordinary document. These two sets are otherwise kept narrow: widening
+# either changes the persisted ``is_executable``/``is_archive`` of existing records
+# (verdicts are scored once and stored), so a new MAGIC_SIGNATURES entry is a *reporting*
+# improvement only until that is a deliberate, separately-verified decision.
 EXECUTABLE_MAGIC = frozenset({'PE', 'ELF', 'MACHO'})
 ARCHIVE_MAGIC = frozenset({'ZIP', 'RAR', '7Z', 'GZIP'})
 
@@ -144,21 +127,15 @@ def file_extension(filename):
 
 
 def is_executable(magic_type=None, filename=None):
-    """True when either the sniffed format or the extension says executable."""
     return magic_type in EXECUTABLE_MAGIC or file_extension(filename) in EXECUTABLE_EXTENSIONS
 
 
 def is_archive(magic_type=None, filename=None):
-    """True when either the sniffed format or the extension says archive."""
     return magic_type in ARCHIVE_MAGIC or file_extension(filename) in ARCHIVE_EXTENSIONS
 
 
 def file_digests(data):
-    """md5 + sha1 + sha256 hex digests of one in-memory buffer.
-
-    Three digests from a single buffer, with no filesystem access and no printing:
-    the callers that need all three must not re-read the source three times.
-    """
+    """All three digests from one buffer, so callers needing them do not re-read thrice."""
     buf = _as_bytes(data)
     return {
         'md5': hashlib.md5(buf).hexdigest(),
@@ -168,11 +145,8 @@ def file_digests(data):
 
 
 def shannon_entropy(data):
-    """Byte-level Shannon entropy in bits, 0.0 to 8.0. Empty input is 0.0.
-
-    Single pass; ``Counter`` over ``bytes`` tallies in C. Slice the buffer if you
-    only want a sample of a very large file.
-    """
+    """Byte-level Shannon entropy in bits, 0.0 to 8.0. Empty input is 0.0. Single pass over
+    the whole buffer - slice it first if you only want a sample of a very large file."""
     buf = _as_bytes(data)
     if not buf:
         return 0.0
@@ -185,17 +159,12 @@ def shannon_entropy(data):
 
 @lru_cache(maxsize=16)
 def _string_patterns(min_length):
-    """(ascii, utf16le) run patterns for ``min_length``.
-
-    The UTF-16LE pattern matches only NUL-padded ASCII - the ``strings -e l`` case
-    that surfaces Windows wide-char URLs, paths, and registry keys. Genuine
-    non-Latin UTF-16 is out of scope for a triage listing.
-
-    Matching is byte-wise, **not** 2-byte aligned, exactly as ``strings -e l`` is:
-    a wide run preceded by a single printable byte absorbs it (``d`` + ``W\\0I\\0``
-    reads as ``dWI``). Anchoring to even offsets would instead miss every wide run
-    that starts at an odd offset, which is the more damaging failure.
-    """
+    """The UTF-16LE pattern matches only NUL-padded ASCII - the ``strings -e l`` case that
+    surfaces Windows wide-char URLs, paths and registry keys. Matching is byte-wise,
+    **not** 2-byte aligned, exactly as ``strings -e l`` is: a wide run preceded by a single
+    printable byte absorbs it (``d`` + ``W\\0I\\0`` reads as ``dWI``). Anchoring to even
+    offsets would instead miss every wide run starting at an odd offset, the more damaging
+    failure."""
     return (
         re.compile(b'[\x20-\x7e]{%d,}' % min_length),
         re.compile(b'(?:[\x20-\x7e]\x00){%d,}' % min_length),
@@ -215,17 +184,11 @@ def _collect(pattern, buf, cap, wide):
 
 
 def extract_strings(data, min_length=MIN_STRING_LENGTH, limit=MAX_STRINGS):
-    """Printable ASCII and UTF-16LE runs of at least ``min_length`` characters.
-
-    Returns at most ``limit`` strings, each truncated to ``MAX_STRING_LENGTH``, in
-    offset order within each encoding (ASCII first, then UTF-16LE). Duplicates are
-    kept - this is the ``strings`` primitive, so de-duplication is the caller's
-    call.
-
-    ``limit`` is shared round-robin between the two encodings. Filling it
-    encoding-by-encoding would let an ASCII-heavy binary drop every wide string,
-    which on Windows malware is where the interesting text usually is.
-    """
+    """Printable ASCII and UTF-16LE runs of at least ``min_length`` characters, at most
+    ``limit`` of them, each truncated to ``MAX_STRING_LENGTH``. Duplicates are kept; this
+    is the ``strings`` primitive. ``limit`` is shared round-robin between the two
+    encodings - filling it encoding-by-encoding would let an ASCII-heavy binary drop every
+    wide string, which on Windows malware is where the interesting text usually is."""
     buf = _as_bytes(data)
     limit = max(int(limit), 0)
     if not buf or not limit:
@@ -253,18 +216,14 @@ def extract_strings(data, min_length=MIN_STRING_LENGTH, limit=MAX_STRINGS):
     return groups[0][:taken[0]] + groups[1][:taken[1]]
 
 
-# One alternation so hits come out in a single offset-ordered pass and share one
-# candidate budget.
+# One alternation, so hits come out in a single offset-ordered pass sharing one budget.
 _EMBEDDED_MAGIC_RE = re.compile(b'MZ|\x7fELF')
 
 
 def _confirms_pe(buf, offset):
-    """True when ``MZ`` at ``offset`` is followed by a reachable ``PE\\0\\0``.
-
-    A bare ``MZ`` is not evidence of anything - it is two common ASCII letters and
-    occurs constantly in text and compressed data. Following e_lfanew is what makes
-    this a signal rather than noise.
-    """
+    """True when ``MZ`` at ``offset`` is followed by a reachable ``PE\\0\\0``. A bare ``MZ``
+    is not evidence of anything - two common ASCII letters, constant in text and compressed
+    data. Following e_lfanew is what makes this a signal, not noise."""
     field = offset + _PE_LFANEW_OFFSET
     if field + 4 > len(buf):
         return False
@@ -283,12 +242,9 @@ def _confirms_elf(buf, offset):
 
 
 def find_embedded_executables(data, limit=MAX_EMBEDDED_HITS):
-    """PE and ELF headers at **nonzero** offsets - appended or padded droppers.
-
-    Returns up to ``limit`` ``{'offset': int, 'signature': 'PE'|'ELF'}`` in
-    ascending offset order. Offset 0 is excluded by definition: that is the file's
-    own format, which :func:`sniff_magic` already reports.
-    """
+    """PE and ELF headers at **nonzero** offsets (appended or padded droppers), up to
+    ``limit`` of them in ascending order. Offset 0 is excluded by definition: that is the
+    file's own format, which :func:`sniff_magic` already reports."""
     buf = _as_bytes(data)
     limit = max(int(limit), 0)
     if not buf or not limit:

@@ -1,12 +1,13 @@
 """Regression tests for `_is_main_frame_navigation`.
 
-Only the driven page's own main frame may write `nav_state`: `primary_host` comes
-from `nav_state['final_url']`, so an iframe or popup that gets through falsifies
-the report's DNS/TLS/ASN/PTR/WHOIS.
+Only the driven page's own main frame may write `nav_state`: `primary_host` comes from
+`nav_state['final_url']`, so an iframe or popup that gets through falsifies the report's
+DNS/TLS/ASN/PTR/WHOIS. The gate is `request.frame is page.main_frame`; `parent_frame is
+None` is not sufficient, because a popup's main frame also has no parent.
 
-Fake request/frame/page objects - no Playwright, no Chromium. Playwright's own
-frame semantics were verified separately against real Chromium; this pins only
-that the gate reads them correctly and fails closed.
+Fake request/frame/page objects - no Playwright, no Chromium. Playwright's own frame
+semantics were verified separately against real Chromium; this pins only that the gate
+reads them correctly and fails closed.
 """
 
 import os

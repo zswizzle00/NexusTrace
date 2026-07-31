@@ -1,10 +1,9 @@
 """Pure e-mail parsing and detection. stdlib only, no network, no I/O.
 
-Two deliberate choices: **header access never raises** (``policy.default`` builds
-header objects that raise on malformed input, and hostile mail is malformed on
-purpose, so all reads go through :func:`header`), and **brand matching is
-word-boundary anchored**, so ``'chase' in 'purchase'`` cannot make an ordinary
-sender look like phishing.
+Two deliberate choices: **header access never raises** (``policy.default`` builds header
+objects that raise on malformed input, and hostile mail is malformed on purpose, so all
+reads go through :func:`header`), and **brand matching is word-boundary anchored**, so
+``'chase' in 'purchase'`` cannot make an ordinary sender look like phishing.
 """
 
 import ipaddress
@@ -24,16 +23,14 @@ logger = logging.getLogger(__name__)
 DATE_FUTURE_TOLERANCE = timedelta(hours=24)
 DATE_STALE_TOLERANCE = timedelta(days=180)
 
-# Output caps: a hostile message must not bloat the persisted record (20,000
-# Received headers produced 2.3 MB of JSON) or the unpaginated tables that render
-# it. The chain is oldest-first, so keeping the first N keeps the hops closest to
-# the originator.
+# A hostile message must not bloat the persisted record (20,000 Received headers produced
+# 2.3 MB of JSON) or the unpaginated tables that render it. The chain is oldest-first, so
+# keeping the first N keeps the hops closest to the originator.
 MAX_RECEIVED_HOPS = 50
 MAX_ATTACHMENTS = 25
 
-# Defence in depth: extraction is linear (see :class:`_AnchorCollector`), but
-# there is no analytic value in the tail of a multi-megabyte body and the route
-# is unauthenticated.
+# Defence in depth: extraction is linear (see :class:`_AnchorCollector`), but there is
+# no analytic value in the tail of a multi-megabyte body and the route is unauthenticated.
 MAX_URL_SCAN_CHARS = 1024 * 1024
 
 _AUTH_RE = re.compile(
@@ -71,7 +68,7 @@ class EmailParseError(ValueError):
 
 def parse_message(raw):
     """Parse raw message bytes. Raises :class:`EmailParseError` only when nothing
-    usable can be recovered - a message with headers and no body is valid."""
+    usable can be recovered; a message with headers and no body is valid."""
     if isinstance(raw, str):
         raw = raw.encode('utf-8', 'replace')
     if not raw or not raw.strip():
@@ -114,7 +111,6 @@ def _addr(header_value):
 
 
 def _display(header_value):
-    """The display-name portion of an address header."""
     if not header_value:
         return ''
     try:
@@ -128,7 +124,6 @@ def _domain_of(addr):
 
 
 def sender_domain(msg):
-    """Registrable domain of the From address, or None."""
     domain = registrable_domain(_domain_of(_addr(header(msg, 'From'))))
     return domain or None
 
@@ -173,10 +168,9 @@ def parse_auth_results(msg):
 
 
 def _display_name_impersonates(display, from_domain):
-    """True when a display name claims an identity the From domain contradicts:
-    it spells out a domain that is not the sender's, or names a well-known brand
-    absent from the sender's domain (word-boundary anchored, so 'purchase' is not
-    a 'chase' hit)."""
+    """True when a display name claims an identity the From domain contradicts: it spells
+    out a domain that is not the sender's, or names a well-known brand absent from the
+    sender's domain (word-boundary anchored, so 'purchase' is not a 'chase' hit)."""
     if not display or not from_domain:
         return False
     for match in _DOMAINISH_RE.finditer(display):
@@ -195,13 +189,10 @@ _BULK_PRECEDENCE = frozenset({'list', 'bulk'})
 
 
 def is_list_mail(msg):
-    """True when the message carries mailing-list or bulk-sender markers.
-
-    A false-positive guard, not a detection: lists and ESPs rewrite
-    ``Return-Path`` and point ``Reply-To`` at the list, so those "mismatches" are
-    the normal shape on real list traffic. Without this suppression ordinary list
-    mail scores 0.30-0.50 and lands in ``suspicious``.
-    """
+    """A false-positive guard, not a detection: lists and ESPs rewrite ``Return-Path`` and
+    point ``Reply-To`` at the list, so those "mismatches" are the normal shape on real list
+    traffic. Without this suppression ordinary list mail scores 0.30-0.50 and lands in
+    ``suspicious``."""
     for name in _LIST_HEADERS:
         if header(msg, name):
             return True
@@ -209,12 +200,9 @@ def is_list_mail(msg):
 
 
 def check_spoofing(msg):
-    """Signals that the sender is not who the message presents them as.
-
-    ``Reply-To`` / ``Return-Path`` mismatches are suppressed for list and bulk mail
-    (see :func:`is_list_mail`); display-name impersonation is not, because a list
-    does not explain a display name claiming someone else's brand.
-    """
+    """``Reply-To`` / ``Return-Path`` mismatches are suppressed for list and bulk mail (see
+    :func:`is_list_mail`); display-name impersonation is not, because a list does not
+    explain a display name claiming someone else's brand."""
     signals = []
     from_raw = header(msg, 'From')
     from_domain = registrable_domain(_domain_of(_addr(from_raw)))
@@ -256,9 +244,8 @@ def _date_anomalous(raw, now=None):
 
 
 def find_suspicious_headers(msg, now=None):
-    """Weak, ambient header quirks. Individually meaningless; the rule engine
-    weights them so no combination of these alone produces a verdict. ``now`` is
-    injectable so tests never time-bomb."""
+    """Weak, ambient header quirks, weighted by the rule engine so no combination of them
+    alone produces a verdict. ``now`` is injectable so tests never time-bomb."""
     signals = []
     if not header(msg, 'Message-ID'):
         signals.append('missing_message_id')
@@ -272,12 +259,11 @@ def find_suspicious_headers(msg, now=None):
     return signals
 
 
-# Address literals inside a Received header. Deliberately loose - every candidate
-# is validated with :mod:`ipaddress`, which is the real filter. Both shapes occur
-# in the wild: a bracketed literal (IPv6 must be bracketed; Postfix writes the
-# RFC 5321 `IPv6:` prefix) and a bare dotted quad in a parenthesised comment.
-# Matching IPv4 only made `sender_ip_blacklisted` unreachable for Gmail /
-# Microsoft 365 inbound mail, which is routinely delivered over IPv6.
+# Deliberately loose: every candidate is validated with :mod:`ipaddress`, which is the real
+# filter. Both shapes occur in the wild - a bracketed literal (Postfix writes the RFC 5321
+# `IPv6:` prefix) and a bare dotted quad in a parenthesised comment. Matching IPv4 only
+# made `sender_ip_blacklisted` unreachable for Gmail / Microsoft 365 inbound mail, which is
+# routinely delivered over IPv6.
 _RECEIVED_ADDR_RE = re.compile(
     r'\[\s*(?:ipv6:)?([0-9A-Fa-f:.]{2,45})\s*\]'
     r'|\b((?:\d{1,3}\.){3}\d{1,3})\b',
@@ -304,11 +290,9 @@ def _first_address(text):
 
 
 def _hop_address(collapsed):
-    """The originating address of a hop, preferring the ``from`` clause: the first
-    literal anywhere in the header mis-attributes hops, so
-    ``by 10.0.0.5 ... from relay.test (203.0.113.9)`` would credit the receiver.
-    Falls back to a whole-header search for relays that write neither clause cleanly.
-    """
+    """The originating address of a hop, preferring the ``from`` clause: the first literal
+    anywhere in the header mis-attributes hops, so ``by 10.0.0.5 ... from relay.test
+    (203.0.113.9)`` would credit the receiver. Falls back to a whole-header search."""
     from_clause = _RECEIVED_FROM_CLAUSE_RE.search(collapsed)
     if from_clause:
         found = _first_address(from_clause.group(1))
@@ -318,13 +302,10 @@ def _hop_address(collapsed):
 
 
 def received_chain(msg, limit=MAX_RECEIVED_HOPS):
-    """Received hops, **oldest first** - index 0 is closest to the originator, which
-    is the hop that injected the message and the one an analyst wants.
-
-    Bounded by ``limit`` (oldest kept). A malformed header degrades that one hop,
-    not the whole chain - losing every hop would silently take out IP enrichment,
-    the DNSBL lookup, and ``sender_ip_blacklisted`` with it.
-    """
+    """Received hops, **oldest first**: index 0 is the hop that injected the message.
+    Bounded by ``limit`` (oldest kept). A malformed header degrades that one hop, not the
+    whole chain; losing every hop would silently take out IP enrichment, the DNSBL lookup,
+    and ``sender_ip_blacklisted`` with it."""
     try:
         raw_values = list(msg.get_all('Received') or [])
     except Exception:
@@ -358,9 +339,9 @@ def received_chain(msg, limit=MAX_RECEIVED_HOPS):
 
 
 def public_ips_from_received(msg):
-    """Globally-routable addresses (IPv4 **and** IPv6) from the Received chain,
-    oldest first, deduped. Private and reserved addresses are internal relay hops,
-    not the sender, and must never reach an external enrichment service."""
+    """Globally-routable addresses (IPv4 **and** IPv6) from the Received chain, oldest
+    first, deduped. Private and reserved addresses are internal relay hops, not the sender,
+    and must never reach an external enrichment service."""
     found = []
     seen = set()
     for hop in received_chain(msg):
@@ -386,13 +367,10 @@ _URL_TRAILING = '.,;:!?)\'"]>'
 
 
 class _AnchorCollector(HTMLParser):
-    """Collect ``(href, anchor_text)`` pairs from an HTML body.
-
-    **Replaces a regex on purpose - do not go back.** A ``(.*?)</a>`` pairing
-    backtracks catastrophically on unclosed anchors (the normal shape of phishing
-    HTML): ~7.8x growth per input doubling, so an 86 KB body became minutes of
-    GIL-held CPU on an unauthenticated route, stalling all gunicorn threads.
-    """
+    """**Replaces a regex on purpose; do not go back.** A ``(.*?)</a>`` pairing backtracks
+    catastrophically on unclosed anchors (the normal shape of phishing HTML) - ~7.8x growth
+    per input doubling, so an 86 KB body became minutes of GIL-held CPU on an
+    unauthenticated route, stalling all gunicorn threads."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -408,8 +386,7 @@ class _AnchorCollector(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         if tag == 'a':
-            # A second <a> before the first closed ends the first one, matching
-            # the anchor/text pairing browsers apply.
+            # A second <a> before the first closed ends it, as browsers pair them.
             self._flush()
             for name, value in attrs:
                 if name == 'href' and value:
@@ -441,8 +418,8 @@ class _AnchorCollector(HTMLParser):
 
 
 def _anchor_pairs(html_text):
-    """``(href, text)`` for each anchor in ``html_text``. Never raises - a parse
-    error yields the pairs collected so far rather than losing the whole body."""
+    """``(href, text)`` for each anchor in ``html_text``. Never raises: a parse error yields
+    the pairs collected so far rather than losing the whole body."""
     collector = _AnchorCollector()
     try:
         collector.feed(html_text)
@@ -456,8 +433,7 @@ def _anchor_pairs(html_text):
 
 
 def _text_bodies(msg):
-    """(subtype, text) for each non-attachment text part. Never touches
-    attachment payloads."""
+    """(subtype, text) for each non-attachment text part. Never touches attachments."""
     bodies = []
     try:
         parts = list(msg.walk()) if msg.is_multipart() else [msg]
@@ -497,8 +473,8 @@ def _display_mismatch(url, anchor_text):
 
 
 def extract_urls(msg, limit=200):
-    """URLs from hrefs and plaintext, with display-vs-target mismatch flagged.
-    Returns **live** URLs - the caller defangs for storage and display."""
+    """URLs from hrefs and plaintext, display-vs-target mismatch flagged. Returns **live**
+    URLs; the caller defangs for storage and display."""
     results = []
     seen = set()
 
@@ -535,9 +511,9 @@ def extract_urls(msg, limit=200):
 
 
 def attachment_metadata(msg, limit=MAX_ATTACHMENTS):
-    """Per-attachment metadata and digests. **Returns metadata only - never
-    bytes**: each payload is hashed and goes out of scope immediately, so no code
-    path can persist or serve attachment content."""
+    """Per-attachment metadata and digests. **Returns metadata only, never bytes**: each
+    payload is hashed and goes out of scope immediately, so no code path can persist or
+    serve attachment content."""
     results = []
     seen = 0
     try:

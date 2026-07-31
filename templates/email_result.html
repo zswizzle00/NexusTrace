@@ -27,9 +27,7 @@
   {% set level = v.get('level') or 'unknown' %}
   {% set score = v.get('score') %}
   {% set signals = v.get('signals') or [] %}
-  {# .get() with a default, NEVER [level] - a record written by an older/newer
-     version, or one with a level this template doesn't know about, must not
-     raise. See app/services/email_rules.py for the level vocabulary. #}
+  {# .get() with a default, NEVER [level]: a record from another version, or one carrying an unknown level, must not raise. See app/services/email_rules.py. #}
   {% set tone = {
        'malicious':  ('bg-red-900/40', 'text-red-300', 'border-red-800/60'),
        'suspicious': ('bg-yellow-900/40', 'text-yellow-300', 'border-yellow-800/60'),
@@ -66,7 +64,7 @@
       <span class="text-xs text-gray-500 font-mono">score {{ '%.2f' % score }}</span>
       {% endif %}
       <span class="text-xs text-gray-600">
-        Heuristic over message structure and reputation lookups - not a definitive judgement.
+        Heuristic over message structure and reputation lookups, not a definitive judgement.
       </span>
     </div>
     {% if signals %}
@@ -152,9 +150,9 @@
     {% endif %}
   </div>
 
-  {# enrichment.sender_domain is get_domain_info_quick's record with a whois result
-     grafted on at ['whois'] (see email_service._enrich). Absent when the domain failed
-     the SSRF guard or every lookup failed - both must render, not raise. #}
+  {# enrichment.sender_domain is get_domain_info_quick's record with whois grafted on at
+     ['whois'] (see email_service._enrich). Absent when the domain failed the SSRF guard or
+     every lookup failed; both must render, not raise. #}
   {% set enrichment = analysis.get('enrichment') or {} %}
   {% set sdom = enrichment.get('sender_domain') or {} %}
   {% if analysis.get('sender_domain') %}
@@ -198,7 +196,7 @@
     {% else %}
     <p class="text-xs text-gray-500">
       No domain enrichment. The domain did not resolve to a globally-routable
-      address, or every lookup failed - parsing and scoring are unaffected.
+      address, or every lookup failed; parsing and scoring are unaffected.
     </p>
     {% endif %}
   </div>
@@ -302,9 +300,8 @@
             </td>
             <td class="py-1.5 pr-4 text-gray-500 break-all">{{ sha or '-' }}</td>
             <td class="py-1.5">
-              {# Pivot only when the value really is an MD5/SHA-1/SHA-256 digest: the
-                 record is read back off disk, so `sha` is not guaranteed to be a
-                 hexdigest. The link goes through url_for, never hand-built. #}
+              {# Pivot only when the value really is a digest: the record is read back off disk, so
+                 `sha` is not guaranteed to be a hexdigest. The link goes through url_for. #}
               {% set shalow = (sha or '') | lower %}
               {% set is_digest = shalow | length in [32, 40, 64]
                                  and shalow | reject('in', '0123456789abcdef') | list | length == 0 %}
@@ -328,8 +325,8 @@
   </div>
 
   {# Stored URLs are defanged, attacker-controlled text (anchor_text especially) and are
-     NEVER rendered as a live <a href>: the app's CSP carries 'unsafe-inline', so a
-     clickable harvested href is an XSS hole. #}
+     NEVER a live <a href>: the CSP carries 'unsafe-inline', so a clickable harvested href
+     is an XSS hole. #}
   {% set urls = analysis.get('urls') or [] %}
   <div class="nt-card p-4 mb-5">
     <h3 class="nt-card-title mb-3">URLs{% if urls %} ({{ urls | length }}){% endif %}</h3>

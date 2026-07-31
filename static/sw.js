@@ -1,8 +1,7 @@
-// Service Worker for NexusTrace
-//
+
 // Strategy:
 //   - Navigations (HTML pages): network-first, fall back to cache when offline.
-//     This guarantees users always get fresh pages after a deploy - never a stale shell.
+//     This guarantees users always get fresh pages after a deploy (never a stale shell).
 //   - Same-origin static assets (CSS/JS/fonts/images): stale-while-revalidate.
 //     Fast paint from cache, with a background refresh so the next load is current.
 //   - Everything else (cross-origin, non-GET): passed straight to the network.
@@ -42,12 +41,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const { request } = event;
 
-    // Only handle GET; let the browser deal with POST/PUT/etc.
     if (request.method !== 'GET') return;
 
     const url = new URL(request.url);
 
-    // Network-first for page navigations so deploys are picked up immediately.
     if (request.mode === 'navigate') {
         event.respondWith(
             fetch(request)
@@ -61,7 +58,6 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Stale-while-revalidate for same-origin static assets only.
     if (url.origin === self.location.origin && url.pathname.startsWith('/static/')) {
         event.respondWith(
             caches.match(request).then(cached => {

@@ -1,9 +1,8 @@
 """Pins app/utils/lnk_parse.py - .lnk parsing and heuristics. Pure, no network.
 
-Every fixture is assembled here with struct against MS-SHLLINK; there are no
-sample files and nothing is downloaded. The malformed fixtures exist to prove the
-parser degrades to partial results instead of raising on attacker-controlled
-binary input.
+Every fixture is assembled here with struct against MS-SHLLINK; there are no sample files
+and nothing is downloaded. The malformed fixtures exist to prove the parser degrades to
+partial results instead of raising on attacker-controlled binary input.
 """
 import os
 import random
@@ -455,7 +454,6 @@ def scenario_analyze_lnk_wrapper():
     found = keys(result['signals'])
     assert 'lolbas_target' in found and 'unc_path_in_arguments' in found, sorted(found)
     assert any(item['type'] == 'ipv4' for item in result['iocs'])
-    # Non-bytes input is a caller error, not an exception.
     for bad in (None, 'not bytes', 42, []):
         assert analyze_lnk(bad)['parsed']['error'] == 'input is not bytes'
     assert analyze_lnk(bytearray(build_lnk(local_base=NOTEPAD)))['parsed']['parsed_ok']

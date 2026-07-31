@@ -21,7 +21,6 @@ def sanitize_filename(name):
 
 
 def is_safe_path(base_dir, filepath):
-    """Check if the resolved filepath is within the base directory."""
     base_dir = os.path.realpath(base_dir)
     filepath = os.path.realpath(filepath)
     return filepath.startswith(base_dir + os.sep) or filepath == base_dir
@@ -45,7 +44,6 @@ def register_cyberchef_routes(app):
 
     @cyberchef_bp.route('/api/cyberchef/recipes', methods=['GET'])
     def get_recipes():
-        """Get list of saved recipes"""
         recipes = []
         try:
             for filename in os.listdir(recipes_dir):
@@ -65,7 +63,6 @@ def register_cyberchef_routes(app):
 
     @cyberchef_bp.route('/api/cyberchef/recipes', methods=['POST'])
     def save_recipe():
-        """Save a new recipe"""
         data = request.json
         if not data or 'name' not in data:
             return jsonify({'error': 'Recipe name is required'}), 400
@@ -92,7 +89,6 @@ def register_cyberchef_routes(app):
 
     @cyberchef_bp.route('/api/cyberchef/recipes/<filename>', methods=['GET'])
     def load_recipe(filename):
-        """Load a specific recipe"""
         safe_name = sanitize_filename(filename)
         if not safe_name:
             return jsonify({'error': 'Invalid filename'}), 400

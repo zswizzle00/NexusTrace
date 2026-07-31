@@ -1,7 +1,7 @@
 # Deploying NexusTrace on Cloud Run
 
 This is the runbook for running NexusTrace as a Cloud Run service. It assumes the
-VM / `docker-compose` deployment stays as it is - the same image works in both, and
+VM / `docker-compose` deployment stays as it is; the same image works in both, and
 nothing here changes local development.
 
 The declarative half of this lives in [`service.yaml`](../service.yaml) at the repo
@@ -27,7 +27,7 @@ behaves, all of them verified against the current code:
 | 3 | 80 concurrent requests per instance by default | Pinned to 8 to match `--threads 8`, because every URL scan holds its thread while a real Chromium process runs (§4). |
 | 4 | Request bodies are capped at 32 MiB by the platform | The app allows 50 MB. Uploads between 32 MiB and 50 MB fail **before** Flask sees them (§5). |
 | 5 | CPU is only allocated during requests by default | The 30-minute cache-clearing daemon thread in `app/utils/cache.py` would not fire. `service.yaml` sets CPU always-allocated (§4). |
-| 6 | No nginx; TLS terminates at Google's front end | `nginx.conf` is dead weight here - its `client_max_body_size 50M` and 300s proxy timeouts do not apply (§5, §6). |
+| 6 | No nginx; TLS terminates at Google's front end | `nginx.conf` is dead weight here: its `client_max_body_size 50M` and 300s proxy timeouts do not apply (§5, §6). |
 
 And one more that belongs to the storage work: **the container filesystem is
 in-memory and per-instance.** Everything under `data/` (scans, screenshots, e-mail
@@ -57,7 +57,7 @@ target site, but the UI round-trip is not.
 
 ---
 
-## 2. `SECRET_KEY` - do this first
+## 2. `SECRET_KEY`: do this first
 
 `app/__init__.py` falls back to `os.urandom(32).hex()` when `SECRET_KEY` is unset or
 still the `your-secret-key-here` placeholder. That fallback is survivable on a
@@ -66,7 +66,7 @@ single long-lived VM. On Cloud Run it is a defect generator:
 * every new revision is a new process, so all outstanding CSRF tokens and sessions
   break at deploy time;
 * with more than one instance, a token minted by instance A is rejected by instance
-  B, so form POSTs fail **intermittently** - the analyst sees
+  B, so form POSTs fail **intermittently**: the analyst sees
   "Your session expired. Please try again." on a random subset of submissions, and
   the pattern does not reproduce on demand;
 * `WTF_CSRF_TIME_LIMIT` is 3600s, so the breakage outlives any single page load.
@@ -79,7 +79,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))" \
   | gcloud secrets create nexustrace-secret-key --data-file=-
 ```
 
-Rotating it logs everyone out and invalidates in-flight forms - do it deliberately,
+Rotating it logs everyone out and invalidates in-flight forms; do it deliberately,
 not on a schedule, and expect the "session expired" flash for one page load.
 
 ---
@@ -91,7 +91,7 @@ not on a schedule, and expect the "session expired" flash for one page load.
 One secret per key in `.env.example`. All of them are optional to the *app* (a
 service whose key is missing is skipped and its card does not render), but a
 `secretKeyRef` in `service.yaml` pointing at a secret that does not exist is a hard
-deploy failure - so create the ones you have and **delete the unused blocks from
+deploy failure, so create the ones you have and **delete the unused blocks from
 `service.yaml`** rather than creating empty secrets.
 
 | Secret name | Env var | Purpose |
@@ -107,7 +107,7 @@ deploy failure - so create the ones you have and **delete the unused blocks from
 | `nexustrace-urlscan-api-key` | `URLSCAN_API_KEY` | urlscan.io submissions |
 | `nexustrace-virustotal-api-key` | `VIRUSTOTAL_API_KEY` | Hash reputation (4 req/**min** free tier) |
 | `nexustrace-alienvault-key` | `ALIENVAULT_KEY` | OTX threat intel |
-| `nexustrace-abusech-auth-key` | `ABUSECH_AUTH_KEY` | **One** key for MalwareBazaar, ThreatFox, URLhaus and the Hunting API. Mandatory as of 2026: without it those endpoints return 401 and the sources report as *unavailable*, not as "nothing known" - a silent loss of coverage. |
+| `nexustrace-abusech-auth-key` | `ABUSECH_AUTH_KEY` | **One** key for MalwareBazaar, ThreatFox, URLhaus and the Hunting API. Mandatory as of 2026: without it those endpoints return 401 and the sources report as *unavailable*, not as "nothing known", a silent loss of coverage. |
 
 ```bash
 # repeat per key; --data-file=- avoids the value landing in shell history
@@ -157,7 +157,7 @@ gcloud storage buckets create gs://BUCKET_NAME \
 
 Uniform access + public access prevention are not optional here: the bucket holds
 screenshots of attacker-controlled pages, e-mail findings (sender addresses,
-subjects, Received-chain IPs), and - if you enable the submission queue - malware
+subjects, Received-chain IPs), and (if you enable the submission queue) malware
 samples (§7b).
 
 Add a lifecycle rule instead of running `scripts/purge_data.py`, which has no cron
@@ -201,7 +201,7 @@ YAML
 gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE="$IMAGE" .
 ```
 
-Confirm the extra actually landed before deploying - this is the failure that only
+Confirm the extra actually landed before deploying; this is the failure that only
 shows up when an analyst runs the first scan:
 
 ```bash
@@ -216,7 +216,7 @@ the constraints the `Dockerfile` is written around and do not "optimise" them aw
   the legacy builder and no buildx, where a cache mount is a hard build failure.
 * **No recursive `chown`.** `appuser` is created before anything is copied and the
   ownership is set by `COPY --chown`. A `chown -R` over the venv rewrites 7,300
-  files into a new layer - that was the step that looked like a 20-minute hang.
+  files into a new layer: that was the step that looked like a 20-minute hang.
 * **`--only-binary` on the expensive packages.** A missing wheel must fail loudly
   rather than silently compile `cryptography` (Rust, ~15 min) or `numpy`/`pandas`
   (~25 min). Nothing needs a compiler, which is why `build-essential` and
@@ -243,7 +243,7 @@ gcloud run services replace service.yaml --region REGION
 gcloud run services describe nexustrace --region REGION --format='value(status.url)'
 ```
 
-`services replace` is declarative and authoritative - it removes anything not in the
+`services replace` is declarative and authoritative: it removes anything not in the
 file. Do not mix it with `gcloud run deploy --set-env-vars`; change the file and
 re-apply, so the manifest stays the source of truth.
 
@@ -256,32 +256,32 @@ gcloud run services add-iam-policy-binding nexustrace \
 
 ...or, preferably for an analyst tool, keep it private and front it with IAP or an
 identity-aware load balancer. NexusTrace has **no application-level authentication**
-of its own - anything that can reach the URL can drive the scanner (§7a).
+of its own; anything that can reach the URL can drive the scanner (§7a).
 
-### Concurrency, CPU and memory - the numbers and why
+### Concurrency, CPU and memory: the numbers and why
 
 | Setting | Value | Reason |
 |---|---|---|
 | `containerConcurrency` | **8** | Exactly gunicorn's `--threads 8`. At the default 80, 72 requests would queue in the socket backlog behind 8 threads that each hold a live Chromium process for ~30s+, so queued requests exceed both `--timeout 120` and `timeoutSeconds`. Pinning it moves the waiting into Cloud Run's queue, where it is visible in metrics instead of appearing as random 504s. |
 | `cpu` | **2** | Chromium rendering is CPU-bound, and Cloud Run's CPU/memory minimums require ≥2 vCPU at 4Gi. At 1 vCPU two concurrent scans serialize and both approach the timeout. |
-| `memory` | **4Gi** | ~250 MB base (Python + Flask + MMDB reader) + ~350 MB per in-flight scan (Chromium browser + renderer on a script-heavy page; `--disable-dev-shm-usage` means it is all heap) + ~100 MB of full-page PNG and text buffers. Worst case 8 concurrent scans ≈ 2.8 GB, leaving ~700 MB headroom - which the in-memory filesystem also draws on when `STORAGE_BACKEND=local`. |
+| `memory` | **4Gi** | ~250 MB base (Python + Flask + MMDB reader) + ~350 MB per in-flight scan (Chromium browser + renderer on a script-heavy page; `--disable-dev-shm-usage` means it is all heap) + ~100 MB of full-page PNG and text buffers. Worst case 8 concurrent scans ≈ 2.8 GB, leaving ~700 MB headroom, which the in-memory filesystem also draws on when `STORAGE_BACKEND=local`. |
 | `timeoutSeconds` | **180** | Must exceed gunicorn's `--timeout 120` so a hung worker is killed and logged by gunicorn (502) rather than truncated by the platform (an unattributable 504). |
-| `maxScale` | **1** | Rate limiters are per-process module-level singletons, so N instances multiply the real provider rate - VirusTotal's free tier is 4 req/**minute**. And with `STORAGE_BACKEND=local`, instances cannot see each other's scans. Raise only after GCS storage is in place and you accept the multiplied rate. |
+| `maxScale` | **1** | Rate limiters are per-process module-level singletons, so N instances multiply the real provider rate; VirusTotal's free tier is 4 req/**minute**. And with `STORAGE_BACKEND=local`, instances cannot see each other's scans. Raise only after GCS storage is in place and you accept the multiplied rate. |
 | `minScale` | **1** | Large image + Chromium launch makes cold start tens of seconds; also keeps the cache thread alive. |
 | `cpu-throttling` | **false** | See below. |
 | execution environment | **gen2** | Full syscall surface for Chromium, real `/tmp`, network mounts. |
 
 **The CPU allocation tradeoff.** With the default (CPU only during requests), the
-daemon thread `app/utils/cache.py` starts - which sleeps 1800s then calls
-`clear_caches()` - is frozen between requests and will not fire on any predictable
+daemon thread `app/utils/cache.py` starts (which sleeps 1800s then calls
+`clear_caches()`) is frozen between requests and will not fire on any predictable
 schedule. Same for any straggler enrichment thread that outlives its request
 (`email_service`'s `ENRICH_DEADLINE` detaches futures, it cannot cancel the
 threads). Setting `run.googleapis.com/cpu-throttling: "false"` fixes both but bills
-the instance for its whole lifetime rather than per request - roughly 3-4x an idle
+the instance for its whole lifetime rather than per request, roughly 3-4x an idle
 request-billed instance at `minScale: 1`. If that cost is unacceptable, set it back
 to `"true"` and accept the pre-existing fallback: each cached function still expires
 lazily on its own TTL, so the only loss is the proactive sweep. Do not instead move
-the sweep to Cloud Scheduler - it clears in-process caches and cannot be triggered
+the sweep to Cloud Scheduler; it clears in-process caches and cannot be triggered
 over HTTP.
 
 Scaling up later, in order: raise `--threads` in the `Dockerfile` **and**
@@ -304,7 +304,7 @@ reaches gunicorn. So on Cloud Run:
   raw source (separately capped at 10 MB, so pasting is only affected above that);
 * `nginx.conf`'s `client_max_body_size 50M` is not in the path and does not help.
 
-The app limit is deliberately left at 50 MB - lowering it would silently change the
+The app limit is deliberately left at 50 MB; lowering it would silently change the
 VM deployment, where 50 MB genuinely works. Choose one of these instead:
 
 1. **Recommended:** tell analysts the effective ceiling on Cloud Run is **32 MiB**,
@@ -312,13 +312,13 @@ VM deployment, where 50 MB genuinely works. Choose one of these instead:
    batches are orders of magnitude below this; the limit only bites on large binary
    samples, which are exactly the ones §7b says to think twice about uploading.
 2. If you need the app's error message rather than the platform's, set
-   `MAX_CONTENT_LENGTH` to 32 MiB **for the Cloud Run deployment only** - that means
+   `MAX_CONTENT_LENGTH` to 32 MiB **for the Cloud Run deployment only**: that means
    an env-var-driven override in `app/__init__.py`, which does not exist today.
    Don't hard-code it; it would regress the VM.
 3. Cloud Run documents the 32 MiB cap as applying to HTTP/1 requests, with
    HTTP/2 end-to-end exempt. If you want to rely on that, enable HTTP/2 on the
    service and **verify with a real >32 MiB upload** before telling analysts it
-   works - this is a platform detail, not something this codebase controls.
+   works; this is a platform detail, not something this codebase controls.
 
 ---
 
@@ -332,9 +332,9 @@ wildcard `Access-Control-Allow-Origin: *` disappearing is a small improvement, n
 regression.
 
 `app/__init__.py` wraps the app in `ProxyFix(x_for=1, x_proto=1, x_host=1,
-x_prefix=1)` - trust exactly one upstream hop. What is correct on Cloud Run:
+x_prefix=1)`: trust exactly one upstream hop. What is correct on Cloud Run:
 
-* **Direct Cloud Run URL (`*.run.app`) - `x_for=1` is correct, leave it alone.**
+* **Direct Cloud Run URL (`*.run.app`): `x_for=1` is correct, leave it alone.**
   Google's front end appends the real client IP to any client-supplied
   `X-Forwarded-For`, so the rightmost entry (which is what ProxyFix's one-hop
   setting reads) is the trustworthy one. `X-Forwarded-Proto` is `https`, which is
@@ -348,7 +348,7 @@ x_prefix=1)` - trust exactly one upstream hop. What is correct on Cloud Run:
   `X-Forwarded-For`.
 
 `ProxyFix`'s hop count is not currently configurable by env var. If you deploy
-behind a load balancer, that override is the change to make - one line in
+behind a load balancer, that override is the change to make: one line in
 `app/__init__.py`, defaulting to 1 so the VM is unaffected.
 
 ---
@@ -365,7 +365,7 @@ attached service account** to anything that can make an HTTP request from inside
 the container, with no credential required beyond the request itself.
 
 NexusTrace's URL scanner makes outbound HTTP requests to URLs an untrusted party
-influences - the submitted target, everything in its redirect chain, and every
+influences: the submitted target, everything in its redirect chain, and every
 subresource the page loads. That is the exact shape of an SSRF-to-credential-theft
 chain on GCP.
 
@@ -384,12 +384,12 @@ The guard is real and it does block this:
 
 And the module states its own residual gaps rather than papering over them: a
 subresource that redirects is not re-validated on that hop (the connection has
-already happened), and **DNS rebinding is not closed** - validation and Chromium's
+already happened), and **DNS rebinding is not closed**: validation and Chromium's
 own later resolution are separate lookups, so an attacker who wins that race is not
 stopped. Closing it needs resolve-and-pin at the network layer or egress control.
 
 Therefore, on GCP, defence in depth is mandatory, because the consequence of a
-bypass is not "a leaked internal status code" - it is **theft of the service
+bypass is not "a leaked internal status code"; it is **theft of the service
 account's credentials**:
 
 1. **Grant the runtime service account nothing beyond what it needs.** Concretely:
@@ -397,7 +397,7 @@ account's credentials**:
    and `roles/storage.objectUser` on the specific bucket in §3c. Nothing else. No
    project-level roles, and **never** the default compute service account, whose
    project Editor role turns a scanner SSRF into full project compromise.
-2. **Do not attach anything else to this identity** - no Cloud SQL, no BigQuery, no
+2. **Do not attach anything else to this identity**: no Cloud SQL, no BigQuery, no
    Pub/Sub, no `iam.serviceAccountTokenCreator` (which would let a stolen token mint
    tokens for other identities and defeat the whole point of item 1).
 3. **Prefer egress control.** Route egress through a VPC connector /
@@ -415,13 +415,13 @@ account's credentials**:
    `kind: 'blocked'` naming a link-local or metadata target is a high-signal
    indicator that someone is probing this specific path.
 
-### 7b. `data/quarantine/` holds live malware - an acceptable-use decision
+### 7b. `data/quarantine/` holds live malware, an acceptable-use decision
 
 The abuse.ch submission queue (`app/services/submissions.py`) writes sample bytes to
 `data/quarantine/` while a submission waits for operator approval. Those are **live
-malware samples**. The module is careful with them - `0600`, filenames derived from a
+malware samples**. The module is careful with them (`0600`, filenames derived from a
 digest the module computes itself, deleted as soon as the record reaches a terminal
-state, never returned by any accessor - but that is local hygiene, not a hosting
+state, never returned by any accessor), but that is local hygiene, not a hosting
 decision.
 
 On Cloud Run this becomes an explicit choice the operator must make, for two
@@ -456,7 +456,7 @@ Options, in decreasing order of caution:
   operator process that approves or rejects promptly so records reach a terminal
   state and the bytes are deleted.
 
-Whatever you choose, decide it before enabling the queue - not after the first
+Whatever you choose, decide it before enabling the queue, not after the first
 sample is uploaded.
 
 ### 7c. Everything else
@@ -471,7 +471,7 @@ sample is uploaded.
 * `FLASK_DEBUG` must stay false/unset. It is not referenced by `create_app()` today,
   but do not introduce it here.
 * Cloud Run's own request logs record full URLs. Analysts paste indicators into
-  `GET /i/<indicator>`, so those indicators - including URLs from phishing mails -
+  `GET /i/<indicator>`, so those indicators (including URLs from phishing mails)
   land in Cloud Logging. Set a retention policy that matches how you treat the rest
   of your analyst data.
 
@@ -491,7 +491,7 @@ environment, and it is the only path that needs Chromium):
 
 1. Submit a benign URL at `/url_scan` and confirm a screenshot renders. A Chromium
    launch failure shows up here as a scan with `status='error'`.
-2. Submit an IP at `/` and confirm the provider cards you have keys for appear -
+2. Submit an IP at `/` and confirm the provider cards you have keys for appear;
    a missing card means a missing or unreadable secret.
 3. Upload a small `.eml` at `/email_analysis` and confirm the result page loads on a
    **second** request (that is what catches per-instance storage: with
