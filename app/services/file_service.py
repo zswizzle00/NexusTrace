@@ -171,17 +171,22 @@ def looks_like_lnk(magic_type, filename):
     return magic_type == 'LNK' or file_extension(filename) == 'lnk'
 
 
-def reputation_report(sha256):
+def reputation_report(sha256, md5=None):
     """Exactly one `get_hash_info_quick` call plus OTX. Embedded executables are **not**
-    looked up: `virustotal_limiter` is a process-wide 4-per-minute limiter whose acquire()
-    blocks in time.sleep, so a per-hit loop would stall the request and starve concurrent
-    /hash_analysis users (see the MAX_ENRICH_HASHES note in email_service.py).
+    looked up: `virustotal_limiter` is a process-wide 4-per-minute limiter, so a per-hit
+    loop would spend the whole minute's quota on one upload and leave concurrent
+    /hash_analysis users with `rate_limited` (see the MAX_ENRICH_HASHES note in
+    email_service.py).
+
+    `md5` is passed only for Cymru MHR, whose zone has no sha256 records at all, so
+    without it that source can never answer for an upload.
 
     Per-source state uses `hash_service.source_state`'s vocabulary, so 'skipped' (never
-    queried) stays distinct from 'no_record' (queried, nothing known).
+    queried) stays distinct from 'no_record' (queried, nothing known) and from
+    'rate_limited' (queried nothing, quota spent, retry will answer).
     """
     try:
-        hash_info = get_hash_info_quick(sha256) or {}
+        hash_info = get_hash_info_quick(sha256, md5=md5) or {}
     except Exception as exc:
         logger.warning('Hash reputation lookup failed for %s: %s', sha256, exc)
         hash_info = {}
@@ -209,6 +214,12 @@ def reputation_report(sha256):
 
     return {
         'sources': sources,
+        # A separate key, not a fifth entry in `sources`, because file_rules.score() reads
+        # `sources` to decide whether `benign` is reachable at all and neither of these may
+        # clear a file: MHR scores the empty-file MD5 at 91%, and EICAR is present in NSRL.
+        # CIRCL still reaches `known_malware` when it reports KnownMalicious, via
+        # hash_info['summary']['is_malicious'].
+        'advisory': report.get('advisory') or [],
         'known_malware': known_malware,
         'links': report.get('reference_links') or reference_links(sha256),
     }
@@ -253,6 +264,7 @@ def _empty_reputation(sha256=''):
     """Reputation shape for a file that was never hashed, so never looked up."""
     return {
         'sources': {},
+        'advisory': [],
         'known_malware': False,
         'links': reference_links(sha256) if sha256 else {},
     }
@@ -302,6 +314,6 @@ def analyze_file(file_path, filename):
 
     return _scored(_assemble(
         filename, size_bytes, digests, inspection, lnk, iocs,
-        reputation_report(digests['sha256']),
+        reputation_report(digests['sha256'], md5=digests['md5']),
         len(window) < size_bytes, None,
     ))

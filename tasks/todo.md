@@ -357,3 +357,64 @@ passes raw values to `ipaddress.ip_address`, so `123` becomes `"0.0.0.123"`.
   underlying thread running in the background after the executor detaches (Python cannot force
   a thread to stop). This matches existing behavior in `home_routes._run_parallel` elsewhere in
   the app, but is worth remembering if `data/analyses/` enrichment ever needs a hard kill.
+
+---
+
+# 2026-07-31: hash reputation without a VirusTotal key
+
+Goal: hash reputation stays useful when VirusTotal is throttled. VT's free tier is 4 requests
+per **minute** and there is no keyless VT API, so the answer is not to bypass VT; it is to stop
+VT from blocking and to add sources that need no key at all.
+
+Owner approved both new outbound destinations (CIRCL hashlookup, Team Cymru MHR).
+
+## Acceptance criteria
+- [x] A rate-limited VT lookup reports `rate_limited` and makes no HTTP request, rather than
+      sleeping in the request thread.
+- [x] `rate_limited` is a distinct state from `skipped`, which means "no key, never asked".
+- [x] `RateLimiter.acquire()` and its context manager keep their blocking behaviour unchanged;
+      every other service depends on that politeness with sub-second windows.
+- [x] A pasted SHA-256 gets a real reputation answer with no API keys configured at all.
+- [x] An MHR hit never on its own marks a file malicious.
+- [x] Presence in NSRL never clears a file.
+- [x] No weight or threshold in any of the three rule engines changes.
+- [x] Both destinations declared in `disclosure.py`; `test_disclosure.py` green.
+- [x] Both new cached functions added to the eager list in `cache.py:clear_caches()`.
+- [x] New pure test script, house style, no network. Existing 23 suites keep byte-identical
+      `PASS:` counts.
+
+## Working notes
+The real defect is not the key, it is that `virustotal_limiter.acquire()` loops in `time.sleep`.
+At 4 per minute the fifth lookup parks a request thread for up to ~60s, and with `--threads 8`
+a handful of lookups can wedge the server. That is what makes VT feel unusable.
+
+Both keyless sources were verified live before any code was written:
+
+| Source | Key | Transport | Accepts | Unknown |
+|---|---|---|---|---|
+| CIRCL hashlookup | none | HTTPS | md5, sha1, sha256 | HTTP 404 |
+| Team Cymru MHR | none | DNS TXT | md5, sha1 only | empty answer |
+
+Two findings from that testing, both load-bearing:
+
+1. **MHR flagged the empty-file MD5 at 91%** (`d41d8cd98f00b204e9800998ecf8427e` returns
+   `"1445018789 91"`). It is noisy on ubiquitous artifacts, so it must never feed
+   `known_malware_hash`, which `file_rules.py` weights at exactly `MALICIOUS_THRESHOLD` so a
+   hit reaches `malicious` alone.
+2. **EICAR is in NSRL** and simultaneously flagged `KnownMalicious`, shipped on a Linux distro
+   ISO. So NSRL presence is not evidence of anything good.
+
+MHR being md5/sha1 only matters more than it looks: `/hash_analysis` input is usually a
+SHA-256, so MHR contributes nothing there. `file_digests()` already computes all three, but
+`file_service` passed only the sha256 into `get_hash_info_quick`, so uploads needed the md5
+plumbed through.
+
+## Deliberately out of scope
+- Scraping the VirusTotal web GUI. It needs an authenticated session, is behind anti-bot, and
+  violates their terms.
+- Any weight or band change in the rule engines. `file_rules.check_band_derivation()`
+  recomputes its interval from `WEIGHTS` at test time, so a new weighted signal re-bands every
+  verdict and needs its own case-table work.
+- Raising `MAX_ENRICH_HASHES` above 3. The cap's documented justification is that the VT
+  limiter blocks, so the reasoning needs revisiting now that it does not, but the cap itself
+  stays until that is done deliberately.

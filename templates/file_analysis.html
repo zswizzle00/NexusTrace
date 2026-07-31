@@ -246,12 +246,13 @@
     {% endfor %}
   {% endif %}
   {% set state_labels = {
-       'no_record':   ('No record',    'text-gray-300'),
-       'not_found':   ('No record',    'text-gray-300'),
-       'skipped':     ('Not queried',  'text-gray-500'),
-       'unavailable': ('Unavailable',  'text-yellow-300'),
-       'error':       ('Unavailable',  'text-yellow-300'),
-       'found':       ('Record found', 'text-red-300')
+       'no_record':    ('No record',    'text-gray-300'),
+       'not_found':    ('No record',    'text-gray-300'),
+       'skipped':      ('Not queried',  'text-gray-500'),
+       'rate_limited': ('Rate limited', 'text-yellow-300'),
+       'unavailable':  ('Unavailable',  'text-yellow-300'),
+       'error':        ('Unavailable',  'text-yellow-300'),
+       'found':        ('Record found', 'text-red-300')
      } %}
   <div class="nt-card p-4 mb-5">
     <h3 class="nt-card-title mb-3">Hash Reputation
@@ -274,6 +275,8 @@
                 {{ info.get('key_env') }} not configured
               {% elif state in ['skipped'] %}
                 API key not configured
+              {% elif state == 'rate_limited' %}
+                per-minute quota spent, not queried; retry shortly
               {% elif state in ['unavailable', 'error'] %}
                 query failed or timed out
               {% elif info.get('message') %}
@@ -299,6 +302,37 @@
       evidence is not evidence of absence, and a freshly built dropper is unknown to every
       feed by design.
     </p>
+    {% endif %}
+
+    {% set rep_advisory = rep.get('advisory') or [] %}
+    {% if rep_advisory %}
+    {% set adv_labels = {
+         'found':       ('Answered',    'text-yellow-300'),
+         'no_record':   ('No record',   'text-gray-300'),
+         'unavailable': ('Unavailable', 'text-yellow-300')
+       } %}
+    <div class="mt-4">
+      <h4 class="text-xs text-gray-500 uppercase tracking-wide mb-2">Keyless sources (context only)</h4>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <tbody>
+            {% for row in rep_advisory %}
+            {% set label, colour = adv_labels.get(row.get('state'), ('Unknown', 'text-gray-400')) %}
+            <tr class="border-t border-gray-800">
+              <td class="py-2 pr-4 text-gray-300 whitespace-nowrap">{{ row.get('name') }}</td>
+              <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
+              <td class="py-2 pr-4 text-gray-500 break-all">{{ row.get('detail') or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Neither feeds the verdict above. Cymru MHR scores the empty file at 91%, so its
+        percentage is noisy on common artifacts, and EICAR is present in NSRL, so a CIRCL
+        record cannot clear a file. Only CIRCL's own malicious flag raises the verdict.
+      </p>
+    </div>
     {% endif %}
 
     {% set rep_links = rep.get('links') or {} %}

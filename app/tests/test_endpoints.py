@@ -87,7 +87,7 @@ def test_pages(s):
         ('/user_agent_search',   200, None, 'User Agent Analysis'),
         ('/url_scan',            200, 'URL Scan | NexusTrace', None),
         ('/email_analysis',      200, 'E-mail Analysis | NexusTrace', None),
-        ('/cyberchef',           200, 'CyberChef - NexusTrace', None),
+        ('/cyberchef',           200, 'CyberChef | NexusTrace', None),
         ('/no_results',          200, 'No Results Found', None),
     ]
     for path, status, want_title, want_body in pages:

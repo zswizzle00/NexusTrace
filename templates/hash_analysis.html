@@ -1,6 +1,34 @@
 {% extends "base.html" %}
 {% from "_search_form.html" import search_form %}
 
+{# Keyless sources reported apart from the four reputation sources. `found` is not red on
+   purpose: neither of them is a malicious verdict on its own. #}
+{% macro advisory_table(rows) %}
+  {% set adv_labels = {
+       'found':       ('Answered',    'text-yellow-300'),
+       'no_record':   ('No record',   'text-gray-300'),
+       'unavailable': ('Unavailable', 'text-yellow-300')
+     } %}
+  <table class="w-full text-sm">
+    <tbody>
+      {% for row in rows %}
+      {% set label, colour = adv_labels.get(row.state, ('Unknown', 'text-gray-400')) %}
+      <tr class="border-b border-gray-800">
+        <td class="py-2 pr-4 text-gray-300 whitespace-nowrap">{{ row.name }}</td>
+        <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
+        <td class="py-2 pr-4 text-gray-500 text-xs">{{ row.detail or '' }}</td>
+        <td class="py-2">
+          {% if row.url %}
+          <a href="{{ row.url }}" target="_blank" rel="noopener noreferrer"
+             class="text-blue-400 hover:underline text-xs whitespace-nowrap">Open &rarr;</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}
+
 {% block main_content_class %}full-width{% endblock %}
 
 {% block content %}
@@ -17,10 +45,11 @@
 
     {% if unknown_hash %}
     {% set state_labels = {
-         'no_record':   ('No record',   'text-gray-300'),
-         'skipped':     ('Not queried', 'text-gray-500'),
-         'unavailable': ('Unavailable', 'text-yellow-300'),
-         'found':       ('Record found','text-red-300')
+         'no_record':    ('No record',    'text-gray-300'),
+         'skipped':      ('Not queried',  'text-gray-500'),
+         'rate_limited': ('Rate limited', 'text-yellow-300'),
+         'unavailable':  ('Unavailable',  'text-yellow-300'),
+         'found':        ('Record found', 'text-red-300')
        } %}
 
     <div class="verdict-bar is-suspicious shadow-lg px-6 py-5 mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -37,6 +66,7 @@
             {% if unknown_hash.type %}<span class="px-4 text-gray-400">Type <span class="text-gray-100">{{ unknown_hash.type }}</span></span>{% endif %}
             <span class="px-4 text-gray-400">No record <span class="text-gray-100">{{ unknown_hash.counts.no_record }}</span></span>
             {% if unknown_hash.counts.unavailable %}<span class="px-4 text-gray-400">Unavailable <span class="text-yellow-300">{{ unknown_hash.counts.unavailable }}</span></span>{% endif %}
+            {% if unknown_hash.counts.rate_limited %}<span class="px-4 text-gray-400">Rate limited <span class="text-yellow-300">{{ unknown_hash.counts.rate_limited }}</span></span>{% endif %}
             {% if unknown_hash.counts.skipped %}<span class="px-4 text-gray-400">Not queried <span class="text-gray-100">{{ unknown_hash.counts.skipped }}</span></span>{% endif %}
         </div>
     </div>
@@ -78,6 +108,8 @@
                         <td class="py-2 pr-4 text-gray-500 text-xs">
                             {% if source.state == 'skipped' %}
                                 {{ source.key_env }} not configured
+                            {% elif source.state == 'rate_limited' %}
+                                per-minute quota spent, not queried; retry shortly
                             {% elif source.state == 'unavailable' %}
                                 query failed or timed out
                             {% endif %}
@@ -92,6 +124,19 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            {% if unknown_hash.advisory %}
+            <div class="mt-6">
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Keyless sources (context only)</h4>
+                {{ advisory_table(unknown_hash.advisory) }}
+                <p class="text-gray-500 text-xs mt-2">
+                    Neither of these decides the verdict above. Cymru MHR scores the empty
+                    file at 91%, so its percentage is noisy on common artifacts, and EICAR
+                    is present in NSRL, so a CIRCL record is not a clean result. Only
+                    CIRCL's own malicious flag counts as a finding.
+                </p>
+            </div>
+            {% endif %}
 
             {% if unknown_hash.reference_links %}
             <div class="mt-6">
@@ -173,6 +218,19 @@
                 </a>
                 {% endif %}
             </div>
+        </div>
+        {% endif %}
+
+        {% if hash_info and hash_info.advisory %}
+        <div class="bg-gray-900 rounded-2xl shadow-lg p-6 flex flex-col overflow-x-auto">
+            <h3 class="text-xl font-bold text-blue-400 mb-4">Keyless sources</h3>
+            {{ advisory_table(hash_info.advisory) }}
+            <p class="text-gray-500 text-xs mt-3">
+                Context, not verdict. Cymru MHR scores the empty file at 91%, so its
+                percentage is noisy on common artifacts, and EICAR is present in NSRL, so a
+                CIRCL record is not a clean result. Only CIRCL's own malicious flag counts
+                as a finding.
+            </p>
         </div>
         {% endif %}
 

@@ -34,8 +34,12 @@ PARTIES = (
     Party('sender_site', 'the sender domain itself', (),
           'a TLS connection from this server to read its certificate', ALWAYS),
     Party('dns', 'public DNS', (), 'domain names and IP addresses', ALWAYS),
-    Party('cymru', 'Team Cymru', ('asn.cymru.com', 'origin.asn.cymru.com'),
-          'IP addresses, as DNS queries', ALWAYS),
+    # One party, three zones: the ASN zones carry IP addresses and the Malware Hash
+    # Registry zone carries hashes, but it is one operator and one account-free service.
+    Party('cymru', 'Team Cymru', ('asn.cymru.com', 'origin.asn.cymru.com',
+                                  'malware.hash.cymru.com', 'team-cymru.com'),
+          'IP addresses and file hashes, as DNS queries', ALWAYS),
+    Party('circl', 'CIRCL hashlookup', ('hashlookup.circl.lu',), 'file hashes', ALWAYS),
     Party('ip2whois', 'IP2WHOIS', ('api.ip2whois.com',), 'domain names', ALWAYS),
     Party('abuseipdb', 'AbuseIPDB', ('api.abuseipdb.com',), 'IP addresses', ALWAYS),
     Party('vpnapi', 'VPNAPI.io', ('vpnapi.io',), 'IP addresses', ALWAYS),
@@ -102,16 +106,16 @@ SURFACES = {
                   'body and attachment bytes are never written to disk'),
         retention=RETENTION,
         parties=('dns', 'sender_site', 'ip2whois', 'vpnapi', 'abuseipdb', 'otx',
-                 'virustotal', 'abusech', 'spamhaus', 'spamcop', 'barracuda',
-                 'hybrid_analysis', 'anyrun', 'joesandbox'),
+                 'virustotal', 'abusech', 'circl', 'cymru', 'spamhaus', 'spamcop',
+                 'barracuda', 'hybrid_analysis', 'anyrun', 'joesandbox'),
     ),
     'file': Surface(
         label='file analysis',
-        sends='the SHA-256 hash of the sample (never the file itself)',
+        sends='the SHA-256 and MD5 hashes of the sample (never the file itself)',
         retained=('nothing. The sample is written to a temporary file, analysed, and '
                   'deleted before the page renders'),
         retention=None,
-        parties=('virustotal', 'abusech', 'otx',
+        parties=('virustotal', 'abusech', 'otx', 'circl', 'cymru',
                  'hybrid_analysis', 'anyrun', 'joesandbox'),
     ),
 }

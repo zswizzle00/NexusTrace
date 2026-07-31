@@ -30,7 +30,7 @@ SERVICES = Path(disclosure.__file__).resolve().parent.parent / 'services'
 # matching only on `https?://` would miss every DNS-based provider.
 HOST_RE = re.compile(
     r'\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+'
-    r'(?:com|net|org|io|ch|sh|run|gov|edu|info|co|me|us|ai|dev|cloud|app|xyz)\b')
+    r'(?:com|net|org|io|ch|sh|run|gov|edu|info|co|me|us|ai|dev|cloud|app|xyz|lu)\b')
 
 CASES = 0
 FAILURES = []

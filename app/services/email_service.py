@@ -44,11 +44,16 @@ logger = logging.getLogger(__name__)
 # auto-enriched; they get pivot links instead.
 MAX_ENRICH_IPS = 5
 # Do NOT raise this above 3. `hash_service.virustotal_limiter` is a process-wide
-# RateLimiter(max_requests=4, time_window=1 minute) whose acquire() *blocks* in
-# time.sleep rather than failing fast. At 4 hashes one e-mail consumes the whole
-# free-tier minute; at 5 the fifth task sleeps ~60s, blowing past ENRICH_DEADLINE (20s),
-# so `attachment_known_malware` - the only signal that reaches `malicious` alone -
-# silently misses. 3 leaves a slot per minute for concurrent /hash_analysis users.
+# RateLimiter(max_requests=4, time_window=1 minute), so one e-mail with 4 attachments
+# consumes the entire free-tier minute and every concurrent /hash_analysis user gets
+# `rate_limited` instead of an answer. 3 leaves a slot per minute for them.
+#
+# The mechanism changed on 2026-07-31 but not the cap: get_virustotal_report now uses
+# try_acquire(), so a spent quota returns `rate_limited` at once instead of sleeping ~60s
+# and blowing past ENRICH_DEADLINE. The consequence for this cap is the same either way.
+# `attachment_known_malware` (the only signal that reaches `malicious` alone) still comes
+# from VirusTotal, MalwareBazaar and ThreatFox, so a throttled VirusTotal still means that
+# signal can silently miss; it now fails fast rather than slow.
 MAX_ENRICH_HASHES = 3
 ENRICH_WORKERS = 8
 

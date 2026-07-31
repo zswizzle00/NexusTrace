@@ -87,9 +87,14 @@ def clear_caches():
                 domain_service.get_talos_reputation,
                 domain_service.get_domain_info,
                 domain_service.get_domain_info_quick,
-                hash_service.get_virustotal_report,
+                # The cached function is the private inner one: get_virustotal_report is a
+                # thin uncached wrapper that turns a spent quota into `rate_limited`
+                # without memoizing it.
+                hash_service._virustotal_report,
                 hash_service.get_malwarebazaar_report,
                 hash_service.get_threatfox_iocs,
+                hash_service.get_circl_hashlookup,
+                hash_service.get_cymru_mhr,
                 hash_service.get_hash_info,
                 abusech.threatfox_lookup,
                 abusech.threatfox_hash,
