@@ -20,6 +20,7 @@ import hmac
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    session, url_for)
@@ -118,6 +119,28 @@ def _authorized():
     return _session_valid()
 
 
+def _hourly_buckets(entries):
+    """24-slot request/error counts for the last 24 hours, oldest-first."""
+    now = datetime.now(timezone.utc)
+    slots = {}
+    for i in range(23, -1, -1):
+        dt = now - timedelta(hours=i)
+        key = dt.strftime('%Y-%m-%dT%H')
+        slots[key] = {'label': dt.strftime('%H:00'), 'count': 0, 'errors': 0}
+    for e in entries:
+        ts = str(e.get('ts', ''))
+        if len(ts) >= 13:
+            key = ts[:13]
+            if key in slots:
+                slots[key]['count'] += 1
+                try:
+                    if int(e.get('status') or 0) >= 400:
+                        slots[key]['errors'] += 1
+                except (TypeError, ValueError):
+                    pass
+    return list(slots.values())
+
+
 def _int_arg(name, default, low, high):
     try:
         value = int(request.args.get(name, default))
@@ -143,7 +166,9 @@ def _dashboard():
     # and truncates at the oldest end, so the summary window is never what gets cut.
     entries = activity.read_entries(days=days)
     cutoff = activity.window_start(24)
-    window = activity.summarize([e for e in entries if str(e.get('ts', '')) >= cutoff])
+    window_entries = [e for e in entries if str(e.get('ts', '')) >= cutoff]
+    window = activity.summarize(window_entries)
+    hours_data = _hourly_buckets(window_entries)
 
     total = len(entries)
     pages = max(1, (total + per_page - 1) // per_page)
@@ -161,6 +186,7 @@ def _dashboard():
         days=days,
         summary=window,
         cutoff=cutoff,
+        hours_data=hours_data,
     ), 200
 
 
