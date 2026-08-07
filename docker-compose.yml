@@ -56,10 +56,8 @@ services:
       retries: 3
       start_period: 20s
     networks:
-      # Deliberately NOT app_network. nginx is the one container published to the LAN, and
-      # keeping it off this network means it cannot reach the admin service even if its
-      # config later grows a stray proxy_pass.
       - admin_network
+      - app_network
 
   nginx:
     image: nginx:latest
