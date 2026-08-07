@@ -31,12 +31,10 @@ services:
   admin:
     build: .
     ports:
-      # LOOPBACK ONLY, the most important line in this file. A bare "5051:5051" publishes
-      # on 0.0.0.0 and puts the admin UI on the LAN, which defeats the entire split: a
-      # home LAN includes IoT devices and anything else on it that gets compromised. Reach
-      # it over an SSH tunnel from the workstation instead:
-      #   ssh -L 5051:127.0.0.1:5051 <homelab-host>
-      - "127.0.0.1:5051:5051"
+      # Published on all interfaces so it is reachable on the local network.
+      # Make sure ADMIN_TOKEN is set: the token is the only door when Cloudflare
+      # Access is not in use, and /admin returns 404 without it.
+      - "5051:5051"
     volumes:
       - app_logs:/app/logs
       # The same records as `web`. This container is less REACHABLE, not less privileged:
