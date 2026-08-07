@@ -1,317 +1,337 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if authorized %}Dashboard{% else %}Sign in{% endif %} · NexusTrace Admin</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon_io/favicon.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}?v={{ asset_v }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ asset_v }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ asset_v }}">
+  <style>
+    .admin-shell { display:flex; flex-direction:column; min-height:100vh; background:#0b0f1a; }
+    .admin-topbar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 1.25rem; height:52px;
+      background:#0f1624; border-bottom:1px solid #1e293b;
+      position:sticky; top:0; z-index:50;
+    }
+    .admin-brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    .admin-brand-icon {
+      width:30px; height:30px; background:#1e3a5f; border-radius:8px;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .admin-badge {
+      font-size:0.6rem; font-weight:600; letter-spacing:0.12em;
+      padding:0.15rem 0.45rem; border-radius:4px;
+      background:#1d4ed820; border:1px solid #2563eb40; color:#60a5fa;
+      text-transform:uppercase;
+    }
+    .admin-main { flex:1; padding:2rem 1.25rem; max-width:1300px; margin:0 auto; width:100%; }
+  </style>
+</head>
+<body class="admin-shell">
 
-{% block title %}Admin | NexusTrace{% endblock %}
-
-{% block content %}
-<div class="max-w-7xl mx-auto px-4 py-8">
-
-  {# ── FLASH MESSAGES ── #}
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for category, message in messages %}
-    <div class="mb-4 px-4 py-3 rounded text-sm
-      {% if category == 'error' %}bg-red-900/40 text-red-300 border border-red-800
-      {% else %}bg-blue-900/40 text-blue-300 border border-blue-800{% endif %}">
-      {{ message }}
-    </div>
-    {% endfor %}
-  {% endwith %}
-
-  {# ════════════════════════════════════════════
-     LOGIN
-     ════════════════════════════════════════════ #}
-  {% if not authorized %}
-  <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
-    <div class="nt-card p-8" style="width:100%;max-width:22rem;">
-
-      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem;">
-        <div style="width:48px;height:48px;background:#1e3a5f;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:0.75rem;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="11" width="18" height="11" rx="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-        </div>
-        <h1 class="text-xl font-semibold text-gray-100">NexusTrace Admin</h1>
-        <p class="text-xs text-gray-500 mt-1">Activity dashboard — restricted access</p>
+  {# ── Top bar ── #}
+  <header class="admin-topbar">
+    <div class="admin-brand">
+      <div class="admin-brand-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z"/>
+        </svg>
       </div>
-
-      <form method="POST" action="/admin">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <label for="admin-token" class="block text-xs text-gray-500 uppercase tracking-wide mb-2">Admin token</label>
-        <input type="password" name="token" id="admin-token" autocomplete="current-password" spellcheck="false"
-          class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2.5 text-gray-100 font-mono text-sm mb-4"
-          placeholder="••••••••••••••••••••" required autofocus />
-        <button type="submit"
-          class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded"
-          style="width:100%;">
-          Sign in
-        </button>
-      </form>
+      <span style="font-size:0.95rem;font-weight:600;color:#e2e8f0;letter-spacing:-0.01em;">NexusTrace</span>
+      <span class="admin-badge">Admin</span>
     </div>
-  </div>
-
-  {# ════════════════════════════════════════════
-     DASHBOARD
-     ════════════════════════════════════════════ #}
-  {% else %}
-
-  {# ── Header ── #}
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
-    <div>
-      <h1 class="text-2xl font-semibold text-gray-100 mb-1">Activity Dashboard</h1>
-      <p class="text-sm text-gray-400">
-        Last 24 h — <span class="font-mono text-gray-300">{{ summary.total }}</span> requests &nbsp;·&nbsp;
-        <span class="font-mono text-gray-300">{{ total }}</span> records over last {{ days }} day{{ '' if days == 1 else 's' }}
-      </p>
-    </div>
-    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-      {# Days filter buttons #}
-      {% for d in [1, 3, 7, 14, 30] %}
-      <a href="/admin?days={{ d }}&per={{ per_page }}"
-        style="padding:0.3rem 0.65rem;border-radius:6px;font-size:0.75rem;font-family:monospace;border:1px solid;
-               {% if days == d %}background:#1d4ed8;border-color:#2563eb;color:#bfdbfe;
-               {% else %}background:#1f2937;border-color:#374151;color:#9ca3af;{% endif %}
-               text-decoration:none;">
-        {{ d }}d
+    {% if authorized %}
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <a href="http://{{ request.host.split(':')[0] }}:5050/" target="_blank"
+        style="font-size:0.72rem;color:#64748b;text-decoration:none;display:flex;align-items:center;gap:4px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Open app
       </a>
-      {% endfor %}
       <form method="POST" action="/admin/logout" style="margin:0;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <button type="submit"
-          style="padding:0.3rem 0.65rem;border-radius:6px;font-size:0.75rem;background:#1f2937;border:1px solid #374151;color:#9ca3af;cursor:pointer;">
+          style="font-size:0.72rem;padding:0.25rem 0.65rem;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;">
           Sign out
         </button>
       </form>
     </div>
-  </div>
+    {% endif %}
+  </header>
 
-  {# ── Stat tiles ── #}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.5rem;">
+  <main class="admin-main">
 
-    {% set tiles = [
-      ('Requests',   summary.total,            '#60a5fa', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
-      ('Unique IPs',  summary.unique_ips,       '#34d399', 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
-      ('Uploads',     summary.uploads,          '#a78bfa', 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12'),
-      ('Errors',      summary.errors,           '#f87171', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'),
-      ('Error Rate',  (summary.error_rate | string) ~ '%', '#fbbf24', 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z'),
-      ('Countries',   summary.top_countries | length, '#38bdf8', 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
-    ] %}
-
-    {% for label, value, accent, icon_path in tiles %}
-    <div class="nt-card p-4" style="border-top:2px solid {{ accent }}20;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-        <span style="font-size:0.7rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">{{ label }}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ accent }}" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:0.7;flex-shrink:0;">
-          <path d="{{ icon_path }}"/>
-        </svg>
+    {# ── Flash messages ── #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div style="margin-bottom:1rem;padding:0.65rem 1rem;border-radius:6px;font-size:0.8rem;
+        {% if category == 'error' %}background:#450a0a30;color:#fca5a5;border:1px solid #7f1d1d;
+        {% else %}background:#1e3a5f30;color:#93c5fd;border:1px solid #1d4ed8;{% endif %}">
+        {{ message }}
       </div>
-      <div style="font-size:1.5rem;font-weight:600;font-family:monospace;color:{{ accent }};">{{ value }}</div>
-    </div>
-    {% endfor %}
-
-  </div>
-
-  {# ── Hourly chart ── #}
-  <div class="nt-card p-4" style="margin-bottom:1.5rem;">
-    <div style="font-size:0.7rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">
-      Requests — last 24 hours
-    </div>
-    {% set hour_max = (hours_data | map(attribute='count') | max) or 1 %}
-    <svg viewBox="0 0 480 90" preserveAspectRatio="none" class="w-full" style="height:90px;display:block;" aria-hidden="true">
-      {# baseline #}
-      <line x1="0" y1="74" x2="480" y2="74" stroke="#374151" stroke-width="1"/>
-      {% for h in hours_data %}
-        {% set i = loop.index0 %}
-        {% set bh = ((h.count / hour_max) * 68) | int %}
-        {% set eh = ((h.errors / hour_max) * 68) | int %}
-        <g>
-          <title>{{ h.label }}: {{ h.count }} req{% if h.errors %}, {{ h.errors }} err{% endif %}</title>
-          {% if bh > 0 %}
-          <rect x="{{ i * 20 + 1 }}" y="{{ 74 - bh }}" width="18" height="{{ bh }}" rx="2" fill="#2563eb" opacity="0.75"/>
-          {% else %}
-          <rect x="{{ i * 20 + 1 }}" y="73" width="18" height="1" rx="1" fill="#1f2937"/>
-          {% endif %}
-          {% if eh > 0 %}
-          <rect x="{{ i * 20 + 1 }}" y="{{ 74 - eh }}" width="18" height="{{ eh }}" rx="2" fill="#ef4444" opacity="0.7"/>
-          {% endif %}
-        </g>
-        {% if i % 6 == 0 %}
-        <text x="{{ i * 20 + 9 }}" y="87" text-anchor="middle" font-size="8" fill="#6b7280">{{ h.label }}</text>
-        {% endif %}
       {% endfor %}
-    </svg>
-    <div style="display:flex;gap:1.25rem;margin-top:0.5rem;">
-      <span style="display:flex;align-items:center;gap:5px;font-size:0.65rem;color:#6b7280;">
-        <span style="width:10px;height:10px;background:#2563eb;border-radius:2px;display:inline-block;opacity:0.75;"></span>Requests
-      </span>
-      <span style="display:flex;align-items:center;gap:5px;font-size:0.65rem;color:#6b7280;">
-        <span style="width:10px;height:10px;background:#ef4444;border-radius:2px;display:inline-block;opacity:0.7;"></span>Errors (4xx/5xx)
-      </span>
-    </div>
-  </div>
+    {% endwith %}
 
-  {# ── Top-N tables ── #}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:1.5rem;">
-    {% set top_sections = [
-      ('Top Paths',     summary.top_paths),
-      ('Top IPs',       summary.top_ips),
-      ('Top Countries', summary.top_countries),
-    ] %}
-    {% for section_label, rows in top_sections %}
-    <div class="nt-card p-4">
-      <div style="font-size:0.7rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">
-        {{ section_label }}
+    {# ════════════════════════════════
+       LOGIN
+       ════════════════════════════════ #}
+    {% if not authorized %}
+    <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
+      <div class="nt-card p-8" style="width:100%;max-width:21rem;">
+        <div style="text-align:center;margin-bottom:1.5rem;">
+          <div style="width:48px;height:48px;background:#1e3a5f;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <p style="font-size:0.78rem;color:#475569;margin-top:0.25rem;">Enter your admin token to continue</p>
+        </div>
+        <form method="POST" action="/admin">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <label for="admin-token" style="display:block;font-size:0.7rem;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.4rem;">
+            Admin token
+          </label>
+          <input type="password" name="token" id="admin-token"
+            autocomplete="current-password" spellcheck="false" required autofocus
+            style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.6rem 0.75rem;color:#e2e8f0;font-family:monospace;font-size:0.85rem;margin-bottom:0.75rem;box-sizing:border-box;"
+            placeholder="••••••••••••••••••••"/>
+          <button type="submit"
+            style="width:100%;padding:0.6rem 1rem;background:#2563eb;border:none;border-radius:6px;color:#fff;font-size:0.85rem;font-weight:500;cursor:pointer;">
+            Sign in
+          </button>
+        </form>
       </div>
-      {% if rows %}
-        {% set top_max = namespace(val=1) %}
-        {% for name, count in rows %}{% if count > top_max.val %}{% set top_max.val = count %}{% endif %}{% endfor %}
-        <table style="width:100%;border-collapse:collapse;">
-          <tbody>
-          {% for name, count in rows %}
-          {% set pct = ((count / top_max.val) * 100) | int %}
-          <tr style="border-bottom:1px solid #1f2937;">
-            <td style="padding:0.35rem 0.5rem 0.35rem 0;font-size:0.7rem;font-family:monospace;color:#d1d5db;word-break:break-all;max-width:0;width:55%;">
-              {{ name }}
-            </td>
-            <td style="padding:0.35rem 0 0.35rem 0.5rem;width:45%;">
-              <div style="display:flex;align-items:center;gap:6px;">
-                <div style="flex:1;background:#1f2937;border-radius:2px;height:4px;overflow:hidden;">
-                  <div style="width:{{ pct }}%;height:100%;background:#2563eb;border-radius:2px;"></div>
+    </div>
+
+    {# ════════════════════════════════
+       DASHBOARD
+       ════════════════════════════════ #}
+    {% else %}
+
+    {# ── Page header ── #}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+      <div>
+        <h1 style="font-size:1.25rem;font-weight:600;color:#e2e8f0;margin:0 0 0.25rem;">Activity Dashboard</h1>
+        <p style="font-size:0.78rem;color:#64748b;margin:0;">
+          Last 24 h —
+          <span style="font-family:monospace;color:#94a3b8;">{{ summary.total }}</span> requests &nbsp;·&nbsp;
+          <span style="font-family:monospace;color:#94a3b8;">{{ total }}</span> records over {{ days }} day{{ '' if days == 1 else 's' }}
+        </p>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+        {% for d in [1, 3, 7, 14, 30] %}
+        <a href="/admin?days={{ d }}&per={{ per_page }}"
+          style="padding:0.25rem 0.6rem;border-radius:5px;font-size:0.72rem;font-family:monospace;border:1px solid;text-decoration:none;
+                 {% if days == d %}background:#1d4ed8;border-color:#2563eb;color:#bfdbfe;
+                 {% else %}background:#1e293b;border-color:#334155;color:#64748b;{% endif %}">
+          {{ d }}d
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ── Stat tiles ── #}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;">
+      {% set tiles = [
+        ('Requests',   summary.total,                          '#60a5fa', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
+        ('Unique IPs',  summary.unique_ips,                    '#34d399', 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
+        ('Uploads',     summary.uploads,                       '#a78bfa', 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12'),
+        ('Errors',      summary.errors,                        '#f87171', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'),
+        ('Error Rate',  (summary.error_rate | string) ~ '%',   '#fbbf24', 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z'),
+        ('Countries',   summary.top_countries | length,        '#38bdf8', 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
+      ] %}
+      {% for label, value, accent, icon_path in tiles %}
+      <div class="nt-card p-4" style="border-top:2px solid {{ accent }}22;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+          <span style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.06em;">{{ label }}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ accent }}" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:0.7;flex-shrink:0;">
+            <path d="{{ icon_path }}"/>
+          </svg>
+        </div>
+        <div style="font-size:1.4rem;font-weight:600;font-family:monospace;color:{{ accent }};">{{ value }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── Hourly chart ── #}
+    <div class="nt-card p-4" style="margin-bottom:1.25rem;">
+      <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.75rem;">
+        Requests — last 24 hours
+      </div>
+      {% set hour_max = (hours_data | map(attribute='count') | max) or 1 %}
+      <svg viewBox="0 0 480 88" preserveAspectRatio="none" style="width:100%;height:88px;display:block;" aria-hidden="true">
+        <line x1="0" y1="72" x2="480" y2="72" stroke="#1e293b" stroke-width="1"/>
+        {% for h in hours_data %}
+          {% set i = loop.index0 %}
+          {% set bh = ((h.count / hour_max) * 66) | int %}
+          {% set eh = ((h.errors / hour_max) * 66) | int %}
+          <g>
+            <title>{{ h.label }}: {{ h.count }} req{% if h.errors %}, {{ h.errors }} err{% endif %}</title>
+            {% if bh > 0 %}
+            <rect x="{{ i * 20 + 1 }}" y="{{ 72 - bh }}" width="18" height="{{ bh }}" rx="2" fill="#2563eb" opacity="0.7"/>
+            {% else %}
+            <rect x="{{ i * 20 + 1 }}" y="71" width="18" height="1" fill="#1e293b"/>
+            {% endif %}
+            {% if eh > 0 %}
+            <rect x="{{ i * 20 + 1 }}" y="{{ 72 - eh }}" width="18" height="{{ eh }}" rx="2" fill="#ef4444" opacity="0.65"/>
+            {% endif %}
+          </g>
+          {% if i % 6 == 0 %}
+          <text x="{{ i * 20 + 9 }}" y="85" text-anchor="middle" font-size="8" fill="#475569">{{ h.label }}</text>
+          {% endif %}
+        {% endfor %}
+      </svg>
+      <div style="display:flex;gap:1rem;margin-top:0.4rem;">
+        <span style="display:flex;align-items:center;gap:5px;font-size:0.65rem;color:#475569;">
+          <span style="width:8px;height:8px;background:#2563eb;border-radius:2px;display:inline-block;opacity:0.7;"></span>Requests
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:0.65rem;color:#475569;">
+          <span style="width:8px;height:8px;background:#ef4444;border-radius:2px;display:inline-block;opacity:0.65;"></span>Errors
+        </span>
+      </div>
+    </div>
+
+    {# ── Top-N ── #}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:1.25rem;">
+      {% for section_label, rows in [('Top Paths', summary.top_paths), ('Top IPs', summary.top_ips), ('Top Countries', summary.top_countries)] %}
+      <div class="nt-card p-4">
+        <div style="font-size:0.65rem;color:#475569;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.65rem;">{{ section_label }}</div>
+        {% if rows %}
+          {% set top_max = namespace(val=1) %}
+          {% for name, count in rows %}{% if count > top_max.val %}{% set top_max.val = count %}{% endif %}{% endfor %}
+          <table style="width:100%;border-collapse:collapse;">
+            {% for name, count in rows %}
+            {% set pct = ((count / top_max.val) * 100) | int %}
+            <tr style="border-bottom:1px solid #0f172a;">
+              <td style="padding:0.3rem 0.5rem 0.3rem 0;font-size:0.68rem;font-family:monospace;color:#cbd5e1;word-break:break-all;width:55%;">{{ name }}</td>
+              <td style="padding:0.3rem 0 0.3rem 0.5rem;width:45%;">
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <div style="flex:1;background:#0f172a;border-radius:2px;height:3px;">
+                    <div style="width:{{ pct }}%;height:100%;background:#2563eb;border-radius:2px;"></div>
+                  </div>
+                  <span style="font-size:0.62rem;font-family:monospace;color:#475569;min-width:2rem;text-align:right;">{{ count }}</span>
                 </div>
-                <span style="font-size:0.65rem;font-family:monospace;color:#6b7280;white-space:nowrap;min-width:2rem;text-align:right;">{{ count }}</span>
-              </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div style="font-size:0.7rem;color:#334155;">No data yet.</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── Request log header ── #}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.65rem;">
+      <span style="font-size:0.65rem;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">
+        Request log — last {{ days }} day{{ '' if days == 1 else 's' }}
+      </span>
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <span style="font-size:0.65rem;color:#334155;font-family:monospace;">{{ total }} record{{ '' if total == 1 else 's' }}</span>
+        <span style="color:#1e293b;">·</span>
+        <span style="font-size:0.65rem;color:#334155;">per page:</span>
+        {% for n in [25, 50, 100, 200] %}
+        <a href="/admin?days={{ days }}&per={{ n }}&page=1"
+          style="padding:0.2rem 0.4rem;border-radius:4px;font-size:0.65rem;font-family:monospace;border:1px solid;text-decoration:none;
+                 {% if per_page == n %}background:#1d4ed8;border-color:#2563eb;color:#bfdbfe;
+                 {% else %}background:#1e293b;border-color:#334155;color:#475569;{% endif %}">
+          {{ n }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ── Request log table ── #}
+    <div class="nt-card" style="overflow-x:auto;margin-bottom:1rem;">
+      {% if entries %}
+      <table style="width:100%;font-size:0.68rem;font-family:monospace;border-collapse:collapse;min-width:680px;">
+        <thead>
+          <tr style="color:#475569;text-align:left;border-bottom:1px solid #1e293b;">
+            <th style="padding:0.55rem 0.75rem;font-weight:500;white-space:nowrap;">Time (UTC)</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">IP</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">CC</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">Method</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">Path</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">Status</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">ms</th>
+            <th style="padding:0.55rem 0.75rem;font-weight:500;">↑</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          {% set status = e.get('status') or 0 %}
+          {% set method = e.get('method') or '-' %}
+          <tr style="border-bottom:1px solid #0f172a;" title="{{ e.get('ua') or '' }}">
+            <td style="padding:0.4rem 0.75rem;color:#64748b;white-space:nowrap;">
+              {{ (e.get('ts') or '-')[:19] | replace('T', ' ') }}
             </td>
+            <td style="padding:0.4rem 0.75rem;color:#cbd5e1;white-space:nowrap;">{{ e.get('ip') or '-' }}</td>
+            <td style="padding:0.4rem 0.75rem;color:#475569;">{{ e.get('country') or '-' }}</td>
+            <td style="padding:0.4rem 0.75rem;">
+              <span style="padding:0.1rem 0.35rem;border-radius:3px;font-size:0.6rem;
+                {% if method == 'GET' %}background:#1e293b;color:#64748b;
+                {% elif method == 'POST' %}background:#1e3a5f;color:#93c5fd;
+                {% elif method == 'PUT' %}background:#451a03;color:#fcd34d;
+                {% elif method == 'DELETE' %}background:#450a0a;color:#fca5a5;
+                {% else %}background:#1e293b;color:#64748b;{% endif %}">{{ method }}</span>
+            </td>
+            <td style="padding:0.4rem 0.75rem;color:#cbd5e1;max-width:280px;word-break:break-all;">
+              {{ e.get('path') or '-' }}
+              {% if e.get('rid') %}<span style="color:#334155;"> {{ e.get('rid')[:8] }}…</span>{% endif %}
+              {% if not e.get('matched') %}<span style="color:#334155;"> (no route)</span>{% endif %}
+            </td>
+            <td style="padding:0.4rem 0.75rem;white-space:nowrap;">
+              <span style="padding:0.1rem 0.35rem;border-radius:3px;font-size:0.6rem;
+                {% if status >= 500 %}background:#450a0a;color:#fca5a5;
+                {% elif status >= 400 %}background:#431407;color:#fed7aa;
+                {% elif status >= 200 and status < 300 %}background:#052e16;color:#86efac;
+                {% else %}background:#1e293b;color:#64748b;{% endif %}">{{ status or '-' }}</span>
+            </td>
+            <td style="padding:0.4rem 0.75rem;color:#334155;white-space:nowrap;">{{ e.get('ms') or 0 }}</td>
+            <td style="padding:0.4rem 0.75rem;color:#a78bfa;">{{ '↑' if e.get('upload') else '' }}</td>
           </tr>
           {% endfor %}
-          </tbody>
-        </table>
+        </tbody>
+      </table>
       {% else %}
-      <div style="font-size:0.7rem;color:#6b7280;">No data.</div>
+      <div style="padding:2rem;text-align:center;font-size:0.78rem;color:#334155;">
+        No requests recorded in this window.
+      </div>
       {% endif %}
     </div>
-    {% endfor %}
-  </div>
 
-  {# ── Request log ── #}
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
-    <span style="font-size:0.7rem;font-weight:500;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">
-      Request log — last {{ days }} day{{ '' if days == 1 else 's' }}
-    </span>
+    {# ── Pagination ── #}
+    {% if pages > 1 %}
     <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span style="font-size:0.7rem;color:#6b7280;font-family:monospace;">{{ total }} record{{ '' if total == 1 else 's' }}</span>
-      <span style="color:#374151;font-size:0.7rem;">·</span>
-      <span style="font-size:0.7rem;color:#6b7280;">per page:</span>
-      {% for n in [25, 50, 100, 200] %}
-      <a href="/admin?days={{ days }}&per={{ n }}&page=1"
-        style="padding:0.2rem 0.45rem;border-radius:4px;font-size:0.7rem;font-family:monospace;border:1px solid;text-decoration:none;
-               {% if per_page == n %}background:#1d4ed8;border-color:#2563eb;color:#bfdbfe;
-               {% else %}background:#1f2937;border-color:#374151;color:#9ca3af;{% endif %}">
-        {{ n }}
+      {% if page > 1 %}
+      <a href="/admin?page={{ page - 1 }}&per={{ per_page }}&days={{ days }}"
+        style="padding:0.3rem 0.7rem;background:#1e293b;border:1px solid #334155;border-radius:6px;font-size:0.72rem;color:#94a3b8;text-decoration:none;">
+        ← Newer
       </a>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="nt-card" style="overflow-x:auto;margin-bottom:1rem;">
-    {% if entries %}
-    <table style="width:100%;font-size:0.7rem;font-family:monospace;border-collapse:collapse;min-width:720px;">
-      <thead>
-        <tr style="color:#6b7280;text-align:left;border-bottom:1px solid #374151;">
-          <th style="padding:0.6rem 0.75rem;font-weight:500;white-space:nowrap;">Time (UTC)</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">IP</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">CC</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">Method</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">Path</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">Status</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">ms</th>
-          <th style="padding:0.6rem 0.75rem;font-weight:500;">↑</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in entries %}
-        {% set status = e.get('status') or 0 %}
-        {% set method = e.get('method') or '-' %}
-        <tr style="border-bottom:1px solid #1f2937;" title="{{ e.get('ua') or '' }}">
-
-          <td style="padding:0.45rem 0.75rem;color:#9ca3af;white-space:nowrap;">
-            {{ (e.get('ts') or '-')[:19] | replace('T', ' ') }}
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;color:#d1d5db;white-space:nowrap;">
-            {{ e.get('ip') or '-' }}
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;color:#6b7280;">
-            {{ e.get('country') or '-' }}
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;">
-            <span style="padding:0.15rem 0.4rem;border-radius:4px;font-size:0.65rem;
-              {% if method == 'GET' %}background:#1f2937;color:#9ca3af;
-              {% elif method == 'POST' %}background:#1e3a5f;color:#93c5fd;
-              {% elif method == 'PUT' %}background:#451a03;color:#fcd34d;
-              {% elif method == 'DELETE' %}background:#450a0a;color:#fca5a5;
-              {% else %}background:#1f2937;color:#9ca3af;{% endif %}">
-              {{ method }}
-            </span>
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;color:#d1d5db;max-width:300px;word-break:break-all;">
-            {{ e.get('path') or '-' }}
-            {% if e.get('rid') %}<span style="color:#6b7280;"> {{ e.get('rid')[:8] }}…</span>{% endif %}
-            {% if not e.get('matched') %}<span style="color:#6b7280;"> (no route)</span>{% endif %}
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;white-space:nowrap;">
-            <span style="padding:0.15rem 0.4rem;border-radius:4px;font-size:0.65rem;
-              {% if status >= 500 %}background:#450a0a;color:#fca5a5;
-              {% elif status >= 400 %}background:#451a03;color:#fde68a;
-              {% elif status >= 200 and status < 300 %}background:#052e16;color:#86efac;
-              {% else %}background:#1f2937;color:#9ca3af;{% endif %}">
-              {{ status or '-' }}
-            </span>
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;color:#6b7280;white-space:nowrap;">
-            {{ e.get('ms') or 0 }}
-          </td>
-
-          <td style="padding:0.45rem 0.75rem;color:#a78bfa;">
-            {{ '↑' if e.get('upload') else '' }}
-          </td>
-
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div style="padding:2rem;text-align:center;font-size:0.8rem;color:#6b7280;">
-      No requests recorded in this window.
+      {% endif %}
+      <span style="font-size:0.68rem;color:#334155;font-family:monospace;padding:0 0.25rem;">
+        Page {{ page }} of {{ pages }}
+      </span>
+      {% if page < pages %}
+      <a href="/admin?page={{ page + 1 }}&per={{ per_page }}&days={{ days }}"
+        style="padding:0.3rem 0.7rem;background:#1e293b;border:1px solid #334155;border-radius:6px;font-size:0.72rem;color:#94a3b8;text-decoration:none;">
+        Older →
+      </a>
+      {% endif %}
     </div>
     {% endif %}
-  </div>
 
-  {# ── Pagination ── #}
-  {% if pages > 1 %}
-  <div style="display:flex;align-items:center;gap:0.5rem;">
-    {% if page > 1 %}
-    <a href="/admin?page={{ page - 1 }}&per={{ per_page }}&days={{ days }}"
-      style="padding:0.35rem 0.75rem;background:#1f2937;border:1px solid #374151;border-radius:6px;font-size:0.75rem;color:#d1d5db;text-decoration:none;">
-      ← Newer
-    </a>
-    {% endif %}
-    <span style="font-size:0.7rem;color:#6b7280;font-family:monospace;padding:0 0.5rem;">
-      Page {{ page }} of {{ pages }}
-    </span>
-    {% if page < pages %}
-    <a href="/admin?page={{ page + 1 }}&per={{ per_page }}&days={{ days }}"
-      style="padding:0.35rem 0.75rem;background:#1f2937;border:1px solid #374151;border-radius:6px;font-size:0.75rem;color:#d1d5db;text-decoration:none;">
-      Older →
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {% endif %}{# authorized #}
-</div>
-{% endblock %}
+    {% endif %}{# authorized #}
+  </main>
+</body>
+</html>
