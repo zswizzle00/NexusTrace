@@ -65,3 +65,16 @@ data/quarantine/
 # data/activity/ is the request log. It records client IPs, countries and the paths
 # that were looked up, so it carries the same sensitivity as the analysis records.
 data/activity/
+
+# --- Internal-only: not meant for the public repo. Added after the
+# .github/workflows/sync-public.yml workflow that used to enforce this split
+# was deleted (2026-07-30), so pushes stopped being filtered. ---
+ENHANCEMENT_PLAN.md
+nexus_auto_update.sh
+scripts/cloudflare_admin.py
+docs/operations.md
+docs/cloudflare-admin.md
+docs/dev-notes.md
+docs/superpowers/
+cleanup-step1-untrack.sh
+cleanup-step2-history-rewrite.sh
