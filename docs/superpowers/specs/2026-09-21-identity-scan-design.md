@@ -355,6 +355,24 @@ Records, direct links, delete buttons, and 30-day retention are untouched. A vis
 no longer browse what other people submitted; an analyst who kept their own link still
 has it.
 
+## 8.5 Sherlock fetches its site list over the network by default
+
+Verified by reading the installed package. ``SitesInformation()`` called with no
+argument sets ``data_file_path = MANIFEST_URL`` and performs ``requests.get(url,
+timeout=30)`` before any username is checked. The docstring says this is deliberate, to
+give users fresher data than the release carries.
+
+**The worker must pass the bundled local path instead**, which ships in the wheel at
+``sherlock_project/resources/data.json`` (104 KB). Three reasons, any one sufficient:
+
+* it would spend up to 30 of the 70-second budget fetching a manifest before starting;
+* an unreachable GitHub turns every scan into a hard failure rather than a degraded one;
+* a container with restricted egress would never work, and would fail at run time rather
+  than at build time.
+
+Resolve the path from the installed package rather than hard-coding it, and pin the
+behaviour with a test that asserts no network call happens during site-list load.
+
 ## 9. Open items
 
 - The Docker build with `curl_cffi` on the slim base image is unverified. Confirm during
