@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% from "_use_notice.html" import use_notice %}
+
+{% block title %}Phone Analysis | NexusTrace{% endblock %}
+
+{% block content %}
+{# Every value out of `report` traces back to a phone number: libphonenumber's bundled
+   data (report.offline), LocalCallingGuide's NANP allocation table (report.prefix), and
+   SkipCalls' crowd reports (report.spam). All escaped, never `|safe`.
+
+   This page renders NO verdict. Account presence and number allocation are not threat
+   signals, so there is no verdict banner, no score, and no red/amber/green styling
+   anywhere below. #}
+
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">Phone Analysis</h1>
+    <p class="text-sm text-gray-400">
+      Offline number metadata from libphonenumber, plus two keyless NANP-only lookups:
+      original range allocation and crowd-reported spam status.
+    </p>
+  </div>
+
+  <form method="POST" action="{{ url_for('phone.phone_analysis') }}" class="nt-card p-5 mb-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex-1 min-w-0">
+        <label for="phone-number" class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+          Phone number
+        </label>
+        <input type="text" id="phone-number" name="number" value="{{ raw or '' }}" required
+               placeholder="+12127363100"
+               class="form-input w-full bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none">
+      </div>
+      <div class="sm:w-40">
+        <label for="phone-region" class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+          Default region
+        </label>
+        <input type="text" id="phone-region" name="region" value="{{ region or '' }}"
+               placeholder="US" maxlength="2"
+               class="form-input w-full bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none">
+      </div>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">
+      A number already in E.164 form (a leading <code>+</code>) needs no region. The
+      region is only used to interpret a number written without a country code.
+    </p>
+
+    <div class="mt-4">{{ use_notice('phone') }}</div>
+
+    <div class="flex items-center gap-3 mt-4">
+      <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+        Analyze
+      </button>
+    </div>
+  </form>
+
+  {% if report is defined and report is not none %}
+  {% set offline = report.get('offline') or {} %}
+
+  {% if not offline.get('ok') %}
+  <div class="mb-5 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
+    Could not parse this number{% if offline.get('error') %}: {{ offline.get('error') }}{% endif %}
+  </div>
+
+  {% else %}
+
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Offline metadata</h3>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Valid</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">
+          {% if offline.get('valid') %}yes{% else %}no{% endif %}
+          {% if offline.get('valid') and not offline.get('possible', true) %}<span class="text-gray-500">(possible: no)</span>{% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">E.164</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ offline.get('e164') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">International</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ offline.get('international') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">National</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ offline.get('national') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Region</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ offline.get('region') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Country</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ offline.get('country') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Line type</dt>
+        {# The one place a blank cell would fabricate intel: an empty line type reads as
+           "landline" to a reader. When libphonenumber cannot resolve it (every NANP
+           FIXED_LINE_OR_MOBILE number), render the note explaining why instead. #}
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">
+          {% if offline.get('line_type_resolvable') %}
+          {{ offline.get('number_type') or '-' }}
+          {% else %}
+          <span class="text-yellow-300">not resolvable offline</span>
+          <div class="text-gray-500 mt-0.5 normal-case">{{ offline.get('line_type_note') }}</div>
+          {% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Timezones</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">
+          {{ offline.get('timezones') | join(', ') if offline.get('timezones') else '-' }}
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="nt-card p-4 mb-5">
+    {# Named "Original range holder", never "Carrier": libphonenumber's carrier lookup
+       returns who the number range was originally allocated to, which is wrong for any
+       number that has since been ported. See app/utils/phone_parse.py. #}
+    <h3 class="nt-card-title mb-3">Original range holder</h3>
+    {% if offline.get('range_holder') %}
+    <p class="text-sm text-gray-200">{{ offline.get('range_holder') }}</p>
+    <p class="text-xs text-gray-500 mt-2">Caveat: {{ offline.get('range_holder_caveat') }}</p>
+    {% else %}
+    <p class="text-sm text-gray-500">{{ offline.get('range_holder_unavailable_reason') or 'not available' }}</p>
+    {% endif %}
+  </div>
+
+  {% set prefix = report.get('prefix') %}
+  {% if prefix %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Allocation (LocalCallingGuide)</h3>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">OCN</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('ocn') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Company</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ prefix.get('company_name') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Company type</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('company_type_label') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Rate center</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('rate_center') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">LATA</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('lata') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Switch</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('switch') or '-' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-500 uppercase tracking-wide">Updated</dt>
+        <dd class="text-gray-200 font-mono text-xs mt-0.5">{{ prefix.get('updated') or '-' }}</dd>
+      </div>
+    </dl>
+  </div>
+  {% endif %}
+
+  {% set spam = report.get('spam') %}
+  {% if spam %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Reported spam (community report)</h3>
+    {# Deliberately NOT the red/amber/green verdict palette from email_result.html: this
+       is a crowd report, not a scored verdict. SkipCalls flags legitimate high-volume
+       corporate lines too, so a neutral badge, not a danger colour. #}
+    {% if spam.get('reported') %}
+    <span class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-gray-800 text-gray-300 border border-gray-700">
+      reported by the community
+    </span>
+    <p class="text-sm text-gray-200 mt-3">{{ spam.get('category') or 'no category given' }}</p>
+    {% else %}
+    <span class="px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-gray-800 text-gray-400 border border-gray-700">
+      no community reports
+    </span>
+    {% endif %}
+    <p class="text-xs text-gray-500 mt-2">Source: {{ spam.get('source') or 'SkipCalls community reports' }}</p>
+  </div>
+  {% endif %}
+
+  {% endif %}
+  {% else %}
+
+  <div class="nt-card p-4 text-sm text-gray-500">
+    Enter a phone number above to see offline metadata, original range allocation, and
+    community spam reports.
+  </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}

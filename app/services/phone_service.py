@@ -23,6 +23,7 @@ from datetime import timedelta
 import requests
 
 from ..utils.cache import timed_lru_cache
+from ..utils.phone_parse import analyze
 from ..utils.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -223,3 +224,27 @@ def spam_lookup(national_number, *, fetch=None):
     except Exception:
         logger.debug('SkipCalls returned an unreadable body', exc_info=True)
         return None
+
+
+def build_report(raw, default_region=None, live=True):
+    """Offline metadata, plus the two keyless sources when ``live``.
+
+    Lives here rather than in the route because two routes need it: the dedicated page
+    and /analyze's E.164 branch. A route importing another route would invert this
+    project's layering.
+
+    ``live=False`` is how the tests exercise the offline tier with no network call. It is
+    also the honest shape of the feature: the offline tier is the product and the live
+    sources are enrichment that may simply be absent.
+    """
+    offline = analyze(raw, default_region)
+    report = {'offline': offline, 'prefix': None, 'spam': None}
+    if not offline.get('ok') or not offline.get('valid') or not live:
+        return report
+
+    # Both live sources are NANP-only, so a non-NANP number skips them rather than
+    # sending the number to somewhere that cannot answer for it.
+    if offline.get('is_nanp'):
+        report['prefix'] = prefix_lookup(offline['national_number'])
+        report['spam'] = spam_lookup(offline['national_number'])
+    return report

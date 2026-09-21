@@ -12,6 +12,7 @@ from app.services.user_agent_service import parse_user_agent
 from app.services.azure_error_service import get_azure_error_info
 from dotenv import load_dotenv
 from app.services.event_service import get_event_info
+from app.services.phone_service import build_report as build_phone_report
 from urllib.parse import urlparse
 from app.utils.validators import is_valid_ip, is_valid_domain
 from app.utils.parsers import parse_alienvault_otx, parse_shodan, parse_abuseipdb
@@ -116,6 +117,8 @@ def _run_analysis(indicator):
         indicator_type = 'azure_error'
     elif re.match(r'^\d+$', indicator):
         indicator_type = 'ad_code'
+    elif re.match(r'^\+[1-9]\d{6,14}$', indicator):
+        indicator_type = 'phone'
     else:
         logger.debug(f"Treating as User Agent: {indicator}")
         try:
@@ -171,6 +174,13 @@ def _run_analysis(indicator):
                               indicator=indicator,
                               indicator_type=indicator_type,
                               **result_data)
+    elif indicator_type == 'phone':
+        return render_template('phone_analysis.html',
+                               report=build_phone_report(indicator),
+                               raw=indicator,
+                               region='',
+                               indicator=indicator,
+                               indicator_type=indicator_type)
     elif indicator_type == 'event':
         event_info = get_event_info(indicator)
         result_data['event_info'] = event_info if event_info else None
