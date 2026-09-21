@@ -188,6 +188,37 @@ def test_spam_lookup_fails_soft():
           'spam_lookup raised or returned a value when the source was unreachable')
 
 
+class FakeResponse:
+    def __init__(self, status_code=200, text='', content=None):
+        self.status_code = status_code
+        self.text = text
+        self.content = content if content is not None else text.encode()
+
+
+def test_oversized_responses_are_refused():
+    """One gunicorn worker serves everything, so a single huge third-party body must
+    not be parsed. Both sources, because the first version capped one and not the other."""
+    huge = 'x' * (300 * 1024)
+    check(prefix_lookup('2127363100', fetch=lambda u, timeout=None: FakeResponse(text=huge)) is None,
+          'prefix_lookup parsed a body over the size cap')
+    check(spam_lookup('2127363100', fetch=lambda u, timeout=None: FakeResponse(text=huge)) is None,
+          'spam_lookup parsed a body over the size cap')
+
+
+def test_malformed_response_objects_do_not_raise():
+    """A response lacking the attributes we read must yield no card, not an exception."""
+    class Nothing:
+        pass
+
+    for name, fn in (('prefix_lookup', prefix_lookup), ('spam_lookup', spam_lookup)):
+        try:
+            result = fn('2127363100', fetch=lambda u, timeout=None: Nothing())
+        except Exception as exc:  # noqa: BLE001 - the point of the case
+            failures.append(f'{name} raised {exc!r} on a malformed response object')
+            continue
+        check(result is None, f'{name} returned {result!r} for a malformed response')
+
+
 def main():
     test_prefix_xml_parses_the_real_shape()
     test_prefix_xml_company_type_labels()
@@ -199,6 +230,8 @@ def main():
     test_spam_response_is_reported_not_a_verdict()
     test_spam_response_clean()
     test_spam_lookup_fails_soft()
+    test_oversized_responses_are_refused()
+    test_malformed_response_objects_do_not_raise()
 
     if failures:
         print('FAIL:')

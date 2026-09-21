@@ -15,6 +15,7 @@ support line, which comes back is_spam=true. Everything here maps it to a *repor
 its category, and the template is required to render it that way.
 """
 
+import json
 import logging
 import xml.etree.ElementTree as ET
 from datetime import timedelta
@@ -76,6 +77,23 @@ def _http_get(url, timeout=None):
                         headers={'User-Agent': 'NexusTrace/1.0 (+phone number lookup)'})
 
 
+def _read_capped(response, source):
+    """The response body as text, or None when it is absent, not a 200, or over the cap.
+
+    ONE implementation for both sources on purpose. The first version of this module
+    applied the cap inline in one fetch path and forgot it in the other two, which is
+    the failure mode a shared helper removes rather than documents.
+    """
+    if getattr(response, 'status_code', None) != 200:
+        return None
+    body = getattr(response, 'content', b'') or b''
+    if len(body) > MAX_RESPONSE_BYTES:
+        logger.warning('%s returned %d bytes, over the %d byte cap',
+                       source, len(body), MAX_RESPONSE_BYTES)
+        return None
+    return getattr(response, 'text', '') or ''
+
+
 def parse_prefix_xml(text):
     """One ``<prefixdata>`` record as a dict, or None when there is no record.
 
@@ -126,22 +144,19 @@ def parse_prefix_xml(text):
 
 @timed_lru_cache(PREFIX_CACHE_SECONDS)
 def _prefix_lookup_cached(npa, nxx):
-    # acquire(), not try_acquire(): the window is sub-second, so blocking briefly is the
-    # documented house choice. try_acquire() exists for long windows like VirusTotal's
-    # 4/minute, where parking a gunicorn thread is worse than skipping the source.
+    # Deliberately NOT registered in app/utils/cache.py:clear_caches(). That helper is
+    # a hand-maintained list swept periodically, and a function it does not name keeps
+    # its own TTL. Registering this one would collapse the 24-hour TTL to the sweep
+    # interval, which is the opposite of what a table of number-range allocations
+    # needs. If you came here to "fix" the omission, this comment is the reason not to.
     prefix_limiter.acquire()
     try:
-        response = _http_get(f'{PREFIX_URL}?npa={npa}&nxx={nxx}')
+        text = _read_capped(_http_get(f'{PREFIX_URL}?npa={npa}&nxx={nxx}'),
+                            'LocalCallingGuide')
     except Exception:
         logger.debug('LocalCallingGuide unreachable', exc_info=True)
         return None
-    if response.status_code != 200:
-        return None
-    if len(response.content or b'') > MAX_RESPONSE_BYTES:
-        logger.warning('LocalCallingGuide returned %d bytes for %s-%s; over the cap',
-                       len(response.content), npa, nxx)
-        return None
-    return parse_prefix_xml(response.text)
+    return parse_prefix_xml(text)
 
 
 def prefix_lookup(national_number, *, fetch=None):
@@ -157,12 +172,11 @@ def prefix_lookup(national_number, *, fetch=None):
 
     if fetch is not None:
         try:
-            response = fetch(f'{PREFIX_URL}?npa={npa}&nxx={nxx}', timeout=TIMEOUT)
+            text = _read_capped(fetch(f'{PREFIX_URL}?npa={npa}&nxx={nxx}',
+                                      timeout=TIMEOUT), 'LocalCallingGuide')
         except Exception:
             return None
-        if getattr(response, 'status_code', None) != 200:
-            return None
-        return parse_prefix_xml(response.text)
+        return parse_prefix_xml(text)
 
     return _prefix_lookup_cached(npa, nxx)
 
@@ -197,14 +211,15 @@ def spam_lookup(national_number, *, fetch=None):
         spam_limiter.acquire()
 
     try:
-        response = getter(f'{SPAM_URL}/{digits}', timeout=TIMEOUT)
+        text = _read_capped(getter(f'{SPAM_URL}/{digits}', timeout=TIMEOUT),
+                            'SkipCalls')
     except Exception:
         logger.debug('SkipCalls unreachable', exc_info=True)
         return None
-    if getattr(response, 'status_code', None) != 200:
+    if text is None:
         return None
     try:
-        return map_spam_response(response.json())
+        return map_spam_response(json.loads(text))
     except Exception:
         logger.debug('SkipCalls returned an unreadable body', exc_info=True)
         return None
