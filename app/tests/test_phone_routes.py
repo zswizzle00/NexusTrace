@@ -57,6 +57,17 @@ def test_no_verdict_key_anywhere():
           'build_report produced a score key; this surface renders no score')
 
 
+def test_the_page_is_reachable_from_the_nav():
+    """The feature shipped once with a working route and no nav entry, so it was only
+    reachable by typing the URL. Asserting the link exists is what makes "built" and
+    "reachable" the same claim."""
+    client = build().test_client()
+    for path in ('/', '/phone_analysis'):
+        body = client.get(path).get_data(as_text=True)
+        check('href="/phone_analysis"' in body,
+              f'GET {path} renders no nav link to /phone_analysis')
+
+
 def test_unparseable_input_renders_an_error_not_a_500():
     client = build().test_client()
     response = client.post('/phone_analysis', data={'number': 'not a number'})
@@ -68,6 +79,7 @@ def main():
     test_form_renders()
     test_offline_report_needs_no_network()
     test_no_verdict_key_anywhere()
+    test_the_page_is_reachable_from_the_nav()
     test_unparseable_input_renders_an_error_not_a_500()
 
     if failures:
