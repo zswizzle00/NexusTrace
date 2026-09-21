@@ -47,6 +47,12 @@ dependencies = [
     # it, then `uv lock && uv export --no-dev --no-hashes -o requirements.txt` (Docker
     # installs from requirements.txt, not from this file).
     "publicsuffixlist==1.0.2.20260726",
+    # The bundled metadata IS the intel, so this pin is exact for the same reason the
+    # publicsuffixlist pin is: a version bump silently changes what a lookup returns
+    # with no code change here. Apache-2.0. Do NOT substitute `phonenumberslite`, which
+    # ships no geodata/carrierdata/tzdata, so geocoder, carrier and timezone all raise
+    # ModuleNotFoundError.
+    "phonenumbers==9.0.39",
 ]
 
 # Deliberately not a base dependency: storage.py imports it lazily, so only a Cloud Run
