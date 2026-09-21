@@ -302,24 +302,3 @@ def get_analysis(analysis_id):
         return json.loads(raw)
     except Exception:
         return None
-
-
-def list_analyses(limit=100):
-    analyses = store('analyses')
-    results = []
-    for entry in analyses.list(suffix='.json', limit=limit):
-        try:
-            data = json.loads(analyses.read_text(entry['key']) or '')
-        except Exception:
-            continue
-        results.append({
-            # The key, not data['id']: a stored id disagreeing with its record name
-            # would produce links that 404.
-            'id': entry['key'][:-len('.json')],
-            'created_at': data.get('created_at'),
-            'subject': (data.get('headers') or {}).get('subject'),
-            'from': (data.get('headers') or {}).get('from'),
-            'level': (data.get('verdict') or {}).get('level'),
-            'attachment_count': len(data.get('attachments') or []),
-        })
-    return results
