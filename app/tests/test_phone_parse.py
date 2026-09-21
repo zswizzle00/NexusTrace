@@ -124,6 +124,21 @@ def test_unparseable_input():
         check(bool(result.get('error')), f'{label} returned ok=False with no error text')
 
 
+def test_non_string_input_returns_a_dict():
+    """analyze() fronts a public HTTP route, and a JSON body can hand that route an
+    int, a list or a dict. Every one of those must come back as a result dict rather
+    than a traceback. The hostile-string case below does not cover this."""
+    for bad in (None, 12345, 3.14, ['+12127363100'], {'number': '+12127363100'},
+                b'+12127363100'):
+        try:
+            result = analyze(bad)
+        except Exception as exc:  # noqa: BLE001 - the point of the case
+            failures.append(f'analyze({bad!r}) raised {exc!r}')
+            continue
+        check(isinstance(result, dict) and result.get('ok') is False,
+              f'analyze({bad!r}) returned {result!r}, expected a dict with ok=False')
+
+
 def test_no_exception_escapes():
     """This feeds a web route, so a hostile string must produce a result dict, never a
     traceback."""
@@ -142,6 +157,7 @@ def main():
     test_range_holder_portability_is_flagged()
     test_invalid_numbers()
     test_unparseable_input()
+    test_non_string_input_returns_a_dict()
     test_no_exception_escapes()
 
     if failures:

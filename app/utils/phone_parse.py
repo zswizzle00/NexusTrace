@@ -79,7 +79,16 @@ def analyze(raw, default_region=None):
 
     Never raises. This feeds an HTTP route and the input is attacker-controlled.
     """
-    raw = (raw or '').strip()
+    if raw is None:
+        return {'ok': False, 'error': 'no number supplied', 'raw': ''}
+    # Not a string. A JSON body can hand a route an int, a list or a dict, and this
+    # function is the first thing a public route touches with attacker-controlled input.
+    # Rejecting is honest where coercing is not: str({'a': 1}) would have us parse a
+    # dict's repr and report on it as though it were a number.
+    if not isinstance(raw, str):
+        return {'ok': False, 'error': 'that does not look like a phone number', 'raw': ''}
+
+    raw = raw.strip()
     if not raw:
         return {'ok': False, 'error': 'no number supplied', 'raw': raw}
 
