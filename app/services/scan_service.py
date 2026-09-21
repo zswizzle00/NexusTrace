@@ -58,7 +58,6 @@ def get_scan(scan_id: str) -> dict | None:
     return data
 
 
-
 def screenshot_key(scan_id: str, label: str | None = None) -> str:
     """``label=None`` is the full-page shot and keeps the original ``<id>.png`` name, so
     scans recorded before staged capture existed still resolve to their screenshot."""
