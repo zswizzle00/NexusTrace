@@ -2,7 +2,6 @@ import logging
 from flask import Blueprint, render_template, request, redirect, url_for, send_file, abort, flash
 from ..services.scan_service import (
     get_scan,
-    list_scans,
     run_scan,
     screenshot_key,
     screenshot_local_path,
@@ -38,8 +37,7 @@ def _screenshot_keys(scan_id):
 
 @scan_bp.route('/url_scan', methods=['GET'])
 def url_scan_form():
-    recent = list_scans(10)
-    return render_template('url_scan.html', recent=recent)
+    return render_template('url_scan.html')
 
 
 @scan_bp.route('/url_scan', methods=['POST'])

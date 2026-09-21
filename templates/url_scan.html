@@ -47,42 +47,5 @@
     </div>
     <p class="text-xs text-gray-500">Scans take 10-30 seconds. Private/internal addresses are blocked.</p>
   </form>
-
-  {% if recent %}
-  <div>
-    <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Recent Scans</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
-      {% for s in recent %}
-      <a href="/url_scan/{{ s.id }}"
-        class="nt-card overflow-hidden hover:border-blue-700/50 transition-colors group block"
-        style="text-decoration:none;">
-        <div style="height:110px;overflow:hidden;position:relative;background:#1f2937;">
-          {% if s.has_screenshot %}
-          <img src="/url_scan/screenshot/{{ s.id }}" alt="screenshot"
-            style="width:100%;height:110px;object-fit:cover;object-position:center top;"
-            onerror="this.style.display='none'" />
-          {% endif %}
-          <span style="position:absolute;top:6px;left:6px;font-family:monospace;font-size:11px;padding:1px 5px;border-radius:3px;
-            {% if s.http_status and s.http_status < 400 %}background:rgba(6,78,59,0.85);color:#4ade80;
-            {% elif s.http_status and s.http_status < 500 %}background:rgba(78,63,6,0.85);color:#facc15;
-            {% elif s.http_status %}background:rgba(78,6,6,0.85);color:#f87171;
-            {% else %}background:rgba(31,41,55,0.85);color:#9ca3af;{% endif %}">
-            {{ s.http_status or '?' }}
-          </span>
-        </div>
-        <div style="padding:8px 10px 10px;">
-          {% if s.title %}
-          <div style="font-size:12px;font-weight:500;color:#d1d5db;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;">{{ s.title }}</div>
-          {% endif %}
-          <div style="font-size:11px;font-family:monospace;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ s.url }}</div>
-          {% if s.asn or s.main_ip %}
-          <div style="font-size:10px;color:#4b5563;margin-top:3px;">{{ s.asn or s.main_ip }}</div>
-          {% endif %}
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
 </div>
 {% endblock %}

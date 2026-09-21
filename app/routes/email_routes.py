@@ -4,8 +4,7 @@ import logging
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 
-from ..services.email_service import (analyze_email, get_analysis,
-                                      list_analyses, save_analysis)
+from ..services.email_service import analyze_email, get_analysis, save_analysis
 from ..utils.storage import store, validate_key
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ def _analysis_record_key(analysis_id):
 
 @email_bp.route('/email_analysis', methods=['GET'])
 def email_analysis_form():
-    return render_template('email_analysis.html', recent=list_analyses(10))
+    return render_template('email_analysis.html')
 
 
 @email_bp.route('/email_analysis', methods=['POST'])

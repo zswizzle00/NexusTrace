@@ -378,8 +378,12 @@ def test_scanner_get_surfaces(s, tok):
               f'got {r.status_code} {r.headers.get("Location")}')
 
     # Read-only, and only if the environment happens to already have a stored scan.
-    ids = re.findall(r'/url_scan/([0-9a-f-]{36})',
-                     s.get(f'{BASE_URL}/url_scan', timeout=30).text)
+    # The listing page was removed, so discover an id from the store on disk instead.
+    scans_dir = os.path.join(REPO_ROOT, 'data', 'scans')
+    stems = sorted(
+        os.path.splitext(f)[0] for f in os.listdir(scans_dir) if f.endswith('.json')
+    ) if os.path.isdir(scans_dir) else []
+    ids = [stem for stem in stems if re.fullmatch(r'[0-9a-f-]{36}', stem)]
     if not ids:
         skip('GET /url_scan/<id> and its screenshot', 'no stored scans in data/scans')
         return
