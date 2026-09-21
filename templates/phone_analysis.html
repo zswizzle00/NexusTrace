@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_use_notice.html" import use_notice %}
 
 {% block title %}Phone Analysis | NexusTrace{% endblock %}
 
@@ -48,7 +47,6 @@
       region is only used to interpret a number written without a country code.
     </p>
 
-    <div class="mt-4">{{ use_notice('phone') }}</div>
 
     <div class="flex items-center gap-3 mt-4">
       <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
