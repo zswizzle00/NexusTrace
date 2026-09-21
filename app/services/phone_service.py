@@ -206,8 +206,8 @@ def spam_lookup(national_number, *, fetch=None):
 
     getter = fetch or _http_get
     if fetch is None:
-        # See the note in _prefix_lookup_cached: sub-second window, so block briefly
-        # rather than dropping the lookup. Skipped entirely when a test injects `fetch`.
+        # Sub-second window, so block briefly rather than dropping the lookup.
+        # Skipped entirely when a test injects `fetch`.
         spam_limiter.acquire()
 
     try:

@@ -10,6 +10,7 @@ The LocalCallingGuide fixture keeps its real DTD preamble. The live endpoint ret
 about 250 lines of HTML entity declarations before the payload, and a parser written
 against a trimmed fixture would work in tests and fail in production.
 """
+import json
 import os
 import sys
 
@@ -196,13 +197,24 @@ class FakeResponse:
 
 
 def test_oversized_responses_are_refused():
-    """One gunicorn worker serves everything, so a single huge third-party body must
-    not be parsed. Both sources, because the first version capped one and not the other."""
-    huge = 'x' * (300 * 1024)
-    check(prefix_lookup('2127363100', fetch=lambda u, timeout=None: FakeResponse(text=huge)) is None,
-          'prefix_lookup parsed a body over the size cap')
-    check(spam_lookup('2127363100', fetch=lambda u, timeout=None: FakeResponse(text=huge)) is None,
-          'spam_lookup parsed a body over the size cap')
+    """One gunicorn worker serves every request, so a single huge third-party body
+    must never be parsed. Both bodies below are VALID and parse into a real result
+    when the cap is removed: that is what makes this a test rather than a coincidence.
+    An earlier version padded with junk that failed to parse anyway, so it passed
+    with the cap absent and proved nothing.
+    """
+    padding = 'x' * (300 * 1024)
+
+    big_xml = PREFIX_XML.replace('New York City Zone 01', padding)
+    check(prefix_lookup('2127363100',
+                        fetch=lambda u, timeout=None: FakeResponse(text=big_xml)) is None,
+          'prefix_lookup parsed a valid but oversized XML body')
+
+    big_json = json.dumps({'number': '2127363100', 'is_spam': True,
+                           'status_description': padding})
+    check(spam_lookup('2127363100',
+                      fetch=lambda u, timeout=None: FakeResponse(text=big_json)) is None,
+          'spam_lookup parsed a valid but oversized JSON body')
 
 
 def test_malformed_response_objects_do_not_raise():
