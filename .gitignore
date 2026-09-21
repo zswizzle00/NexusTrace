@@ -75,6 +75,14 @@ scripts/cloudflare_admin.py
 docs/operations.md
 docs/cloudflare-admin.md
 docs/dev-notes.md
-docs/superpowers/
+# Agent scratch (briefs, diffs, review notes) stays ignored, but design specs are
+# decision records, so they are tracked. See tasks/lessons.md (2026-07-28, "Agent
+# scratch directories swallow the audit trail").
+#
+# The glob is `docs/superpowers/*`, not `docs/superpowers/`: git cannot re-include
+# anything beneath an excluded directory, so the directory itself has to stay
+# traversable for the negation below to take effect.
+docs/superpowers/*
+!docs/superpowers/specs/
 cleanup-step1-untrack.sh
 cleanup-step2-history-rewrite.sh
