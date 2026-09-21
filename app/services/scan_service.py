@@ -58,37 +58,10 @@ def get_scan(scan_id: str) -> dict | None:
     return data
 
 
-def list_scans(limit: int = 100) -> list:
-    scans = store('scans')
-    # One listing, not an existence check per scan: on GCS that is 1 request, not `limit`.
-    shot_keys = {entry['key'] for entry in store('screenshots').list(suffix='.png')}
-    result = []
-    for entry in scans.list(suffix='.json', limit=limit):
-        try:
-            data = json.loads(scans.read_text(entry['key']) or '')
-            sid = data.get('id', '')
-            # `or {}`, not a .get() default: a JSON-null `page` would raise here and
-            # be swallowed below, vanishing from the recent list instead of rendering.
-            page = data.get('page') or {}
-            result.append({
-                'id': sid,
-                'url': data.get('url'),
-                'created_at': data.get('created_at'),
-                'status': data.get('status'),
-                'http_status': page.get('status'),
-                'main_ip': data.get('main_ip'),
-                'asn': (data.get('asn') or {}).get('asn'),
-                'title': page.get('title'),
-                'has_screenshot': screenshot_key(sid) in shot_keys if sid else False,
-            })
-        except Exception:
-            continue
-    return result
-
 
 def screenshot_key(scan_id: str, label: str | None = None) -> str:
-    """``label=None`` is the full-page shot and keeps the original ``<id>.png`` name,
-    so pre-staged-capture scans and ``list_scans``' has_screenshot check keep working."""
+    """``label=None`` is the full-page shot and keeps the original ``<id>.png`` name, so
+    scans recorded before staged capture existed still resolve to their screenshot."""
     if label:
         return f'{scan_id}-{label}.png'
     return f'{scan_id}.png'
@@ -1032,7 +1005,7 @@ def run_scan(raw_url: str, device: str = 'desktop') -> dict:
                 # No consent wall, or it did not yield to one narrow click. Fine.
                 pass
 
-            # Last, and unlabeled, so the template and list_scans keep working unchanged.
+            # Last, and unlabeled, so the result template keeps working unchanged.
             full_page_screenshot_url = None
             try:
                 shot_bytes = page.screenshot(full_page=True, type='png')

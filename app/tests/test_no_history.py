@@ -26,9 +26,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app import create_app
 from app.utils import activity, storage
 
-# A real 1x1 PNG. The bytes are never decoded by anything under test: list_scans only
-# checked that the key existed, and the template only emitted its URL. It is a valid PNG
-# so the fixture cannot be the reason a future image-touching assertion fails.
+# A real 1x1 PNG. It makes has_screenshot true, so the assertion that no screenshot URL
+# appears in the form page genuinely tests the fix, not just an absent image. It is a
+# valid PNG so the fixture cannot be the reason a future image-touching assertion fails.
 PNG_1PX = base64.b64decode(
     b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8AAAAMBAQAY'
     b'3Y2wAAAAAElFTkSuQmCC')
@@ -127,17 +127,56 @@ def test_email_direct_link_still_works():
               'the e-mail result page no longer renders its own record')
 
 
+def test_scan_form_lists_nothing():
+    """The scanner listing was a thumbnail grid, so it rendered screenshots of pages
+    other people scanned. The screenshot URL is asserted separately from the record id:
+    a grid that dropped the link but kept the <img> would still publish the image."""
+    with Sandbox() as box:
+        first = box.seed_scan('https://one.example.test/')
+        second = box.seed_scan('https://two.example.test/')
+        client = build().test_client()
+
+        response = client.get('/url_scan')
+        body = response.get_data(as_text=True)
+
+        check(response.status_code == 200,
+              f'GET /url_scan returned {response.status_code}, expected 200')
+        for leaked in (first, second, 'https://one.example.test/',
+                       'https://two.example.test/', 'Seeded Page Title'):
+            check(leaked not in body,
+                  f'GET /url_scan leaked {leaked!r} from a stored record')
+        check('/url_scan/screenshot/' not in body,
+              'GET /url_scan still emits a screenshot URL for a stored scan')
+
+
+def test_scan_direct_link_still_works():
+    with Sandbox() as box:
+        scan_id = box.seed_scan('https://one.example.test/')
+        client = build().test_client()
+
+        response = client.get(f'/url_scan/{scan_id}')
+
+        check(response.status_code == 200,
+              f'GET /url_scan/<id> returned {response.status_code}, expected 200')
+        check('https://one.example.test/' in response.get_data(as_text=True),
+              'the scan result page no longer renders its own record')
+
+
 def test_listing_helpers_are_gone():
     """Dead code, not just an unused import: both functions existed only to feed the
     listings, so leaving them behind invites the next change to re-add a listing."""
-    from app.services import email_service
+    from app.services import email_service, scan_service
     check(not hasattr(email_service, 'list_analyses'),
           'email_service.list_analyses still exists; it is dead once the listing is gone')
+    check(not hasattr(scan_service, 'list_scans'),
+          'scan_service.list_scans still exists; it is dead once the listing is gone')
 
 
 def main():
     test_email_form_lists_nothing()
     test_email_direct_link_still_works()
+    test_scan_form_lists_nothing()
+    test_scan_direct_link_still_works()
     test_listing_helpers_are_gone()
 
     if failures:
