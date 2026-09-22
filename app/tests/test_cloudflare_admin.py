@@ -29,9 +29,17 @@ os.environ['CF_ACCOUNT_ID'] = ACCOUNT
 os.environ['CF_BASE_DOMAIN'] = 'nexustrace.net'
 os.environ['CF_SUBDOMAIN'] = 'cloud'
 
+_SUBJECT = os.path.join(_ROOT, 'scripts', 'cloudflare_admin.py')
+if not os.path.exists(_SUBJECT):
+    # The subject is internal-only and gitignored (see .gitignore), so it is absent
+    # from any clone. The test stays useful for whoever has it locally rather than
+    # failing for everyone who does not.
+    print('SKIP: scripts/cloudflare_admin.py is not present (internal-only script)')
+    raise SystemExit(0)
+
 _spec = importlib.util.spec_from_file_location(
     'cloudflare_admin_under_test',
-    os.path.join(_ROOT, 'scripts', 'cloudflare_admin.py'),
+    _SUBJECT,
 )
 cfa = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cfa)

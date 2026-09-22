@@ -21,6 +21,12 @@ from app.utils import activity
 RIGHT_TOKEN = 'correct-horse-battery-staple'
 WRONG_TOKEN = 'correct-horse-battery-stapl3'
 
+# Markers that DO appear in the rendered dashboard (templates/admin.html). Asserted as a
+# set so one rewording cannot silently make a leak check vacuous: a previous version of
+# this file pinned "Last 24 hours", the template later became "Last 24 h", and the check
+# then passed whether or not the dashboard leaked to an unauthenticated caller.
+DASHBOARD_MARKERS = ('last 24 h', 'unique ips', 'top paths')
+
 failures = []
 
 
@@ -421,8 +427,9 @@ def test_admin_rejects_a_wrong_token():
             body = response.data.decode('utf-8', 'replace')
             check('203.0.113.201' not in body,
                   f'{label} leaked a log record to an unauthenticated caller')
-            check('Last 24 hours' not in body,
-                  f'{label} rendered the dashboard to an unauthenticated caller')
+            for marker in DASHBOARD_MARKERS:
+                check(marker not in body.lower(),
+                      f'{label} leaked dashboard content ({marker!r}) to an unauthenticated caller')
 
 
 def test_admin_accepts_the_right_token():
@@ -435,7 +442,12 @@ def test_admin_accepts_the_right_token():
               f'the right header token returned {response.status_code}, expected 200')
         body = response.data.decode('utf-8', 'replace')
         check('203.0.113.77' in body, 'the dashboard did not render a seeded record')
-        check('Last 24 hours' in body, 'the dashboard did not render the summary')
+        # Case-insensitive and loose on purpose: the summary block's exact wording has
+        # drifted before (the template went from "Last 24 hours" to "Last 24 h").
+        # Pinning full prose here just breaks the test again on the next copy tweak.
+        # '24 h' covers every spelling seen so far without caring about capitalization
+        # or the surrounding words.
+        check('24 h' in body.lower(), 'the dashboard did not render the summary')
 
         # Form login exchanges the token for a session cookie; the token itself is
         # never placed in a URL.
