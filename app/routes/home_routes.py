@@ -119,6 +119,8 @@ def _run_analysis(indicator):
         indicator_type = 'ad_code'
     elif re.match(r'^\+[1-9]\d{6,14}$', indicator):
         indicator_type = 'phone'
+    elif re.match(r'^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$', indicator):
+        indicator_type = 'identity_email'
     else:
         logger.debug(f"Treating as User Agent: {indicator}")
         try:
@@ -286,6 +288,9 @@ def _run_analysis(indicator):
                               indicator_type=indicator_type,
                               card_count=card_count,
                               **result_data)
+    elif indicator_type == 'identity_email':
+        return redirect(url_for('identity.identity_scan_form', target=indicator,
+                                mode='email'))
     elif indicator_type in ('url', 'domain'):
         # Both domains and full URLs go through the URL scanner. Do NOT prepend a
         # scheme here: url_guard.normalize() owns scheme defaulting, and a second

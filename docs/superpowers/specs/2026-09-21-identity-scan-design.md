@@ -373,6 +373,18 @@ give users fresher data than the release carries.
 Resolve the path from the installed package rather than hard-coding it, and pin the
 behaviour with a test that asserts no network call happens during site-list load.
 
+### Decided: the site list stays pinned to the bundled copy
+
+Sherlock's default behaviour is to fetch a live manifest, and a cached-with-fallback
+design was considered: a background fetch into the existing timed cache, so scans never
+block on the network and fall back to the bundled copy.
+
+**Rejected deliberately.** The bundled list ships with the pinned package, so coverage
+changes only when the pin changes, and a pin change is a reviewable diff. A live manifest
+would silently alter what a scan reports about a named person with no code change in this
+repo, which is the same reasoning behind the exact `publicsuffixlist` and `phonenumbers`
+pins. Updating coverage means bumping `sherlock-project`.
+
 ## 9. Open items
 
 - The Docker build with `curl_cffi` on the slim base image is unverified. Confirm during

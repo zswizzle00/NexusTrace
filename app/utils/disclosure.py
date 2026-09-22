@@ -40,6 +40,8 @@ PARTIES = (
                                   'malware.hash.cymru.com', 'team-cymru.com'),
           'IP addresses and file hashes, as DNS queries', ALWAYS),
     Party('circl', 'CIRCL hashlookup', ('hashlookup.circl.lu',), 'file hashes', ALWAYS),
+    Party('hudsonrock', 'Hudson Rock', ('cavalier.hudsonrock.com',),
+          'usernames and e-mail addresses', ALWAYS),
     Party('ip2whois', 'IP2WHOIS', ('api.ip2whois.com',), 'domain names', ALWAYS),
     Party('abuseipdb', 'AbuseIPDB', ('api.abuseipdb.com',), 'IP addresses', ALWAYS),
     Party('vpnapi', 'VPNAPI.io', ('vpnapi.io',), 'IP addresses', ALWAYS),

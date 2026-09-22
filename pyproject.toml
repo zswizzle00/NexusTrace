@@ -53,6 +53,16 @@ dependencies = [
     # ships no geodata/carrierdata/tzdata, so geocoder, carrier and timezone all raise
     # ModuleNotFoundError.
     "phonenumbers==9.0.39",
+    # Both pinned exactly because the bundled SITE LISTS are the product: a version bump
+    # silently changes which platforms are checked, and therefore what a scan reports,
+    # with no code change in this repo. Same reasoning as the publicsuffixlist pin.
+    #
+    # user-scanner is used as a LIBRARY ONLY, via user_scanner.core.orchestrator and
+    # user_scanner.core.email_orchestrator. Never import user_scanner.__main__ or
+    # anything under user_scanner.utils: that is where its three blocking input()
+    # prompts and its pip-based self-updater live.
+    "sherlock-project==0.16.2",
+    "user-scanner==1.5.2",
 ]
 
 # Deliberately not a base dependency: storage.py imports it lazily, so only a Cloud Run

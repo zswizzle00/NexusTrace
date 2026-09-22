@@ -58,6 +58,7 @@
                         <a href="/file_analysis" class="nav-link{% if request.path == '/file_analysis' %} active{% endif %}">File</a>
                         <a href="/user_agent_search" class="nav-link{% if request.path == '/user_agent_search' %} active{% endif %}">User Agent</a>
                         <a href="/phone_analysis" class="nav-link{% if request.path == '/phone_analysis' %} active{% endif %}">Phone</a>
+                        <a href="/identity_scan" class="nav-link{% if request.path.startswith('/identity_scan') %} active{% endif %}">Identity</a>
                     </div>
                     <div class="nav-sep" role="separator" aria-hidden="true"></div>
                     <div class="nav-group">
@@ -127,6 +128,7 @@
             <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
                 <a href="/cyberchef" class="mobile-nav-link">CyberChef</a>
                 <a href="/user_agent_search" class="mobile-nav-link">User Agent Search</a>
+                <a href="/identity_scan" class="mobile-nav-link">Identity Scan</a>
                 <a href="/hash_analysis" class="mobile-nav-link">Hash Search</a>
                 <a href="/email_analysis" class="mobile-nav-link">E-mail Analysis</a>
                 <a href="/file_analysis" class="mobile-nav-link">File Analysis</a>

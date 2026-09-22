@@ -33,7 +33,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine')
+STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'identity')
 
 BACKENDS = ('local', 'gcs')
 

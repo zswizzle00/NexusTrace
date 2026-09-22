@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Identity Scan | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">Identity Scan</h1>
+    <p class="text-sm text-gray-400">
+      Checks a username or e-mail address for public accounts across many platforms, and
+      looks up infostealer exposure. A scan takes up to 70 seconds and contacts many
+      platforms.
+    </p>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mb-4 px-4 py-3 rounded text-sm
+      {% if category == 'error' %}bg-red-900/30 text-red-300 border border-red-800
+      {% else %}bg-blue-900/30 text-blue-300 border border-blue-800{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('identity.identity_scan_submit') }}" class="nt-card p-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-4">
+      <label for="identity-target" class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">
+        Username or e-mail address
+      </label>
+      <input type="text" id="identity-target" name="target" required
+             value="{{ target or '' }}" placeholder="e.g. jsmith or jsmith@example.com"
+             class="form-input w-full bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none">
+    </div>
+
+    <div class="mb-4">
+      <span class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">Mode</span>
+      <div class="flex items-center gap-4 text-sm text-gray-300">
+        <label class="flex items-center gap-2">
+          <input type="radio" name="mode" value="username" {% if mode != 'email' %}checked{% endif %}>
+          Username
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="mode" value="email" {% if mode == 'email' %}checked{% endif %}>
+          E-mail address
+        </label>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
+        Scan
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

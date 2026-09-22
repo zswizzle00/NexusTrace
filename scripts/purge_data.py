@@ -56,7 +56,8 @@ from pathlib import Path
 DEFAULT_MAX_AGE_DAYS = 30
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
-STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'activity')
+STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'activity',
+          'identity')
 
 _UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 RECORD_RE = re.compile(rf'^({_UUID})\.json$')
@@ -211,6 +212,7 @@ def main():
     subs, subs_unexpected = collect(dirs['submissions'], RECORD_RE)
     samples, samples_unexpected = collect(dirs['quarantine'], SAMPLE_RE)
     activity, activity_unexpected = collect(dirs['activity'], ACTIVITY_RE)
+    identity, identity_unexpected = collect(dirs['identity'], RECORD_RE)
 
     record_uuids = {entry.key for entry in scans}
 
@@ -237,6 +239,13 @@ def main():
     doomed_analyses = [e for e in analyses if e.mtime < cutoff] if 'analyses' in stores else []
     doomed_analysis_ids = {e.key for e in doomed_analyses}
     retained_analyses = [e for e in analyses if e.key not in doomed_analysis_ids]
+
+    # No owning record and no companion store, so identity results age purely on mtime,
+    # like the activity log.
+    doomed_identity = ([e for e in identity if e.mtime < cutoff]
+                       if 'identity' in stores else [])
+    doomed_identity_ids = {e.key for e in doomed_identity}
+    retained_identity = [e for e in identity if e.key not in doomed_identity_ids]
 
     submission_uuids = {e.key for e in subs}
     undecided = {e.key for e in subs if awaiting_decision(e.path)}
@@ -323,9 +332,11 @@ def main():
                  samples_unexpected, sample_notes, args.apply, args.list_all)
     report_store('activity   ', dirs['activity'], doomed_activity, retained_activity,
                  activity_unexpected, [], args.apply, args.list_all)
+    report_store('identity   ', dirs['identity'], doomed_identity, retained_identity,
+                 identity_unexpected, [], args.apply, args.list_all)
 
     total = (doomed_scans + doomed_shots + doomed_analyses + doomed_subs + doomed_samples
-             + doomed_activity)
+             + doomed_activity + doomed_identity)
     total_bytes = sum(e.size for e in total)
     print()
     if not args.apply:
@@ -340,7 +351,8 @@ def main():
                                (doomed_analyses, dirs['analyses']),
                                (doomed_subs, dirs['submissions']),
                                (doomed_samples, dirs['quarantine']),
-                               (doomed_activity, dirs['activity'])):
+                               (doomed_activity, dirs['activity']),
+                               (doomed_identity, dirs['identity'])):
         for entry in entries:
             try:
                 remove(entry.path, store_dir)

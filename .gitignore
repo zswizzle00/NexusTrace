@@ -47,7 +47,9 @@ secrets/
 CLAUDE.md
 
 # Tailwind standalone CLI binary (46MB; download on demand, see tailwind.config.js)
-tools/
+# Anchored to the repo root: an unanchored "tools/" also matched app/tools/, the
+# identity scan's subprocess worker package, and silently kept it out of git.
+/tools/
 
 # Agent scratch: worktrees and subagent-driven-development ledgers/briefs/reviews
 .worktrees/
@@ -65,6 +67,9 @@ data/quarantine/
 # data/activity/ is the request log. It records client IPs, countries and the paths
 # that were looked up, so it carries the same sensitivity as the analysis records.
 data/activity/
+# data/identity/ holds account-enumeration results and infostealer exposure findings
+# about named individuals. Never committed.
+data/identity/
 
 # --- Internal-only: not meant for the public repo. Added after the
 # .github/workflows/sync-public.yml workflow that used to enforce this split
