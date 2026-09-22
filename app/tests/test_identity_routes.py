@@ -187,6 +187,39 @@ def test_busy_scanner_flashes_rather_than_500():
             identity_routes.run_identity_scan = original
 
 
+def test_negative_rows_are_collapsed_not_rendered():
+    """A scan checks well over a thousand platforms and almost all answer negatively, so
+    rendering every row buries the findings. Confirmed accounts and blocked sites show by
+    default; everything else is counted and kept behind a disclosure.
+
+    The counts still have to be right, because "this engine said no" and "this engine
+    never checked" remain different claims.
+    """
+    with Sandbox() as box:
+        def row(site, status):
+            return {'site': site, 'url': f'https://{site.lower()}.test/a', 'status': status,
+                    'engines': ['sherlock'], 'claims': {'sherlock': status},
+                    'agreeing': ['sherlock'], 'category': None, 'metadata': {},
+                    'reason': None}
+
+        findings = [row('GitHub', 'found'), row('Reddit', 'blocked')]
+        findings += [row(f'Neg{i}', 'not_found') for i in range(30)]
+        findings += [row(f'Unk{i}', 'unknown') for i in range(5)]
+        scan_id = box.seed_record('22222222-2222-2222-2222-222222222222', findings)
+
+        body = build().test_client().get(f'/identity_scan/{scan_id}').get_data(as_text=True)
+        head = body.split('<details')[0]
+
+        check('GitHub' in head, 'a confirmed account was not shown by default')
+        check('Reddit' in head,
+              'a blocked site was hidden; refusing to answer is not a negative result')
+        check('Neg0' not in head, 'a not_found row was rendered in the default view')
+        check('Unk0' not in head, 'an unknown row was rendered in the default view')
+        check('<details' in body, 'the remaining rows were dropped rather than collapsed')
+        check('35 platforms with no account found' in ' '.join(body.split()),
+              'the collapsed count is wrong or missing')
+
+
 def main():
     test_form_renders()
     test_result_renders_and_shows_corroboration()
@@ -196,6 +229,7 @@ def main():
     test_dissent_is_not_rendered_as_corroboration()
     test_unsafe_url_is_reguarded_on_read()
     test_busy_scanner_flashes_rather_than_500()
+    test_negative_rows_are_collapsed_not_rendered()
 
     if failures:
         print('FAIL:')

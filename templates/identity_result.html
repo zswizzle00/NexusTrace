@@ -78,71 +78,105 @@
     </div>
   </div>
 
-  {# Findings table, found rows first. A row's engine badges show exactly which engines
-     AGREE with the row's status: two agreeing engines means both independently
-     confirmed it (corroborated); one engine means only that engine's claim is reflected
-     here, either because no other engine checked or because another engine disagreed,
-     and the disagreement is rendered explicitly below rather than folded into the
-     badge. #}
+  {# A row's engine badges show exactly which engines AGREE with the row's status: two
+     agreeing engines means both independently confirmed it (corroborated); one engine
+     means only that engine's claim is reflected here, either because no other engine
+     checked or because another engine disagreed, and the disagreement is rendered
+     explicitly rather than folded into the badge. #}
+  {% macro finding_row(row) %}
+  {% set agreeing = row.get('agreeing') or [] %}
+  {% set corroborated = agreeing | length > 1 %}
+  {% set reason = row.get('reason') %}
+  <tr class="border-b border-gray-800/40">
+    <td class="py-1.5 pr-4 text-gray-200">{{ row.get('site') or '-' }}</td>
+    <td class="py-1.5 pr-4">
+      <span class="px-2 py-0.5 rounded text-xs
+                   {% if row.get('status') == 'found' %}bg-green-900/40 text-green-300 border border-green-800/60
+                   {% elif row.get('status') == 'blocked' %}bg-yellow-900/40 text-yellow-300 border border-yellow-800/60
+                   {% else %}bg-gray-800/60 text-gray-400 border border-gray-700{% endif %}">
+        {{ row.get('status') }}
+      </span>
+    </td>
+    <td class="py-1.5 pr-4 text-gray-400">
+      {% if corroborated %}
+      <span class="px-2 py-0.5 rounded text-xs bg-blue-900/40 text-blue-300 border border-blue-800/60"
+            title="Independently confirmed by every engine listed here.">corroborated: {{ agreeing | join(', ') }}</span>
+      {% elif agreeing %}
+      <span title="Only this engine ever checked this site; no other engine disagreed, it simply was not asked.">{{ agreeing | join(', ') }}</span>
+      {% else %}
+      <span class="text-gray-600">-</span>
+      {% endif %}
+      {% if reason %}
+      <div class="mt-1 text-amber-400/90"
+           title="Another engine that also checked this site reported something different.">disagreement: {{ reason }}</div>
+      {% endif %}
+    </td>
+    <td class="py-1.5">
+      {% if row.get('url') %}
+      <a href="{{ row.get('url') }}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 transition-colors">{{ row.get('url') }}</a>
+      {% else %}
+      <span class="text-gray-600">-</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endmacro %}
+
+  {% macro findings_table(rows) %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs font-mono">
+      <thead>
+        <tr class="text-gray-500 text-left border-b border-gray-700">
+          <th class="pb-1.5 pr-4">Site</th>
+          <th class="pb-1.5 pr-4">Status</th>
+          <th class="pb-1.5 pr-4">Reported by</th>
+          <th class="pb-1.5">Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}{{ finding_row(row) }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# Only confirmed accounts are shown by default. A scan checks well over a thousand
+     platforms and almost all of them answer negatively, so rendering every row buries
+     the findings in hundreds of lines of noise. The rest are counted by status and kept
+     one click away rather than dropped: "this engine said no" and "this engine never
+     checked" remain different claims, and a blocked site is not a negative result at
+     all. #}
   {% set found_rows = findings | selectattr('status', 'equalto', 'found') | list %}
   {% set other_rows = findings | rejectattr('status', 'equalto', 'found') | list %}
-  {% set ordered = found_rows + other_rows %}
+  {% set blocked_rows = other_rows | selectattr('status', 'equalto', 'blocked') | list %}
+  {% set unchecked_rows = other_rows | rejectattr('status', 'equalto', 'blocked') | list %}
   <div class="nt-card p-4 mb-5">
-    <h3 class="nt-card-title mb-3">Findings{% if ordered %} ({{ ordered | length }}){% endif %}</h3>
-    {% if ordered %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs font-mono">
-        <thead>
-          <tr class="text-gray-500 text-left border-b border-gray-700">
-            <th class="pb-1.5 pr-4">Site</th>
-            <th class="pb-1.5 pr-4">Status</th>
-            <th class="pb-1.5 pr-4">Reported by</th>
-            <th class="pb-1.5">Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in ordered %}
-          {% set agreeing = row.get('agreeing') or [] %}
-          {% set corroborated = agreeing | length > 1 %}
-          {% set reason = row.get('reason') %}
-          <tr class="border-b border-gray-800/40">
-            <td class="py-1.5 pr-4 text-gray-200">{{ row.get('site') or '-' }}</td>
-            <td class="py-1.5 pr-4">
-              <span class="px-2 py-0.5 rounded text-xs
-                           {% if row.get('status') == 'found' %}bg-green-900/40 text-green-300 border border-green-800/60
-                           {% elif row.get('status') == 'blocked' %}bg-yellow-900/40 text-yellow-300 border border-yellow-800/60
-                           {% else %}bg-gray-800/60 text-gray-400 border border-gray-700{% endif %}">
-                {{ row.get('status') }}
-              </span>
-            </td>
-            <td class="py-1.5 pr-4 text-gray-400">
-              {% if corroborated %}
-              <span class="px-2 py-0.5 rounded text-xs bg-blue-900/40 text-blue-300 border border-blue-800/60"
-                    title="Independently confirmed by every engine listed here.">corroborated: {{ agreeing | join(', ') }}</span>
-              {% elif agreeing %}
-              <span title="Only this engine ever checked this site; no other engine disagreed, it simply was not asked.">{{ agreeing | join(', ') }}</span>
-              {% else %}
-              <span class="text-gray-600">-</span>
-              {% endif %}
-              {% if reason %}
-              <div class="mt-1 text-amber-400/90"
-                   title="Another engine that also checked this site reported something different.">disagreement: {{ reason }}</div>
-              {% endif %}
-            </td>
-            <td class="py-1.5">
-              {% if row.get('url') %}
-              <a href="{{ row.get('url') }}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 transition-colors">{{ row.get('url') }}</a>
-              {% else %}
-              <span class="text-gray-600">-</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <h3 class="nt-card-title mb-3">Confirmed accounts{% if found_rows %} ({{ found_rows | length }}){% endif %}</h3>
+    {% if found_rows %}
+    {{ findings_table(found_rows) }}
     {% else %}
-    <p class="text-xs text-gray-500">No findings.</p>
+    <p class="text-xs text-gray-500">No confirmed accounts. {{ other_rows | length }} platform{{ 's' if other_rows | length != 1 else '' }} answered without one.</p>
+    {% endif %}
+
+    {% if blocked_rows %}
+    <div class="mt-4">
+      <p class="text-xs text-gray-400 mb-2">
+        {{ blocked_rows | length }} platform{{ 's' if blocked_rows | length != 1 else '' }}
+        refused to answer, so nothing is known either way. Worth checking by hand.
+      </p>
+      {{ findings_table(blocked_rows) }}
+    </div>
+    {% endif %}
+
+    {% if unchecked_rows %}
+    <details class="mt-4">
+      <summary class="text-xs text-gray-500 cursor-pointer select-none hover:text-gray-400">
+        {{ unchecked_rows | length }} platform{{ 's' if unchecked_rows | length != 1 else '' }} with no account found
+        ({{ unchecked_rows | selectattr('status', 'equalto', 'not_found') | list | length }} not found,
+         {{ unchecked_rows | selectattr('status', 'equalto', 'unknown') | list | length }} unknown,
+         {{ unchecked_rows | selectattr('status', 'equalto', 'not_applicable') | list | length }} not applicable)
+      </summary>
+      <div class="mt-2">{{ findings_table(unchecked_rows) }}</div>
+    </details>
     {% endif %}
   </div>
 
