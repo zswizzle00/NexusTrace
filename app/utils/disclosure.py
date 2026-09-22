@@ -61,6 +61,10 @@ PARTIES = (
     Party('ip2location', 'IP2Location', ('ip2location.io', 'api.ip2location.io'),
           'IP addresses', ALWAYS),
     Party('ipapi', 'IP-API', ('ip-api.com',), 'IP addresses', ALWAYS),
+    Party('localcallingguide', 'LocalCallingGuide', ('localcallingguide.com',),
+          'the area code and prefix of a phone number, never the full number', ALWAYS),
+    Party('skipcalls', 'SkipCalls', ('spam.skipcalls.com',),
+          'phone numbers', ALWAYS),
     Party('proxycheck', 'ProxyCheck.io', ('proxycheck.io',), 'IP addresses', ALWAYS),
     # No URL literal anywhere in the tree: the shodan package builds its own.
     Party('shodan', 'Shodan', ('api.shodan.io',), 'IP addresses', ALWAYS),
@@ -117,6 +121,15 @@ SURFACES = {
         retention=None,
         parties=('virustotal', 'abusech', 'otx', 'circl', 'cymru',
                  'hybrid_analysis', 'anyrun', 'joesandbox'),
+    ),
+    'phone': Surface(
+        label='phone number lookup',
+        sends=('the area code and prefix to LocalCallingGuide, and the full number to '
+               'SkipCalls. Validity, line type, region, timezone and the original range '
+               'holder are computed on this server and sent nowhere'),
+        retained=('nothing. The result is rendered once and never written to disk'),
+        retention=None,
+        parties=('localcallingguide', 'skipcalls'),
     ),
 }
 

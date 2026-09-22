@@ -17,6 +17,7 @@ from .enrichment_routes import enrichment_bp
 from .scan_routes import scan_bp
 from .email_routes import email_bp
 from .submission_routes import submission_bp
+from .phone_routes import phone_bp
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def register_routes(app):
     app.register_blueprint(scan_bp)
     app.register_blueprint(email_bp)
     app.register_blueprint(submission_bp)
+    app.register_blueprint(phone_bp)
 
     if role == ROLE_ADMIN:
         # Imported inside the branch, not at module scope: on the public role the admin
