@@ -25,6 +25,7 @@
     <p class="text-sm text-gray-400">
       Upload a sample for static triage. NexusTrace hashes it, sniffs its real format,
       measures entropy, looks for appended executables, parses Windows shortcuts,
+      extracts Office macros, inspects PDF structure, matches operator YARA rules,
       extracts indicators, and checks hash reputation.
     </p>
   </div>
@@ -439,6 +440,114 @@
         </table>
       </div>
     </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Document-analyser cards. Each renders only when its analyser ran, so a file that
+     fired no gate shows no empty cards.
+
+     Two signal treatments, following the .lnk card above: a finding is grey, and a
+     caveat is yellow. A caveat is any signal meaning "we did not look" or "we could
+     not see all of it", and it is coloured because the alternative is an analyst
+     reading an incomplete result as a clean one. Severity deliberately stays with the
+     Verdict card; repeating it here would say the same thing twice. #}
+  {% set caveat_keys = ['analysis_skipped_too_large', 'analysis_busy',
+                        'analysis_timed_out', 'analysis_error',
+                        'office_not_office_container', 'pdf_object_stream',
+                        'pdf_structure_mismatch', 'pdf_unhandled_filter'] %}
+
+  {% macro signal_list(signals, empty_message) %}
+  {% if signals %}
+  <ul class="space-y-1 mb-4">
+    {% for sig in signals %}
+    {% set is_caveat = sig.get('key') in caveat_keys %}
+    <li class="text-xs flex items-start gap-2 {{ 'text-yellow-300' if is_caveat else 'text-gray-300' }}">
+      <span class="{{ 'text-yellow-600' if is_caveat else 'text-gray-600' }} mt-0.5">▸</span>
+      <span>
+        {{ sig.get('label') or sig.get('key') or '-' }}
+        {% if sig.get('detail') %}<span class="{{ 'text-yellow-500/80' if is_caveat else 'text-gray-500' }} font-mono break-all">- {{ sig.get('detail') }}</span>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-xs text-gray-500 mb-4">{{ empty_message }}</p>
+  {% endif %}
+  {% endmacro %}
+
+  {% set office = analysis.get('office') %}
+  {% if office %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">Office Document</h3>
+    {{ signal_list(office.get('signals'), 'No macro heuristics fired.') }}
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-1">
+      {% macro okv(k, val) %}{% if val %}<div><dt class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</dt><dd class="text-gray-200 font-mono text-xs mt-0.5 break-all">{{ val }}</dd></div>{% endif %}{% endmacro %}
+      {{ okv('Container', office.get('container')) }}
+      {{ okv('Encrypted', 'yes' if office.get('encrypted') else '') }}
+      {{ okv('VBA modules', (office.get('modules') or []) | length or '') }}
+    </dl>
+    {% if office.get('modules') %}
+    <ul class="mt-2 space-y-0.5">
+      {% for module in office.get('modules') %}
+      <li class="text-xs font-mono text-gray-400 break-all">{{ module.get('stream') }} &middot; {{ module.get('code_len') }} bytes</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% set pdf = analysis.get('pdf') %}
+  {% if pdf %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">PDF Structure</h3>
+    {{ signal_list(pdf.get('signals'), 'No PDF heuristics fired.') }}
+    {% if pdf.get('keywords') %}
+    {# pdfid's `total (hex)` form. A keyword written as /J#61vaScript resolves to
+       /JavaScript in every reader, so hiding one behind hex escapes is a deliberate
+       act and is worth showing next to the count rather than folded into it. #}
+    <div class="flex flex-wrap gap-x-4 gap-y-1">
+      {% for name, entry in (pdf.get('keywords') or {}) | dictsort %}
+      <span class="text-xs font-mono text-gray-400">/{{ name }}
+        <span class="text-gray-200">{{ entry.get('total') }}</span>{% if entry.get('hex') %}<span class="text-yellow-300"> ({{ entry.get('hex') }} obfuscated)</span>{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% set yara = analysis.get('yara') %}
+  {% if yara %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">YARA{% if yara.get('matches') %} ({{ yara.get('matches') | length }}){% endif %}</h3>
+    {{ signal_list(yara.get('signals'), 'No rules matched this file.') }}
+    {% if yara.get('matches') %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="pb-1.5 pr-4">Rule</th>
+            <th class="pb-1.5 pr-4">Author</th>
+            <th class="pb-1.5 pr-4">Ruleset</th>
+            <th class="pb-1.5">Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# The author column is a LICENCE TERM, not decoration. Detection Rule
+             License 1.1, which covers the default ruleset, requires that messages
+             based on matches identify the rule author. Do not remove this column. #}
+          {% for match in yara.get('matches') %}
+          <tr class="border-b border-gray-800/40">
+            <td class="py-1.5 pr-4 text-gray-200 break-all">{{ match.get('rule') }}</td>
+            <td class="py-1.5 pr-4 text-gray-400">{{ match.get('author') or '-' }}</td>
+            <td class="py-1.5 pr-4 text-gray-500 break-all">{{ match.get('namespace') }}</td>
+            <td class="py-1.5 text-gray-500">{{ (match.get('tags') or []) | join(', ') or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% endif %}
   </div>
   {% endif %}

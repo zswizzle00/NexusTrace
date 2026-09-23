@@ -107,6 +107,39 @@ def test_an_unreadable_file_still_returns_the_three_fields():
         check(field in record, f'the error path drops {field!r} from the record')
 
 
+def test_operator_rule_metadata_is_escaped_on_the_page():
+    """Rule names, authors and tags come from rule files an operator fetched from a
+    third party. They are untrusted text that reaches the result page, and the YARA
+    card renders all three (the author because DRL 1.1 requires it)."""
+    from app import create_app
+    app = create_app()
+    record = {
+        'filename': 'x.bin', 'size_bytes': 3, 'digests': {'md5': '', 'sha1': '', 'sha256': ''},
+        'magic_type': None, 'is_executable': False, 'is_archive': False, 'entropy': 0.0,
+        'embedded_executables': [], 'strings_sample': [], 'lnk': None, 'iocs': [],
+        'reputation': {}, 'truncated': False, 'error': None, 'office': None, 'pdf': None,
+        'yara': {'rules_loaded': 1, 'error': None, 'signals': [],
+                 'matches': [{'rule': '<script>alert(1)</script>', 'namespace': 'a.yar',
+                              'tags': ['<img src=x onerror=alert(2)>'],
+                              'author': '<b>evil</b>', 'meta': {}, 'strings': []}]},
+        'verdict': {'level': 'unknown', 'score': 0.0, 'signals': []},
+    }
+    # test_request_context, not app_context: the template calls url_for.
+    with app.test_request_context('/file_analysis'):
+        body = app.jinja_env.get_template('file_analysis.html').render(
+            analysis=record, post_url='/api/file/analyze', submit_url='/api/file/analyze')
+    check('<script>alert(1)</script>' not in body,
+          'a YARA rule name reached the page unescaped')
+    # Assert on the unescaped angle bracket, not on the payload text. A correctly
+    # escaped `&lt;img src=x onerror=alert(2)&gt;` still contains the substring
+    # "onerror=alert(2)", so checking for that passes on safe and unsafe output alike.
+    check('<img src=x' not in body,
+          'a YARA tag reached the page unescaped')
+    check('&lt;script&gt;' in body,
+          'the rule name was dropped rather than escaped; the assertions above would '
+          'pass vacuously if the card never rendered')
+
+
 def main():
     test_an_extension_cannot_promote_a_file_into_an_analyser()
     test_a_bare_zip_is_not_handed_to_the_office_parser()
@@ -114,6 +147,7 @@ def main():
     test_the_record_is_json_serializable()
     test_pdf_findings_reach_the_verdict()
     test_an_unreadable_file_still_returns_the_three_fields()
+    test_operator_rule_metadata_is_escaped_on_the_page()
 
     if failures:
         print('FAIL:')

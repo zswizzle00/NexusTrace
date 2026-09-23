@@ -37,6 +37,12 @@ Built for security analysts, incident responders, and researchers who need fast,
 ### File & Hash Analysis
 - Static inspection: magic-byte identification, Shannon entropy, embedded-executable detection,
   and a dedicated Windows `.lnk` shortcut parser (30+ attacker-relevant signals)
+- Office macro extraction (`oletools`): auto-executing macros, obfuscated VBA, download
+  cradles, and shell execution
+- PDF structure inspection: JavaScript, automatic actions, launch actions and embedded
+  files, counted as whole normalised name tokens so hex-escaped keywords like
+  `/J#61vaScript` are caught and reported as obfuscated
+- YARA matching against operator-supplied rules, off until rules are installed
 - Multi-source reputation lookup: VirusTotal, MalwareBazaar, ThreatFox, CIRCL hashlookup
   (NIST NSRL-backed), and Team Cymru's Malware Hash Registry
 - Threat intelligence cross-reference (AlienVault OTX)
@@ -178,6 +184,27 @@ For faster lookups without API rate limits, download the IPinfo Lite MMDB databa
 3. Place it in `data/ipinfo_lite.mmdb`
 4. Set `MMDB_PATH=data/ipinfo_lite.mmdb` in `.env`
 
+### YARA rules (optional)
+
+NexusTrace ships with no detection rules, so YARA matching is off and the YARA card
+never renders. To turn it on:
+
+```bash
+uv run python scripts/setup_yara_rules.py
+```
+
+This downloads [Neo23x0/signature-base](https://github.com/Neo23x0/signature-base) into
+`data/yara/`, which is git-ignored. Rules compile once at start-up, so restart the app
+afterwards.
+
+Those rules are published under Detection Rule License 1.1. It requires that messages
+based on a match identify the rule's author, which is why the result card has an Author
+column. Leave it in place.
+
+To use a different ruleset, put `.yar` files in `data/yara/` yourself, or point
+`NEXUSTRACE_YARA_DIR` somewhere else. A ruleset that fails to compile disables matching
+and logs the reason rather than breaking uploads.
+
 ---
 
 ## Architecture
@@ -227,6 +254,9 @@ NexusTrace/
 │       ├── email_parse.py   # .eml parsing (pure, stdlib only)
 │       ├── file_inspect.py  # Magic bytes, entropy, embedded executables (pure)
 │       ├── lnk_parse.py     # Windows .lnk shortcut parser (pure)
+│       ├── office_inspect.py # Office macro extraction via oletools (pure)
+│       ├── pdf_inspect.py   # PDF keyword and structure detection (pure, stdlib only)
+│       ├── yara_scan.py     # YARA matching, operator-supplied rules (pure)
 │       ├── hash_reputation.py # CIRCL/Cymru MHR response mapping (pure)
 │       ├── disclosure.py    # Acceptable-use registry backing the data-governance notice
 │       ├── iocs.py          # IOC extraction + defanging (pure)
