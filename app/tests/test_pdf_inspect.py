@@ -348,14 +348,37 @@ def test_every_signal_has_a_label():
     """`_signal` falls back to the bare key, which would render an identifier to an
     analyst. Every key this module can emit needs a label."""
     for key in ('pdf_javascript', 'pdf_auto_action', 'pdf_launch_action',
-                'pdf_embedded_file', 'pdf_obfuscated_name', 'pdf_encrypted_no_password',
+                'pdf_embedded_file', 'pdf_obfuscated_name', 'pdf_encrypted',
                 'pdf_object_stream', 'pdf_structure_mismatch', 'pdf_unhandled_filter',
                 'analysis_skipped_too_large', 'analysis_error'):
         check(pdf_inspect.SIGNAL_LABELS.get(key, key) != key,
               f'{key} has no label in SIGNAL_LABELS')
 
 
+def test_encryption_is_reported_from_the_raw_bytes():
+    """An encrypted PDF is opaque to every downstream content scanner, which is why it
+    is a known evasion, and `/Encrypt` is visible without decrypting anything.
+
+    This replaces a `pdf_encrypted_no_password` signal that the plan specified and
+    weighted but that nothing could ever emit: deciding "no password" needs the
+    /Encrypt dictionary and the trailer /ID, so it needs xref resolution. A weight
+    nothing can trigger is worse than no weight.
+    """
+    data = build_pdf(b'1 0 obj << /Filter /Standard /V 1 /R 2 >> endobj\n'
+                     b'trailer\n<< /Encrypt 1 0 R /ID [<aa><bb>] >>')
+    keys = {s['key'] for s in pdf_inspect.analyze_pdf_bytes(data)['signals']}
+    check('pdf_encrypted' in keys, 'a PDF declaring /Encrypt was not reported')
+    check('pdf_encrypted_no_password' not in keys,
+          'the undeliverable no-password signal is still being emitted')
+
+    clean = build_pdf(b'1 0 obj << /Type /Catalog >> endobj')
+    clean_keys = {s['key'] for s in pdf_inspect.analyze_pdf_bytes(clean)['signals']}
+    check('pdf_encrypted' not in clean_keys,
+          'an unencrypted PDF was reported as encrypted')
+
+
 def main():
+    test_encryption_is_reported_from_the_raw_bytes()
     test_name_normalization_is_a_single_pass()
     test_prefix_collisions_do_not_count()
     test_font_subset_tag_is_not_an_auto_action()

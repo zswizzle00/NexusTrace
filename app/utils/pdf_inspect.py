@@ -162,10 +162,12 @@ SIGNAL_LABELS = {
     'pdf_launch_action': 'PDF launches an external program',
     'pdf_embedded_file': 'PDF carries an embedded file',
     'pdf_obfuscated_name': 'PDF hides a keyword behind hex escapes',
-    # Deciding this needs the /Encrypt dictionary and the file /ID, which means xref
-    # resolution. Nothing emits it yet; the label is here because file_rules weights
-    # the key and the card renders from this dict.
-    'pdf_encrypted_no_password': 'PDF is encrypted but opens without a password',
+    # `/Encrypt` present is detectable from the raw bytes and is a real fact: an
+    # encrypted document is opaque to every downstream content scanner, which is why
+    # it is a known evasion. Whether it opens WITHOUT a password is the more damning
+    # variant and is deliberately not decided here: it needs the /Encrypt dictionary
+    # and the trailer /ID, so it needs xref resolution, which this module does not do.
+    'pdf_encrypted': 'PDF is encrypted, so its contents could not be examined',
     'pdf_object_stream': ('PDF stores objects in compressed object streams, so counts '
                           'may be incomplete'),
     'pdf_structure_mismatch': 'PDF object or stream markers do not balance',
@@ -230,6 +232,8 @@ def analyze_pdf_bytes(data):
                             for name, entry in keywords.items() if entry.get('hex'))
         signals.append(_signal('pdf_obfuscated_name', ', '.join(obfuscated)))
 
+    if keywords.get(b'Encrypt'):
+        signals.append(_signal('pdf_encrypted'))
     if keywords.get(b'ObjStm'):
         signals.append(_signal('pdf_object_stream'))
     if (structure['obj'] != structure['endobj']
