@@ -13,10 +13,10 @@
                     NexusTrace
                 </h1>
                 <p class="text-sm md:text-base lg:text-xl text-gray-400 px-2">
-                    A tool for analyzing IP addresses, domains, URLs, user-agent strings, and file hashes, with additional support for Windows Event Logs and Azure Error Logs searches.
+                    A tool for analyzing IP addresses, domains, URLs, file hashes, phone numbers, email addresses, and user-agent strings, with additional support for Windows Event Log and Azure error code lookups.
                 </p>
             </div>
-            {{ search_form('Enter IP, domain, URL, hash, or user agent...', form_id='analyze-form', input_id='indicator-input') }}
+            {{ search_form('Enter IP, domain, URL, hash, phone number, email, or user agent...', form_id='analyze-form', input_id='indicator-input') }}
 
             <div class="pt-2">
                 <p class="example-heading">Try an example</p>
@@ -32,6 +32,10 @@
                     <button type="button" class="example-chip" data-indicator="44d88612fea8a8f36de82e1278abb02f" aria-label="Analyze example MD5 hash">
                         <span class="example-chip__label">Hash</span>
                         <span class="example-chip__value">MD5</span>
+                    </button>
+                    <button type="button" class="example-chip" data-indicator="+18002752273" aria-label="Analyze example phone number">
+                        <span class="example-chip__label">Phone</span>
+                        <span class="example-chip__value">+1 800 275 2273</span>
                     </button>
                 </div>
             </div>
