@@ -100,7 +100,8 @@ def test_hex_obfuscated_keywords_are_found_and_flagged():
 def test_keywords_in_body_text_still_count():
     """This is deliberate, not a bug. Suppressing hits by context is a one-byte
     evasion: see the module docstring. A hit in body text is a hit."""
-    data = build_pdf(b'1 0 obj << /Type /Page >> stream\n(The word /JavaScript appears here)\nendstream endobj')
+    data = build_pdf(b'1 0 obj << /Type /Page >> stream\n'
+                     b'(The word /JavaScript appears here)\nendstream endobj')
     check(counts_for(data).get(b'JavaScript', {}).get('total', 0) >= 1,
           'a keyword inside a stream body was suppressed; context must not hide counts')
 
@@ -157,6 +158,203 @@ def test_prefilter_length_bound_admits_a_fully_escaped_name():
           f'prefiltered scan {got} disagrees with reference scan {reference}')
 
 
+def test_structure_counts_tolerate_binary_noise():
+    """Counting bare `obj` mismatched on 3 of 60 benign real PDFs, because the byte
+    sequence `obj` occurs inside compressed image data. Anchoring to `<num> <num> obj`
+    dropped that to zero while still catching genuinely broken files."""
+    data = build_pdf(b'1 0 obj << /Type /Catalog >> endobj\n'
+                     b'2 0 obj << /Len 4 >> stream\n\xa2obj\xb3E\nendstream endobj')
+    structure = pdf_inspect.count_structure(data)
+    check(structure['obj'] == structure['endobj'],
+          f"binary noise produced a false obj mismatch: {structure}")
+
+
+def test_structure_mismatch_is_detected_when_real():
+    data = build_pdf(b'1 0 obj << /A 1 >> endobj\n2 0 obj << /B 2 >>\n3 0 obj << /C 3 >>')
+    structure = pdf_inspect.count_structure(data)
+    check(structure['obj'] > structure['endobj'],
+          f'a genuine obj/endobj mismatch was not detected: {structure}')
+
+
+def test_missing_trailer_is_not_malformed():
+    """PDF 1.5 cross-reference streams produce zero `xref` and zero `trailer`, and
+    occurred in 5 of 60 real files. Zero is normal, not a defect."""
+    data = build_pdf(b'1 0 obj << /Type /XRef >> endobj', trailer=False)
+    structure = pdf_inspect.count_structure(data)
+    check(structure['trailer'] == 0, 'fixture should have no trailer')
+    result = pdf_inspect.analyze_pdf_bytes(data)
+    keys = {s['key'] for s in result['signals']}
+    check('pdf_structure_mismatch' not in keys,
+          'a missing trailer was reported as a structural defect')
+
+
+def test_flate_streams_reveal_hidden_keywords():
+    """Object streams hide objects from raw-byte scanning entirely. Bounded inflation
+    recovered every hidden signal in the design corpus while adding exactly one benign
+    keyword across 60 real files."""
+    hidden = zlib.compress(b'<< /Type /Action /S /JavaScript /JS (app.alert\\(1\\)) >>')
+    data = build_pdf(b'1 0 obj << /Type /ObjStm /Filter /FlateDecode >> stream\n'
+                     + hidden + b'\nendstream endobj')
+    check(pdf_inspect.count_names(data).get(b'JavaScript') is None,
+          'fixture is wrong: the keyword should be invisible in the raw bytes')
+    result = pdf_inspect.analyze_pdf_bytes(data)
+    check(result['keywords'].get('JavaScript', {}).get('total', 0) >= 1,
+          'bounded inflation did not recover a keyword hidden in a Flate stream')
+
+
+def test_object_stream_is_a_coverage_note_not_a_finding():
+    """/ObjStm appeared in 5 of 60 ordinary benign PDFs. Reporting it as suspicious
+    would be an 8% false-positive rate on normal documents."""
+    data = build_pdf(b'1 0 obj << /Type /ObjStm >> endobj')
+    signals = {s['key']: s for s in pdf_inspect.analyze_pdf_bytes(data)['signals']}
+    check('pdf_object_stream' in signals,
+          '/ObjStm was not reported at all; the coverage limit must be visible')
+    check(pdf_inspect.SIGNAL_LABELS['pdf_object_stream'].lower().find('incomplete') >= 0,
+          'the /ObjStm label should describe a coverage limit, not a finding')
+
+
+def test_a_decompression_bomb_is_capped():
+    """Deflate expands at 1029:1 and is flat across sizes, so 1 MB of stream yields
+    1 GB. A bare zlib.decompress() here is a trivial memory kill.
+
+    The bomb has to expand past the budget for this to test anything: a payload that
+    fits inside MAX_TOTAL_INFLATE passes whether or not the cap is applied."""
+    bomb = zlib.compress(b'\x00' * (64 * 1024 * 1024))
+    data = build_pdf(b'1 0 obj << /Filter /FlateDecode >> stream\n' + bomb
+                     + b'\nendstream endobj')
+    result = pdf_inspect.analyze_pdf_bytes(data)
+    check(result['error'] is None, f'a compressed-zeros stream errored: {result["error"]}')
+    check(result['inflated_bytes'] <= pdf_inspect.MAX_INFLATE_PER_STREAM,
+          f'one stream inflated past its own budget: {result["inflated_bytes"]}')
+
+
+def test_many_bombs_share_one_total_budget():
+    """Per-stream capping alone is not a bound: 2048 streams at 4 MB each is 8 GB.
+    The total budget has to stop the walk, and stop it BEFORE the next inflation."""
+    bomb = zlib.compress(b'\x00' * (8 * 1024 * 1024))
+    stream = b'1 0 obj << /Filter /FlateDecode >> stream\n' + bomb + b'\nendstream endobj\n'
+    result = pdf_inspect.analyze_pdf_bytes(build_pdf(stream * 24))
+    check(result['error'] is None, f'a multi-stream document errored: {result["error"]}')
+    check(result['inflated_bytes'] <= pdf_inspect.MAX_TOTAL_INFLATE,
+          f'inflation exceeded the total budget: {result["inflated_bytes"]}')
+
+
+def write_blob(box, name, blob):
+    path = os.path.join(box, name)
+    with open(path, 'wb') as handle:
+        handle.write(blob)
+    return path
+
+
+def test_degenerate_and_boundary_sizes():
+    with tempfile.TemporaryDirectory() as box:
+        for name, blob, expect_skip in (
+            ('empty.pdf', b'', False),
+            ('header_only.pdf', b'%PDF-1.7\n', False),
+            ('at_cap.pdf', b'%PDF-1.7\n' + b'a' * (pdf_inspect.MAX_BYTES - 9), False),
+            ('over_cap.pdf', b'%PDF-1.7\n' + b'a' * pdf_inspect.MAX_BYTES, True),
+        ):
+            result = pdf_inspect.analyze_pdf(write_blob(box, name, blob))
+            keys = {s['key'] for s in result['signals']}
+            check(result['error'] is None, f'{name} produced an error: {result["error"]}')
+            if expect_skip:
+                check(result['truncated'] is True,
+                      f'{name} is over the cap but was not marked truncated')
+            else:
+                check('analysis_skipped_too_large' not in keys,
+                      f'{name} is within the cap but was skipped')
+
+
+def test_a_capped_read_keeps_the_tail():
+    """Head-only truncation lost `startxref` and `trailer` on all five oversized files
+    in the design corpus, and a signal on four of them. PDFs put the xref, the trailer
+    and the /Encrypt reference at the end."""
+    filler = b'%PDF-1.7\n' + b'0' * (pdf_inspect.MAX_BYTES * 2)
+    with tempfile.TemporaryDirectory() as box:
+        path = write_blob(box, 'big.pdf',
+                          filler + b'\n1 0 obj << /J#61vaScript 1 >> endobj\ntrailer\n')
+        result = pdf_inspect.analyze_pdf(path)
+    check(result['truncated'] is True, 'an oversized file was not marked truncated')
+    check(result['keywords'].get('JavaScript', {}).get('total', 0) >= 1,
+          'a keyword in the last megabytes was lost; the read must keep the tail')
+    check(result['structure']['trailer'] >= 1,
+          'the trailer at the end of an oversized file was not seen')
+
+
+def test_malformed_input_never_raises():
+    """A file that is not a PDF, or is a broken one, must produce a record rather than
+    an exception. The analyzer runs inside a request."""
+    blobs = {
+        'random.pdf': b'%PDF-1.7\n' + bytes(range(256)) * 80,
+        'no_eof.pdf': b'%PDF-1.7\n1 0 obj << /A 1 >> endobj',
+        'unbalanced.pdf': b'%PDF-1.7\n1 0 obj << /JS 1 >> stream\nnever closed',
+        'nul.pdf': b'%PDF-1.7\n' + b'\x00' * 4096,
+        'not_pdf.pdf': b'GIF89a' + b'\xff' * 512,
+    }
+    with tempfile.TemporaryDirectory() as box:
+        for name, blob in blobs.items():
+            path = write_blob(box, name, blob)
+            try:
+                result = pdf_inspect.analyze_pdf(path)
+            except Exception as exc:                      # noqa: BLE001 - that is the point
+                failures.append(f'{name} raised {type(exc).__name__}: {exc}')
+                continue
+            check(isinstance(result, dict), f'{name} did not return a record')
+
+    # An unterminated stream must still yield its keyword: suppressing by context is
+    # a one-byte evasion.
+    data = b'%PDF-1.7\n1 0 obj << /JS 1 >> stream\nnever closed'
+    check(pdf_inspect.count_names(data).get(b'JS', {}).get('total', 0) >= 1,
+          'an unterminated stream hid a keyword from counting')
+
+
+def test_a_missing_file_is_a_record_not_an_exception():
+    absent = os.path.join(tempfile.gettempdir(), 'nexustrace-absent.pdf')
+    result = pdf_inspect.analyze_pdf(absent)
+    check(result['error'] is not None, 'an unreadable path reported no error')
+    check({s['key'] for s in result['signals']} == {'analysis_error'},
+          f'an unreadable path did not emit analysis_error: {result["signals"]}')
+
+
+def test_the_record_is_json_serializable():
+    """The record is written to data/ as a JSON analysis file. count_names keys are
+    bytes, and json.dumps raises TypeError on a bytes key, so analyze_pdf_bytes must
+    decode them at its boundary."""
+    data = build_pdf(b'1 0 obj << /J#61vaScript 1 /Launch 2 /LZWDecode 3 '
+                     b'/ObjStm 4 >> endobj')
+    with tempfile.TemporaryDirectory() as box:
+        path = write_blob(box, 'record.pdf', data)
+        try:
+            encoded = json.dumps(pdf_inspect.analyze_pdf(path))
+        except TypeError as exc:
+            failures.append(f'the record is not JSON-serializable: {exc}')
+            return
+    check('JavaScript' in json.loads(encoded)['keywords'],
+          'the serialized record lost its keyword names')
+
+
+def test_record_is_bounded():
+    """Review Focus 2: the record is written to data/ as JSON and rendered. 5000
+    objects each carrying /JavaScript must not produce a 5000-entry structure."""
+    body = b''.join(b'%d 0 obj << /JavaScript %d >> endobj\n' % (i, i) for i in range(5000))
+    result = pdf_inspect.analyze_pdf_bytes(b'%PDF-1.7\n' + body)
+    check(result['keywords']['JavaScript']['total'] == 5000,
+          'the count itself should be accurate')
+    check(len(result['signals']) < 50,
+          f'signal list grew with input size: {len(result["signals"])} entries')
+
+
+def test_every_signal_has_a_label():
+    """`_signal` falls back to the bare key, which would render an identifier to an
+    analyst. Every key this module can emit needs a label."""
+    for key in ('pdf_javascript', 'pdf_auto_action', 'pdf_launch_action',
+                'pdf_embedded_file', 'pdf_obfuscated_name', 'pdf_encrypted_no_password',
+                'pdf_object_stream', 'pdf_structure_mismatch', 'pdf_unhandled_filter',
+                'analysis_skipped_too_large', 'analysis_error'):
+        check(pdf_inspect.SIGNAL_LABELS.get(key, key) != key,
+              f'{key} has no label in SIGNAL_LABELS')
+
+
 def main():
     test_name_normalization_is_a_single_pass()
     test_prefix_collisions_do_not_count()
@@ -165,6 +363,20 @@ def main():
     test_keywords_in_body_text_still_count()
     test_prefilter_agrees_with_a_full_scan()
     test_prefilter_length_bound_admits_a_fully_escaped_name()
+    test_structure_counts_tolerate_binary_noise()
+    test_structure_mismatch_is_detected_when_real()
+    test_missing_trailer_is_not_malformed()
+    test_flate_streams_reveal_hidden_keywords()
+    test_object_stream_is_a_coverage_note_not_a_finding()
+    test_a_decompression_bomb_is_capped()
+    test_many_bombs_share_one_total_budget()
+    test_degenerate_and_boundary_sizes()
+    test_a_capped_read_keeps_the_tail()
+    test_malformed_input_never_raises()
+    test_a_missing_file_is_a_record_not_an_exception()
+    test_the_record_is_json_serializable()
+    test_record_is_bounded()
+    test_every_signal_has_a_label()
 
     if failures:
         print('FAIL:')
