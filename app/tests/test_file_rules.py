@@ -21,6 +21,9 @@ from app.services.file_rules import (
     score,
 )
 from app.utils.lnk_parse import SIGNAL_LABELS as LNK_SIGNAL_LABELS
+from app.utils.office_inspect import SIGNAL_LABELS as OFFICE_SIGNAL_LABELS
+from app.utils.pdf_inspect import SIGNAL_LABELS as PDF_SIGNAL_LABELS
+from app.utils.yara_scan import SIGNAL_LABELS as YARA_SIGNAL_LABELS
 
 # A reputation block where sources actually answered and nobody has a bad record.
 # `benign` is unreachable without one of these - see the module docstring.
@@ -79,6 +82,9 @@ def make_record(**overrides):
         'strings_sample': ['%PDF-1.7', '/Type /Catalog', 'Quarterly results summary',
                            'Microsoft Word for Microsoft 365'],
         'lnk': None,
+        'office': None,
+        'pdf': None,
+        'yara': None,
         'iocs': [],
         'reputation': CLEAN_REPUTATION,
         'truncated': False,
@@ -95,6 +101,32 @@ def lnk(*keys):
                     for key in keys],
         'iocs': [],
     }
+
+
+def _analyzer(keys):
+    """The signal-list shape every document analyser emits. `lnk()` above is the same
+    shape wrapped in a `parsed` dict; these three have no wrapper."""
+    return {'signals': [{'key': key, 'label': key, 'detail': None} for key in keys]}
+
+
+def office(*keys):
+    record = _analyzer(keys)
+    record.update({'container': 'OpenXML', 'encrypted': False, 'modules': [],
+                   'has_macro': 'office_has_macro' in keys, 'error': None})
+    return record
+
+
+def pdf(*keys):
+    record = _analyzer(keys)
+    record.update({'keywords': {}, 'structure': {}, 'inflated_bytes': 0,
+                   'truncated': False, 'error': None})
+    return record
+
+
+def yara_hits(*keys):
+    record = _analyzer(keys)
+    record.update({'matches': [], 'rules_loaded': 1, 'error': None})
+    return record
 
 
 # (name, record, expected_level, must_contain_signals)
@@ -328,6 +360,83 @@ CASES = [
         'suspicious',
         ['filename_masquerade', 'executable_file'],
     ),
+    (
+        # Facts score low deliberately. Enterprise documents carry macros constantly,
+        # so a verdict that fires on presence alone is a verdict nobody trusts. 0.05.
+        'a document with a macro and nothing else is benign',
+        make_record(filename='invoice.docm', magic_type='ZIP',
+                    office=office('office_has_macro')),
+        'benign',
+        ['office_has_macro'],
+    ),
+    (
+        # 0.05 + 0.15 = 0.20, still under the 0.30 floor. AutoOpen is ordinary in a
+        # template; it is what the macro then does that matters.
+        'an auto-executing macro alone is still benign',
+        make_record(filename='template.docm', magic_type='ZIP',
+                    office=office('office_has_macro', 'office_autoexec_macro')),
+        'benign',
+        ['office_autoexec_macro'],
+    ),
+    (
+        # 0.05 + 0.15 + 0.25 = 0.45. Behaviour is what moves the needle.
+        'an obfuscated auto-executing macro is suspicious',
+        make_record(filename='invoice.docm', magic_type='ZIP',
+                    office=office('office_has_macro', 'office_autoexec_macro',
+                                  'office_obfuscated_vba')),
+        'suspicious',
+        ['office_obfuscated_vba'],
+    ),
+    (
+        # 0.05 + 0.15 + 0.25 + 0.30 = 0.75. Clear of suspicious and deliberately short
+        # of malicious: no reputation source has confirmed anything about this file.
+        'a macro that downloads and executes is suspicious, not malicious',
+        make_record(filename='invoice.docm', magic_type='ZIP',
+                    office=office('office_has_macro', 'office_autoexec_macro',
+                                  'office_download_cradle', 'office_shell_execution')),
+        'suspicious',
+        ['office_download_cradle', 'office_shell_execution'],
+    ),
+    (
+        # The baseline record is ALREADY a PDF, so the analyser runs against most of
+        # this corpus. This pins that finding nothing changes nothing.
+        'a PDF analysed with no findings stays benign',
+        make_record(pdf=pdf()),
+        'benign',
+        [],
+    ),
+    (
+        # 0.25 + 0.25 = 0.50.
+        'a PDF that runs JavaScript automatically is suspicious',
+        make_record(pdf=pdf('pdf_javascript', 'pdf_auto_action')),
+        'suspicious',
+        ['pdf_javascript', 'pdf_auto_action'],
+    ),
+    (
+        # /ObjStm is in 5 of 60 ordinary benign PDFs. Scoring it would be an 8% false
+        # positive rate on normal documents, so it is informational at 0.0.
+        'an object-stream PDF is a coverage note, not a finding',
+        make_record(pdf=pdf('pdf_object_stream')),
+        'benign',
+        ['pdf_object_stream'],
+    ),
+    (
+        # 0.10 alone. Loud on the page, quiet in the score.
+        'a YARA hit alone does not reach suspicious',
+        make_record(yara=yara_hits('yara_rule_match')),
+        'benign',
+        ['yara_rule_match'],
+    ),
+    (
+        # "We did not look" must never read as "we looked and found nothing". The
+        # signal renders; it does not move the score.
+        'a skipped oversized document stays benign without claiming cleanliness',
+        make_record(filename='huge.docm', magic_type='ZIP',
+                    office=office('analysis_skipped_too_large')),
+        'benign',
+        ['analysis_skipped_too_large'],
+    ),
+
 ]
 
 # case name -> signals that must NOT appear. CASES only asserts presence, so it
@@ -545,6 +654,22 @@ def check_lnk_partition(failures):
         failures.append(f'rollups reference unknown lnk_parse keys: {sorted(extra)}')
 
 
+def check_analyzer_partition(failures):
+    """Every signal key the three document analysers can emit must be weighted.
+
+    `score` collects with `[name for name in WEIGHTS if present.get(name)]`, so a key
+    that is absent from WEIGHTS is dropped in silence and scores 0. An analyser that
+    grows a signal must fail here rather than quietly contributing nothing, which is
+    the same guarantee check_lnk_partition gives for lnk_parse.
+    """
+    for name, labels in (('office_inspect', OFFICE_SIGNAL_LABELS),
+                         ('pdf_inspect', PDF_SIGNAL_LABELS),
+                         ('yara_scan', YARA_SIGNAL_LABELS)):
+        missing = sorted(set(labels) - set(WEIGHTS))
+        if missing:
+            failures.append(f'{name} emits unweighted signal keys: {missing}')
+
+
 BASE64_FUZZ_ROUNDS = 300
 
 
@@ -593,6 +718,7 @@ def main():
     check_band_derivation(failures)
     check_table_invariants(failures)
     check_lnk_partition(failures)
+    check_analyzer_partition(failures)
     check_base64_is_not_a_wallet(failures)
     check_determinism(failures)
 
