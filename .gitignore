@@ -37,6 +37,8 @@ logs/
 *.mmdb
 data/*.mmdb
 data/api_keys.json
+# data/yara/ holds operator-fetched detection rules under their own licences.
+data/yara/
 
 # Security files (IMPORTANT: never commit keys or secrets)
 *.key
