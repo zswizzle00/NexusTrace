@@ -289,8 +289,7 @@ def _run_analysis(indicator):
                               card_count=card_count,
                               **result_data)
     elif indicator_type == 'identity_email':
-        return redirect(url_for('identity.identity_scan_form', target=indicator,
-                                mode='email'))
+        return redirect(url_for('identity.identity_scan_form', target=indicator))
     elif indicator_type in ('url', 'domain'):
         # Both domains and full URLs go through the URL scanner. Do NOT prepend a
         # scheme here: url_guard.normalize() owns scheme defaulting, and a second

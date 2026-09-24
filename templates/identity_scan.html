@@ -36,20 +36,6 @@
              class="form-input w-full bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none">
     </div>
 
-    <div class="mb-4">
-      <span class="text-xs text-gray-500 uppercase tracking-wide" style="display:block;margin-bottom:0.5rem;">Mode</span>
-      <div class="flex items-center gap-4 text-sm text-gray-300">
-        <label class="flex items-center gap-2">
-          <input type="radio" name="mode" value="username" {% if mode != 'email' %}checked{% endif %}>
-          Username
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="radio" name="mode" value="email" {% if mode == 'email' %}checked{% endif %}>
-          E-mail address
-        </label>
-      </div>
-    </div>
-
     <div class="flex items-center gap-3">
       <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
         Scan

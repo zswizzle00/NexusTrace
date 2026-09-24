@@ -13,6 +13,7 @@ this module's own namespace.
 """
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -27,7 +28,16 @@ logger = logging.getLogger(__name__)
 
 identity_bp = Blueprint('identity', __name__)
 
-MODES = ('username', 'email')
+# A username cannot contain '@' on any platform either engine checks, so the target
+# itself says which mode it is. Asking the analyst to restate it was a way to get it
+# wrong: Sherlock is username-only and user-scanner runs a different orchestrator per
+# mode, so a mismatched answer silently scanned the wrong thing.
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$')
+
+
+def detect_mode(target):
+    """'email' when the target is an e-mail address, otherwise 'username'."""
+    return 'email' if _EMAIL_RE.match((target or '').strip()) else 'username'
 
 
 def _record_key(scan_id):
@@ -55,16 +65,13 @@ def _get_record(scan_id):
 @identity_bp.route('/identity_scan', methods=['GET'])
 def identity_scan_form():
     return render_template('identity_scan.html',
-                           target=request.args.get('target', ''),
-                           mode=request.args.get('mode', 'username'))
+                           target=request.args.get('target', ''))
 
 
 @identity_bp.route('/identity_scan', methods=['POST'])
 def identity_scan_submit():
     target = (request.form.get('target') or '').strip()
-    mode = (request.form.get('mode') or 'username').strip().lower()
-    if mode not in MODES:
-        mode = 'username'
+    mode = detect_mode(target)
 
     if not target:
         flash('Enter a username or e-mail address to scan.', 'error')

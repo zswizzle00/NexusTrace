@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from app import create_app
 from app.routes import identity_routes
+from app.routes.identity_routes import detect_mode
 from app.utils import activity, storage
 
 failures = []
@@ -220,6 +221,49 @@ def test_negative_rows_are_collapsed_not_rendered():
               'the collapsed count is wrong or missing')
 
 
+def test_mode_is_derived_from_the_target():
+    """The form no longer asks. A username cannot contain '@' on any platform either
+    engine checks, so the target says which mode it is, and asking the analyst to restate
+    it was a way to get it wrong: Sherlock is username-only and user-scanner runs a
+    different orchestrator per mode, so a mismatched answer scanned the wrong thing."""
+    for target, want in (('alice', 'username'),
+                         ('alice@example.com', 'email'),
+                         ('a.b+tag@sub.example.co.uk', 'email'),
+                         ('  bob@corp.test  ', 'email'),
+                         ('not@an', 'username'),
+                         ('@alice', 'username'),
+                         ('alice@', 'username'),
+                         ('', 'username')):
+        got = detect_mode(target)
+        check(got == want, f'detect_mode({target!r}) -> {got!r}, expected {want!r}')
+
+
+def test_submitting_without_a_mode_field_still_works():
+    """The form posts no `mode`, so the route must not depend on one."""
+    with Sandbox():
+        captured = {}
+        original = identity_routes.run_identity_scan
+
+        def fake(target, mode='username', **kwargs):
+            captured['mode'] = mode
+            return {'target': target, 'mode': mode, 'timed_out': False, 'error': None,
+                    'findings': [], 'engines': {}, 'breach': None,
+                    'summary': {'checked': 0, 'found': 0, 'corroborated': 0,
+                                'blocked': 0, 'unknown': 0}}
+
+        identity_routes.run_identity_scan = fake
+        try:
+            client = build().test_client()
+            client.post('/identity_scan', data={'target': 'alice@example.com'})
+            check(captured.get('mode') == 'email',
+                  f'a posted e-mail address ran in {captured.get("mode")!r} mode')
+            client.post('/identity_scan', data={'target': 'alice'})
+            check(captured.get('mode') == 'username',
+                  f'a posted username ran in {captured.get("mode")!r} mode')
+        finally:
+            identity_routes.run_identity_scan = original
+
+
 def main():
     test_form_renders()
     test_result_renders_and_shows_corroboration()
@@ -230,6 +274,8 @@ def main():
     test_unsafe_url_is_reguarded_on_read()
     test_busy_scanner_flashes_rather_than_500()
     test_negative_rows_are_collapsed_not_rendered()
+    test_mode_is_derived_from_the_target()
+    test_submitting_without_a_mode_field_still_works()
 
     if failures:
         print('FAIL:')
