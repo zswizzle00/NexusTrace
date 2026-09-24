@@ -62,7 +62,7 @@
      with no keys configured at all. Leaving it out of this set would mean a lookup
      that found something rendered as if it had found nothing. #}
   {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb
-                        or greynoise
+                        or greynoise or internetdb or stopforumspam
                         or ((tf_env or uh_env) and not has_domain_cards) %}
 
   {% if has_ip_cards %}
@@ -588,6 +588,8 @@
     {% endif %}
 
     {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
+    {% if internetdb %}{{ render_internetdb(internetdb) }}{% endif %}
+    {% if stopforumspam %}{{ render_stopforumspam(stopforumspam) }}{% endif %}
 
     {% if alienvault and has_ip_cards %}
       {{ render_alienvault(alienvault) }}
@@ -1517,6 +1519,117 @@
       {% if greynoise.link %}
       <div class="nt-kv"><span class="nt-kv__k">Detail</span><span class="nt-kv__v"><a href="{{ greynoise.link }}" target="_blank" rel="noopener noreferrer">viz.greynoise.io</a></span></div>
       {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+
+{# Shodan InternetDB: the same data source as the keyed Shodan card, with NO key.
+
+   Thinner than the keyed API on purpose: ports, hostnames, CPEs, tags and CVEs, but no
+   banners, no timestamps and no per-port detail. The card should not imply otherwise.
+
+   `tags` is Shodan's own vocabulary kept verbatim (`tor`, `self-signed`, `cdn`,
+   `honeypot`). A tag is an observation about the host, never a verdict about the
+   connection an analyst is looking at. #}
+{% macro render_internetdb(internetdb) %}
+  <div class="nt-card is-shodan">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/>
+          <path d="M7 7h.01M7 17h.01"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">Open Ports</h3>
+      <span class="nt-card__source">Shodan InternetDB, no key</span>
+    </div>
+    <div class="nt-card__body">
+      {% if internetdb.tags %}
+      <div class="nt-kv">
+        <span class="nt-kv__k">Tags</span>
+        <span class="nt-kv__v">{{ internetdb.tags | join(', ') }}</span>
+      </div>
+      {% endif %}
+      <div class="nt-kv">
+        <span class="nt-kv__k">Ports</span>
+        <span class="nt-kv__v">
+          {{ internetdb.ports | join(', ') or 'none indexed' }}
+          {%- if internetdb.port_count > internetdb.ports | length %}
+          <span class="nt-muted">and {{ internetdb.port_count - internetdb.ports | length }} more</span>
+          {%- endif %}
+        </span>
+      </div>
+      {% if internetdb.hostnames %}
+      <div class="nt-kv"><span class="nt-kv__k">Hostnames</span><span class="nt-kv__v">{{ internetdb.hostnames | join(', ') }}</span></div>
+      {% endif %}
+      {% if internetdb.cpes %}
+      <div class="nt-kv"><span class="nt-kv__k">Software</span><span class="nt-kv__v">{{ internetdb.cpes | join(', ') }}</span></div>
+      {% endif %}
+      {% if internetdb.vulns %}
+      {# CVEs Shodan associates with the detected software VERSION. That is a version
+         match, not a confirmed exploitable finding: a backported patch keeps the
+         version string and fixes the bug. Listed for pivoting, never scored. #}
+      <div class="nt-kv">
+        <span class="nt-kv__k">CVEs</span>
+        <span class="nt-kv__v">
+          {% for cve in internetdb.vulns %}<a href="https://nvd.nist.gov/vuln/detail/{{ cve }}" target="_blank" rel="noopener noreferrer">{{ cve }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+          {%- if internetdb.vuln_count > internetdb.vulns | length %}
+          <span class="nt-muted">and {{ internetdb.vuln_count - internetdb.vulns | length }} more</span>
+          {%- endif %}
+        </span>
+      </div>
+      <p class="nt-note">
+        CVEs are matched against the detected software version. A backported patch keeps
+        the version string, so treat these as leads to check rather than findings.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+
+{# StopForumSpam: FORUM AND COMMENT spam reported by site operators.
+
+   Narrower than AbuseIPDB's general abuse reporting, and the card says so, because an
+   analyst reading "spam reports: 91" without that scope will over-weight it.
+
+   The Tor exit flag is why this source earns its place: NexusTrace has no other
+   independent Tor signal, and Shodan's `tor` tag above is the only corroboration. #}
+{% macro render_stopforumspam(stopforumspam) %}
+  <div class="nt-card is-abuse">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4h16v12H7l-3 3z"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">Forum Spam</h3>
+      <span class="nt-card__source">StopForumSpam, no key</span>
+    </div>
+    <div class="nt-card__body">
+      {% if stopforumspam.tor_exit %}
+      <div class="nt-kv">
+        <span class="nt-kv__k">Tor</span>
+        <span class="nt-kv__v">Known Tor exit node <span class="nt-pill nt-pill--warn">exit</span></span>
+      </div>
+      {% endif %}
+      {% if stopforumspam.appears %}
+      <div class="nt-kv">
+        <span class="nt-kv__k">Reports</span>
+        <span class="nt-kv__v">{{ stopforumspam.frequency }} forum spam report{{ 's' if stopforumspam.frequency != 1 }}</span>
+      </div>
+      {% if stopforumspam.last_seen %}
+      <div class="nt-kv"><span class="nt-kv__k">Last reported</span><span class="nt-kv__v">{{ stopforumspam.last_seen }}</span></div>
+      {% endif %}
+      {% if stopforumspam.confidence is not none %}
+      <div class="nt-kv"><span class="nt-kv__k">Their confidence</span><span class="nt-kv__v">{{ stopforumspam.confidence }}%</span></div>
+      {% endif %}
+      {% endif %}
+      <p class="nt-note">
+        Covers forum and comment spam reported by site operators, which is narrower than
+        general abuse reporting. An address absent from this list has not been cleared.
+      </p>
     </div>
   </div>
 {% endmacro %}

@@ -74,6 +74,10 @@ PARTIES = (
           'IP addresses', ALWAYS),
     Party('crtsh', 'crt.sh', ('crt.sh',), 'domain names', ALWAYS),
     Party('greynoise', 'GreyNoise', ('api.greynoise.io',), 'IP addresses', ALWAYS),
+    Party('internetdb', 'Shodan InternetDB', ('internetdb.shodan.io',),
+          'IP addresses', ALWAYS),
+    Party('stopforumspam', 'StopForumSpam', ('api.stopforumspam.org',),
+          'IP addresses', ALWAYS),
     # rdap.org is a bootstrap: it redirects to the authoritative registry for the TLD,
     # so the query reaches that registry too and the notice has to say so.
     Party('rdap', 'the RDAP bootstrap and the domain registry it redirects to',
