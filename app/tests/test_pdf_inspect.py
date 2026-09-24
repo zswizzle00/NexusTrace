@@ -333,6 +333,47 @@ def test_the_record_is_json_serializable():
           'the serialized record lost its keyword names')
 
 
+def test_hostile_structure_stays_linear():
+    """Both scanning regexes were quadratic on inputs a public upload controls: 8 KB of
+    digits cost 0.4 s in the obj recount and 16,000 unterminated `stream` markers cost
+    45 s in inflation, each holding the GIL, so one upload froze every worker thread.
+    These inputs are far larger than that and must finish in well under a second."""
+    import time
+    hostile = (
+        ('digit run', b'%PDF-1.7\n1 0 obj\n' + b'1' * (1024 * 1024)),
+        ('whitespace run', b'%PDF-1.7\n1 0 obj\n' + b'1' + b' ' * (1024 * 1024) + b'x'),
+        ('unterminated streams', b'%PDF-1.7\n1 0 obj\n' + b'stream\n' * 200_000),
+        ('interleaved digits', b'%PDF-1.7\n1 0 obj\n' + b'1 1 ' * 250_000),
+    )
+    for label, data in hostile:
+        started = time.monotonic()
+        result = pdf_inspect.analyze_pdf_bytes(data)
+        elapsed = time.monotonic() - started
+        check(result['error'] is None, f'{label}: errored: {result["error"]}')
+        check(elapsed < 2.0, f'{label}: took {elapsed:.2f}s on {len(data)} bytes')
+
+
+def test_linear_scanners_match_the_regexes_they_replaced():
+    """The rewrite is for cost only. Against the original patterns, on inputs small
+    enough for those to finish, every count and every body must be identical."""
+    old_obj = re.compile(rb'\d+\s+\d+\s+obj\b')
+    old_body = re.compile(rb'stream(?:\r\n|\r|\n)(.*?)endstream', re.DOTALL)
+    samples = (
+        b'1 0 obj << >> endobj 12 34 obj 5  6\n obj x1 2 obj 7 8 objx 99 0 obj',
+        b'a1 0 obj 00 00 obj 1\t\r\n2 obj 3 obj 4 5obj',
+        b'stream\nA endstream stream\r\nB\nendstream streamC endstream',
+        b'endstream\nX endstream stream\rY stream\nZ endstream stream\ntail',
+        b'stream\nstream\nendstream endstream stream\n',
+        b'',
+    )
+    for data in samples:
+        check(len(old_obj.findall(data)) == len(pdf_inspect._ANCHORED_OBJ.findall(data)),
+              f'obj count diverged on {data!r}')
+        check([m.group(1) for m in old_body.finditer(data)]
+              == list(pdf_inspect._stream_bodies(data)),
+              f'stream bodies diverged on {data!r}')
+
+
 def test_record_is_bounded():
     """Review Focus 2: the record is written to data/ as JSON and rendered. 5000
     objects each carrying /JavaScript must not produce a 5000-entry structure."""
@@ -399,6 +440,8 @@ def main():
     test_a_missing_file_is_a_record_not_an_exception()
     test_the_record_is_json_serializable()
     test_record_is_bounded()
+    test_hostile_structure_stays_linear()
+    test_linear_scanners_match_the_regexes_they_replaced()
     test_every_signal_has_a_label()
 
     if failures:

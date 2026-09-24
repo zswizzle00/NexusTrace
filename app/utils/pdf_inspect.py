@@ -83,7 +83,13 @@ def count_names(data):
 # Anchored forms. `obj` must follow two integers, and `stream` must be followed by an
 # end-of-line, which is what distinguishes a real keyword from the same bytes landing
 # inside compressed image data.
-_ANCHORED_OBJ = re.compile(rb'\d+\s+\d+\s+obj\b')
+#
+# The lookbehind and possessive quantifiers are a CPU bound, not style. Plain
+# `\d+\s+\d+` retries from every digit of a long run and backtracks each time, so 8 KB
+# of digits took 0.4 s and 16 MB would take days, holding the GIL throughout. Neither
+# changes what matches: a match can only start where a digit run starts, and giving
+# back a digit or a space can never let the next token match.
+_ANCHORED_OBJ = re.compile(rb'(?<!\d)\d++\s++\d++\s++obj\b')
 _ANCHORED_STREAM = re.compile(rb'stream(?:\r\n|\r|\n)')
 
 
@@ -120,7 +126,25 @@ MAX_INFLATE_PER_STREAM = 4 * 1024 * 1024
 MAX_TOTAL_INFLATE = 32 * 1024 * 1024
 MAX_STREAMS = 2048
 
-_STREAM_BODY = re.compile(rb'stream(?:\r\n|\r|\n)(.*?)endstream', re.DOTALL)
+
+def _stream_bodies(data):
+    """Each `stream` EOL ... `endstream` body, non-overlapping, left to right.
+
+    Not a `stream...(.*?)endstream` regex: with no `endstream` after it, every `stream`
+    marker rescans to the end of the input, so 16,000 markers in a 374 KB file took
+    45 s. Stopping at the first unterminated body keeps this linear, and loses
+    nothing, since no later body could be terminated either.
+    """
+    pos = 0
+    while True:
+        start = _ANCHORED_STREAM.search(data, pos)
+        if start is None:
+            return
+        end = data.find(b'endstream', start.end())
+        if end < 0:
+            return
+        yield data[start.end():end]
+        pos = end + len(b'endstream')
 
 
 def _inflate_streams(data):
@@ -136,11 +160,10 @@ def _inflate_streams(data):
     """
     recovered = []
     total = 0
-    for index, match in enumerate(_STREAM_BODY.finditer(data)):
+    for index, body in enumerate(_stream_bodies(data)):
         if index >= MAX_STREAMS or total >= MAX_TOTAL_INFLATE:
             break
         budget = min(MAX_INFLATE_PER_STREAM, MAX_TOTAL_INFLATE - total)
-        body = match.group(1)
         for wbits in (15, -15):  # zlib header, then raw deflate
             try:
                 out = zlib.decompressobj(wbits).decompress(body, budget)
