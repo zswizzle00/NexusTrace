@@ -81,6 +81,9 @@ from ..utils.file_inspect import (
     file_extension,
 )
 from ..utils.lnk_parse import SIGNAL_LABELS as LNK_SIGNAL_LABELS
+from ..utils.office_inspect import SIGNAL_LABELS as OFFICE_SIGNAL_LABELS
+from ..utils.pdf_inspect import SIGNAL_LABELS as PDF_SIGNAL_LABELS
+from ..utils.yara_scan import SIGNAL_LABELS as YARA_SIGNAL_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +128,37 @@ WEIGHTS = {
     'lnk_encoded_command+lnk_download_cradle': 0.20,
     'lnk_lolbas_target+lnk_hidden_window': 0.15,
     'persistence+download_staging': 0.15,
+    # Document-analyser signals. Facts score low and behaviour scores high, matching
+    # the split already visible above: a bare fact like executable_file is 0.05, a
+    # behaviour like download_cradle is 0.25. A macro is a fact; what the macro does
+    # is behaviour. That keeps a macro'd invoice benign, which matters because
+    # enterprise documents carry macros constantly and a verdict that fires on
+    # presence is a verdict nobody trusts.
+    'office_shell_execution': 0.30,
+    'pdf_launch_action': 0.30,
+    'office_obfuscated_vba': 0.25,
+    'office_download_cradle': 0.25,
+    'pdf_javascript': 0.25,
+    'pdf_auto_action': 0.25,
+    'office_autoexec_macro': 0.15,
+    'office_encrypted': 0.15,
+    'pdf_embedded_file': 0.15,
+    'pdf_obfuscated_name': 0.15,
+    'pdf_encrypted': 0.15,
+    # A rule hit is only as trustworthy as the rule, and operator rules are fetched
+    # from third parties and reviewed by nobody here. It reports loudly and scores
+    # quietly: never enough to reach a band alone.
+    'yara_rule_match': 0.10,
+    'office_has_macro': 0.05,
+    # Informational. Rendered, never scored. Several mean "we did not look", which is
+    # a different claim from "we looked and found nothing" and must not read as clean.
+    'pdf_object_stream': 0.0,
+    'pdf_structure_mismatch': 0.0,
+    'pdf_unhandled_filter': 0.0,
+    'office_not_office_container': 0.0,
+    'analysis_skipped_too_large': 0.0,
+    'analysis_busy': 0.0,
+    'analysis_timed_out': 0.0,
     'analysis_error': 0.0,
     'analysis_truncated': 0.0,
     'no_reputation_data': 0.0,
@@ -175,6 +209,13 @@ SIGNAL_LABELS = {
     'analysis_truncated': 'Inspection window was truncated',
     'no_reputation_data': 'No reputation source answered',
 }
+
+# Each analyser owns the wording for its own signals, exactly as lnk_parse does, so a
+# label change travels with the code that emits it. setdefault, not update: a key this
+# module has already worded deliberately wins over the module's own phrasing.
+for _source in (OFFICE_SIGNAL_LABELS, PDF_SIGNAL_LABELS, YARA_SIGNAL_LABELS):
+    for _key, _label in _source.items():
+        SIGNAL_LABELS.setdefault(_key, _label)
 
 # 7.5 rather than the more common 7.0: an ordinary PDF full of Flate streams and any
 # ZIP sit in the 7.0-7.5 band, and this is an ambient signal, so precision matters
@@ -445,6 +486,24 @@ def _lnk_signal_keys(record):
     return keys
 
 
+def _analyzer_signal_keys(record, field):
+    """Signal keys from one analyser's sub-record.
+
+    office_inspect, pdf_inspect and yara_scan all emit the same
+    ``{'key', 'label', 'detail'}`` shape, so one reader serves all three. A key with no
+    weight is dropped by ``score``'s ``for name in WEIGHTS`` comprehension, which would
+    score it 0 in silence; ``check_analyzer_partition`` in the test file is what turns
+    that into a loud failure instead.
+    """
+    section = _as_dict(record.get(field))
+    keys = set()
+    for signal in _as_list(section.get('signals')):
+        key = _as_dict(signal).get('key')
+        if key:
+            keys.add(key)
+    return keys
+
+
 def _embedded_count(record):
     return sum(
         1 for entry in _as_list(record.get('embedded_executables'))
@@ -573,6 +632,9 @@ def score(record):
         'no_reputation_data': not _reputation_answered(reputation),
     }
     present.update(lnk_present)
+    for _field in ('office', 'pdf', 'yara'):
+        for _key in _analyzer_signal_keys(record, _field):
+            present[_key] = True
     present['lnk_encoded_command+lnk_download_cradle'] = (
         lnk_present['lnk_encoded_command'] and lnk_present['lnk_download_cradle']
     )

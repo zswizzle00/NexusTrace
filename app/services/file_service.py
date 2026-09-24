@@ -14,6 +14,9 @@ import os
 from datetime import datetime, timezone
 
 from ..utils.cache import timed_lru_cache
+from ..utils.office_inspect import analyze_office
+from ..utils.pdf_inspect import analyze_pdf
+from ..utils import yara_scan
 from ..utils.file_inspect import (
     extract_strings,
     file_extension,
@@ -163,6 +166,31 @@ def static_inspection(window, filename):
     }
 
 
+_OFFICE_EXTENSIONS = frozenset(
+    'doc docx docm dot dotm xls xlsx xlsm xlt xltm ppt pptx pptm'.split())
+
+
+def looks_like_office(magic_type=None, filename=None):
+    """Sniffed magic decides; the extension only narrows.
+
+    OLE alone is enough, because a legacy .doc/.xls/.ppt is an OLE compound file and
+    nothing else this app sees is. ZIP needs an Office extension, because ZIP is also
+    every .jar, .apk and .zip an analyst uploads and handing those to olevba would run
+    a VBA parser over each one for nothing.
+
+    A `.docm` name on a PNG must never reach the parser: olevba's Text fallback treats
+    a NUL-free blob as VBA source and reports a macro for it.
+    """
+    if magic_type == 'OLE':
+        return True
+    return magic_type == 'ZIP' and file_extension(filename) in _OFFICE_EXTENSIONS
+
+
+def looks_like_pdf(magic_type=None, filename=None):
+    """Magic only. A `.pdf` name proves nothing and the header is one comparison."""
+    return magic_type == 'PDF'
+
+
 def looks_like_lnk(magic_type, filename):
     """The extension counts even when the magic does not match: `parse_lnk` reports the
     mismatch as `parsed_ok: False` with an error, which is a finding about a file named
@@ -226,7 +254,7 @@ def reputation_report(sha256, md5=None):
 
 
 def _assemble(filename, size_bytes, digests, inspection, lnk, iocs, reputation,
-              truncated, error):
+              truncated, error, office=None, pdf=None, yara=None):
     """The ONLY place a record is shaped, naming every field explicitly so file content
     cannot reach a response by accident."""
     return {
@@ -240,6 +268,9 @@ def _assemble(filename, size_bytes, digests, inspection, lnk, iocs, reputation,
         'embedded_executables': inspection['embedded_executables'],
         'strings_sample': inspection['strings_sample'],
         'lnk': lnk,
+        'office': office,
+        'pdf': pdf,
+        'yara': yara,
         'iocs': iocs,
         'reputation': reputation,
         'analyzed_at': _now(),
@@ -312,8 +343,20 @@ def analyze_file(file_path, filename):
     corpus.extend(inspection['strings'])
     iocs = extract_iocs('\n'.join(corpus)[:MAX_IOC_TEXT_BYTES])
 
+    # Gated on sniffed magic, so a 40 MB video never reaches a document parser. Each
+    # analyser reads from file_path rather than the 4 MB window: both formats keep the
+    # structure they need at the END of the file, so a truncated window does not
+    # degrade the result, it destroys it.
+    office = analyze_office(file_path) if looks_like_office(
+        inspection['magic_type'], filename) else None
+    pdf = analyze_pdf(file_path) if looks_like_pdf(
+        inspection['magic_type'], filename) else None
+    # Deliberately not type-gated: rules should see executables and archives too.
+    yara = yara_scan.scan(file_path) if yara_scan.RULES_LOADED() else None
+
     return _scored(_assemble(
         filename, size_bytes, digests, inspection, lnk, iocs,
         reputation_report(digests['sha256'], md5=digests['md5']),
         len(window) < size_bytes, None,
+        office=office, pdf=pdf, yara=yara,
     ))
