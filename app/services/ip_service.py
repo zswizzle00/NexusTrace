@@ -28,6 +28,7 @@ greynoise_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1)
 # Both keyless and neither publishes a limit, so these are courtesy figures.
 internetdb_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 sfs_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+ripestat_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 
 class _LookupUnavailable(Exception):
@@ -776,5 +777,76 @@ def get_stopforumspam_data(*args, **kwargs):
     """Uncached wrapper; see _LookupUnavailable."""
     try:
         return _get_stopforumspam_data(*args, **kwargs)
+    except _LookupUnavailable:
+        return None
+
+
+RIPESTAT_ABUSE_URL = 'https://stat.ripe.net/data/abuse-contact-finder/data.json'
+
+MAX_ABUSE_CONTACTS = 5
+
+
+def map_ripestat_abuse(payload):
+    """Abuse contacts for an address, or None when RIPE knows of none.
+
+    This answers a question nothing else in this app does: **who do I report this to.**
+    Every other IP source says what an address has been seen doing; this one says who is
+    responsible for it. That is the difference between triage and being able to act.
+
+    The contact is the one the resource holder registered with their RIR, which is the
+    correct place to send a report. It is not evidence about the address: a reputable
+    hosting provider and a bulletproof one both have an abuse mailbox.
+    """
+    if not isinstance(payload, dict):
+        return None
+    data = payload.get('data')
+    if not isinstance(data, dict):
+        return None
+    contacts = [c for c in (data.get('abuse_contacts') or [])
+                if isinstance(c, str) and '@' in c]
+    if not contacts:
+        return None
+    return {
+        'contacts': contacts[:MAX_ABUSE_CONTACTS],
+        'rir': (data.get('authoritative_rir') or '').upper() or None,
+    }
+
+
+@timed_lru_cache(seconds=3600, maxsize=500)
+def _get_ripestat_abuse(ip_address, transport=None):
+    """Cached inner lookup. Raises rather than returning None on a transient failure so
+    nothing memoizes it; callers use get_ripestat_abuse.
+
+    An hour, not the usual half: an abuse contact is a registry record that changes on
+    the scale of months, and RIPEstat's latency is uneven enough that a cached answer is
+    worth holding. Its prefix-overview endpoint timed out at 20s during development while
+    this one answered in well under a second, which is why only this endpoint is used.
+    """
+    if not ripestat_limiter.try_acquire():
+        logger.debug('RIPEstat rate limit reached for %s', ip_address)
+        raise _LookupUnavailable()
+    try:
+        response = (transport or requests.get)(
+            RIPESTAT_ABUSE_URL,
+            params={'resource': ip_address, 'sourceapp': 'NexusTrace'},
+            timeout=TIMEOUT_MEDIUM,
+            headers={'User-Agent': 'NexusTrace/1.0'},
+        )
+        if response.status_code != 200:
+            raise _LookupUnavailable()
+        return map_ripestat_abuse(response.json())
+    except _LookupUnavailable:
+        raise
+    except requests.Timeout:
+        logger.warning('RIPEstat lookup timed out for %s', ip_address)
+    except Exception as exc:
+        logger.debug('RIPEstat lookup failed for %s: %s', ip_address, exc)
+    raise _LookupUnavailable()
+
+
+def get_ripestat_abuse(*args, **kwargs):
+    """Uncached wrapper; see _LookupUnavailable."""
+    try:
+        return _get_ripestat_abuse(*args, **kwargs)
     except _LookupUnavailable:
         return None

@@ -81,6 +81,7 @@ def clear_caches():
                 ip_service.get_greynoise_data,
                 ip_service.get_internetdb_data,
                 ip_service.get_stopforumspam_data,
+                ip_service.get_ripestat_abuse,
                 # Caching matters more for these two than for most: rdap.org bootstraps
                 # to a different registry per TLD, and web.archive.org's CDX latency was
                 # measured swinging between 2s and 10s for the SAME request seconds

@@ -62,7 +62,7 @@
      with no keys configured at all. Leaving it out of this set would mean a lookup
      that found something rendered as if it had found nothing. #}
   {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb
-                        or greynoise or internetdb or stopforumspam
+                        or greynoise or internetdb or stopforumspam or ripestat
                         or ((tf_env or uh_env) and not has_domain_cards) %}
 
   {% if has_ip_cards %}
@@ -590,6 +590,7 @@
     {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
     {% if internetdb %}{{ render_internetdb(internetdb) }}{% endif %}
     {% if stopforumspam %}{{ render_stopforumspam(stopforumspam) }}{% endif %}
+    {% if ripestat %}{{ render_ripestat(ripestat) }}{% endif %}
 
     {% if alienvault and has_ip_cards %}
       {{ render_alienvault(alienvault) }}
@@ -1629,6 +1630,42 @@
       <p class="nt-note">
         Covers forum and comment spam reported by site operators, which is narrower than
         general abuse reporting. An address absent from this list has not been cleared.
+      </p>
+    </div>
+  </div>
+{% endmacro %}
+
+
+{# Abuse contact, from the RIR the address is registered with.
+
+   Every other IP card here says what an address has been seen doing. This one says who
+   is responsible for it, which is the difference between triage and being able to act
+   on the result.
+
+   It is deliberately NOT evidence: a reputable hosting provider and a bulletproof one
+   both register an abuse mailbox, so the presence of a contact says nothing about the
+   address. The copy avoids implying otherwise. #}
+{% macro render_ripestat(ripestat) %}
+  <div class="nt-card is-whois">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">Abuse Contact</h3>
+      <span class="nt-card__source">RIPEstat{% if ripestat.rir %} &middot; {{ ripestat.rir }}{% endif %}</span>
+    </div>
+    <div class="nt-card__body">
+      {% for contact in ripestat.contacts %}
+      <div class="nt-kv">
+        <span class="nt-kv__k">{{ 'Report to' if loop.first else 'Also' }}</span>
+        <span class="nt-kv__v"><a href="mailto:{{ contact }}">{{ contact }}</a></span>
+      </div>
+      {% endfor %}
+      <p class="nt-note">
+        Registered by the resource holder with their RIR. Having an abuse mailbox says
+        nothing about the address; every provider registers one.
       </p>
     </div>
   </div>

@@ -78,6 +78,7 @@ PARTIES = (
           'IP addresses', ALWAYS),
     Party('stopforumspam', 'StopForumSpam', ('api.stopforumspam.org',),
           'IP addresses', ALWAYS),
+    Party('ripestat', 'RIPEstat', ('stat.ripe.net',), 'IP addresses', ALWAYS),
     # rdap.org is a bootstrap: it redirects to the authoritative registry for the TLD,
     # so the query reaches that registry too and the notice has to say so.
     Party('rdap', 'the RDAP bootstrap and the domain registry it redirects to',

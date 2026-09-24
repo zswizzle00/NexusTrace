@@ -226,15 +226,24 @@ def test_a_success_is_memoized():
 # ------------------------------------------------------------------- rendering
 
 def _render(**overrides):
+    """The rendered page with whitespace collapsed.
+
+    Flattening is not cosmetic. The templates wrap their prose, so a contiguous-string
+    assertion against raw HTML can miss a caveat that is present but split across two
+    lines. That is merely annoying for an `in` assertion and dangerous for a `not in`
+    one: `check('no archive history' not in body)` would pass silently the moment the
+    template reflowed, while the card said exactly the wrong thing.
+    """
     from app import create_app
     app = create_app()
     context = dict(indicator='x', error=None, card_count=1, alienvault=None,
                    domain_info=None, url_analysis=None, whois_info=None, abuseipdb=None,
                    tf_env=None, uh_env=None, greynoise=None, registration=None,
-                   archive=None, internetdb=None, stopforumspam=None)
+                   archive=None, internetdb=None, stopforumspam=None, ripestat=None)
     context.update(overrides)
     with app.test_request_context('/'):
-        return app.jinja_env.get_template('analyze_result.html').render(**context)
+        return ' '.join(
+            app.jinja_env.get_template('analyze_result.html').render(**context).split())
 
 
 def test_a_failed_archive_lookup_never_reads_as_no_history():
@@ -362,6 +371,39 @@ def test_internetdb_cves_are_leads_not_findings():
     check('leads to check' in body, 'the CVE caveat about version matching is missing')
 
 
+
+def test_ripestat_extracts_the_abuse_contact():
+    """The question nothing else in this app answers: who do I report this to."""
+    payload = {'data': {'abuse_contacts': ['abuse@artikel10.org'],
+                        'authoritative_rir': 'ripe'}}
+    result = ip_service.map_ripestat_abuse(payload)
+    check(result['contacts'] == ['abuse@artikel10.org'], 'the contact was lost')
+    check(result['rir'] == 'RIPE', f'rir not upper-cased: {result["rir"]!r}')
+
+
+def test_ripestat_with_no_contact_renders_nothing():
+    """RIPE returns a well-formed response with an empty list for an address whose
+    holder registered no abuse mailbox. An empty card would be noise."""
+    for payload in ({'data': {'abuse_contacts': []}}, {'data': {}}, {}, 'junk',
+                    {'data': {'abuse_contacts': ['not-an-address']}}):
+        check(ip_service.map_ripestat_abuse(payload) is None,
+              f'{payload!r} produced an abuse-contact card')
+
+
+def test_the_abuse_contact_is_not_presented_as_evidence():
+    """A reputable host and a bulletproof one both register an abuse mailbox, so the
+    presence of a contact must not read as a finding about the address."""
+    body = _render(ripestat={'contacts': ['abuse@example.net'], 'rir': 'RIPE'})
+    flat = body
+    check('abuse@example.net' in body, 'the contact did not reach the page')
+    check('says nothing about the address' in flat,
+          'the abuse-contact card is missing its caveat')
+    card = flat.split('Abuse Contact')[-1][:900]
+    for verdict in ('malicious', 'suspicious', 'Malicious', 'Suspicious'):
+        check(verdict not in card,
+              f'the abuse-contact card rendered a verdict word: {verdict!r}')
+
+
 def main():
     test_a_404_is_the_not_observed_answer()
     test_a_known_scanner_keeps_its_actor_name()
@@ -387,6 +429,9 @@ def main():
     test_stopforumspam_says_nothing_about_a_clean_address()
     test_a_tor_exit_renders_both_signals()
     test_internetdb_cves_are_leads_not_findings()
+    test_ripestat_extracts_the_abuse_contact()
+    test_ripestat_with_no_contact_renders_nothing()
+    test_the_abuse_contact_is_not_presented_as_evidence()
 
     if failures:
         print('FAIL:')
