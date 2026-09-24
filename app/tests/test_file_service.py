@@ -70,6 +70,10 @@ def test_a_bare_zip_is_not_handed_to_the_office_parser():
 def test_the_record_always_carries_the_three_fields():
     """A plain text file fires no gate. The template tests these fields directly, so
     they must exist as None rather than be absent."""
+    # YARA is not type-gated, and rules load from the real data/yara/ at import, so an
+    # operator who has run setup_yara_rules.py would otherwise turn this red.
+    from app.utils import yara_scan
+    yara_scan.load_rules(None)
     with tempfile.TemporaryDirectory() as box:
         record = file_service.analyze_file(write(box, 'notes.txt', b'plain text\n'),
                                            'notes.txt')
@@ -140,6 +144,16 @@ def test_operator_rule_metadata_is_escaped_on_the_page():
           'pass vacuously if the card never rendered')
 
 
+def test_every_office_extension_can_be_uploaded():
+    """The upload route checks its own extension allowlist before this service runs, so
+    an Office type missing there makes the analyser unreachable. Service-level tests
+    cannot see that on their own: .docm, the case this analyser exists for, was
+    rejected with a 400 while every test here passed."""
+    from app.routes.file_routes import ALLOWED_EXTENSIONS
+    missing = sorted(file_service._OFFICE_EXTENSIONS - ALLOWED_EXTENSIONS)
+    check(not missing, f'Office types the upload route rejects: {missing}')
+
+
 def main():
     test_an_extension_cannot_promote_a_file_into_an_analyser()
     test_a_bare_zip_is_not_handed_to_the_office_parser()
@@ -148,6 +162,7 @@ def main():
     test_pdf_findings_reach_the_verdict()
     test_an_unreadable_file_still_returns_the_three_fields()
     test_operator_rule_metadata_is_escaped_on_the_page()
+    test_every_office_extension_can_be_uploaded()
 
     if failures:
         print('FAIL:')

@@ -23,6 +23,8 @@ file_bp = Blueprint('file', __name__)
 ALLOWED_EXTENSIONS = {
     'exe', 'dll', 'sys', 'scr', 'msi',
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    # Macro-enabled and template forms: the delivery vectors office_inspect exists for.
+    'docm', 'dot', 'dotm', 'xlsm', 'xlt', 'xltm', 'pptm',
     'zip', 'rar', '7z', 'tar', 'gz',
     'js', 'vbs', 'ps1', 'bat', 'cmd',
     'jar', 'class',
