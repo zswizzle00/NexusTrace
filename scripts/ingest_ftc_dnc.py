@@ -27,7 +27,9 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.utils.phone_reports import DB_PATH, connect, normalise, store_stats  # noqa: E402
+from app.utils.phone_reports import (  # noqa: E402
+    DB_PATH, LegacyStoreError, connect, normalise, store_stats,
+)
 
 logger = logging.getLogger('ingest_ftc_dnc')
 
@@ -109,10 +111,11 @@ def ingest_day(connection, day, apply_changes, force=False, transport=None):
 
     if apply_changes:
         if force:
-            connection.execute('DELETE FROM reports WHERE created_date = ?', (day,))
+            connection.execute('DELETE FROM reports WHERE file_day = ?', (day,))
         connection.executemany(
             'INSERT INTO reports (phone, created_date, violation_date, consumer_state,'
-            ' subject, robocall) VALUES (?, ?, ?, ?, ?, ?)', rows)
+            ' subject, robocall, file_day) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [row + (day,) for row in rows])
         record_day(connection, day, len(rows))
         connection.commit()
     return len(rows), published, False
@@ -122,10 +125,11 @@ def prune(connection, max_age_days, apply_changes):
     """Delete rows past the retention window and forget their ledger entries, so the
     store is self-bounding rather than growing without limit."""
     cutoff = (date.today() - timedelta(days=max_age_days)).isoformat()
-    doomed = connection.execute('SELECT COUNT(*) FROM reports WHERE created_date < ?',
+    doomed = connection.execute('SELECT COUNT(*) FROM reports WHERE file_day < ?',
                                 (cutoff,)).fetchone()[0]
-    if apply_changes and doomed:
-        connection.execute('DELETE FROM reports WHERE created_date < ?', (cutoff,))
+    # Unconditional, because a non-publishing day has a ledger entry and no rows.
+    if apply_changes:
+        connection.execute('DELETE FROM reports WHERE file_day < ?', (cutoff,))
         connection.execute('DELETE FROM ingested_days WHERE day < ?', (cutoff,))
         connection.commit()
     return doomed, cutoff
@@ -146,7 +150,11 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
-    connection = connect(args.db, write=True)
+    try:
+        connection = connect(args.db, write=True)
+    except LegacyStoreError as exc:
+        print(f'REFUSED: {exc}', file=sys.stderr)
+        return 2
 
     if not args.yes:
         print('DRY RUN. Nothing will be written. Pass --yes to apply.\n')

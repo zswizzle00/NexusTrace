@@ -38,10 +38,14 @@ CREATE TABLE IF NOT EXISTS reports (
     violation_date  TEXT,
     consumer_state  TEXT,
     subject         TEXT,
-    robocall        INTEGER NOT NULL DEFAULT 0
+    robocall        INTEGER NOT NULL DEFAULT 0,
+    -- The FTC file this row came from. Not derivable from created_date: a file holds
+    -- every complaint since the previous file, so a Monday file carries Friday,
+    -- Saturday and Sunday. --force-day and pruning key on this, never created_date.
+    file_day        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reports_phone ON reports(phone);
-CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_date);
+CREATE INDEX IF NOT EXISTS idx_reports_file_day ON reports(file_day);
 
 -- What makes the ingest idempotent and resumable. The initial backfill is ~250 business
 -- days; without this ledger an interrupted run would either duplicate rows or restart
@@ -63,6 +67,7 @@ def connect(path=None, write=False):
     if write:
         os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
         connection = sqlite3.connect(target)
+        _refuse_legacy_store(connection, target)
         connection.executescript(SCHEMA)
         return connection
     # Read-only, so a bug in the app cannot corrupt a store the ingest owns.
@@ -71,6 +76,24 @@ def connect(path=None, write=False):
     except sqlite3.Error as exc:
         logger.warning('Could not open the phone report store read-only: %s', exc)
         return None
+
+
+class LegacyStoreError(RuntimeError):
+    pass
+
+
+def _refuse_legacy_store(connection, target):
+    """A store built before `file_day` existed cannot be migrated exactly: which file a
+    row came from was never recorded, and inferring it from created_date and the ledger
+    is a guess. Reads still work, since the lookup never touches `file_day`; writing
+    is refused until the operator rebuilds."""
+    columns = {row[1] for row in connection.execute('PRAGMA table_info(reports)')}
+    if columns and 'file_day' not in columns:
+        connection.close()
+        raise LegacyStoreError(
+            f'{target} predates the file_day column and cannot be updated in place. '
+            'Move it aside and re-run the backfill: '
+            'uv run python scripts/ingest_ftc_dnc.py --backfill-days 365 --yes')
 
 
 def normalise(raw):

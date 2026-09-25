@@ -16,6 +16,7 @@ mean completely different things, which is why the card renders all three differ
 import os
 import sys
 import tempfile
+from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -195,7 +196,7 @@ def test_prune_bounds_the_store():
     with tempfile.TemporaryDirectory() as box:
         path = os.path.join(box, 'p.db')
         connection = phone_reports.connect(path, write=True)
-        connection.execute("INSERT INTO reports VALUES ('8009423767','2000-01-01',NULL,NULL,NULL,0)")
+        connection.execute("INSERT INTO reports VALUES ('8009423767','2000-01-01',NULL,NULL,NULL,0,'2000-01-01')")
         connection.execute("INSERT INTO ingested_days VALUES ('2000-01-01',1,'x')")
         connection.commit()
         doomed, _cutoff = ingest_ftc_dnc.prune(connection, 365, True)
@@ -207,6 +208,109 @@ def test_prune_bounds_the_store():
         connection.close()
 
 
+# A file holds every complaint since the previous file, measured against ftc.gov on
+# 2026-09-25: the Wednesday file carried only Tuesday, the Monday file carried Friday,
+# Saturday and Sunday. No row's created_date equals its own file's day. Fixtures where
+# they are equal are what let the created_date-keyed version pass.
+MONDAY_FILE = ('8009423767,2026-09-18 09:00:00,,,Texas,800,Other,Y\n',
+               '8009423767,2026-09-19 09:00:00,,,Texas,800,Other,Y\n',
+               '8009423767,2026-09-20 09:00:00,,,Texas,800,Other,Y\n')
+TUESDAY_FILE = ('8009423767,2026-09-21 09:00:00,,,Ohio,800,Other,N\n',
+                '8009423767,2026-09-21 10:00:00,,,Ohio,800,Other,N\n')
+
+
+def _store_with_two_real_shaped_files(box):
+    path = os.path.join(box, 'p.db')
+    connection = phone_reports.connect(path, write=True)
+    ingest_ftc_dnc.ingest_day(connection, '2026-09-21', True,
+                              transport=transport_for(FakeResponse(csv_for(MONDAY_FILE))))
+    ingest_ftc_dnc.ingest_day(connection, '2026-09-22', True,
+                              transport=transport_for(FakeResponse(csv_for(TUESDAY_FILE))))
+    return connection
+
+
+def _rows_by_file(connection):
+    return dict(connection.execute(
+        'SELECT file_day, COUNT(*) FROM reports GROUP BY file_day').fetchall())
+
+
+def test_force_day_touches_only_its_own_file():
+    """Keyed on created_date, re-fetching Monday deleted Tuesday's rows (created on
+    Monday) and duplicated Monday's own (created Friday to Sunday), inflating the count
+    an analyst sees."""
+    with tempfile.TemporaryDirectory() as box:
+        connection = _store_with_two_real_shaped_files(box)
+        for day, body in (('2026-09-21', MONDAY_FILE), ('2026-09-22', TUESDAY_FILE)):
+            ingest_ftc_dnc.ingest_day(connection, day, True, force=True,
+                                      transport=transport_for(FakeResponse(csv_for(body))))
+            by_file = _rows_by_file(connection)
+            check(by_file == {'2026-09-21': 3, '2026-09-22': 2},
+                  f'--force-day {day} disturbed other files or duplicated: {by_file}')
+        connection.close()
+
+
+def test_prune_keeps_the_oldest_file_inside_the_window():
+    """Keyed on created_date, a backfill's oldest file was pruned the moment it landed,
+    because every row in it predates its own file day, while its ledger entry survived
+    claiming rows the store no longer held."""
+    with tempfile.TemporaryDirectory() as box:
+        connection = _store_with_two_real_shaped_files(box)
+        age = (date.today() - date(2026, 9, 21)).days
+        doomed, cutoff = ingest_ftc_dnc.prune(connection, age, True)
+        check(cutoff == '2026-09-21', f'fixture is wrong: cutoff {cutoff}')
+        check(doomed == 0, f'prune doomed {doomed} rows from a file inside the window')
+        check(_rows_by_file(connection) == {'2026-09-21': 3, '2026-09-22': 2},
+              'a file inside the retention window lost rows')
+
+        doomed, _cutoff = ingest_ftc_dnc.prune(connection, age - 1, True)
+        check(doomed == 3, f'expected the Monday file\'s 3 rows doomed, got {doomed}')
+        check(_rows_by_file(connection) == {'2026-09-22': 2},
+              f'rows and file did not age out together: {_rows_by_file(connection)}')
+        ledger = [d for (d,) in connection.execute('SELECT day FROM ingested_days')]
+        check(ledger == ['2026-09-22'], f'the ledger disagrees with the rows: {ledger}')
+        connection.close()
+
+
+def test_prune_forgets_old_non_publishing_days():
+    """A weekend has a ledger entry and no rows, so a prune that only acts when rows
+    are doomed would keep every old weekend forever."""
+    with tempfile.TemporaryDirectory() as box:
+        connection = phone_reports.connect(os.path.join(box, 'p.db'), write=True)
+        ingest_ftc_dnc.record_day(connection, '2000-01-01', 0)
+        connection.commit()
+        doomed, _cutoff = ingest_ftc_dnc.prune(connection, 365, True)
+        days = connection.execute('SELECT COUNT(*) FROM ingested_days').fetchone()[0]
+        check(doomed == 0 and days == 0, f'an old weekend outlived the window: {days}')
+        connection.close()
+
+
+def test_a_legacy_store_is_refused_for_writing_but_still_read():
+    """A store built before file_day cannot be migrated exactly. Writing to it must be
+    refused, and the app must keep serving lookups from it until it is rebuilt."""
+    import sqlite3
+    with tempfile.TemporaryDirectory() as box:
+        path = os.path.join(box, 'p.db')
+        legacy = sqlite3.connect(path)
+        legacy.executescript(
+            'CREATE TABLE reports (phone TEXT NOT NULL, created_date TEXT NOT NULL,'
+            ' violation_date TEXT, consumer_state TEXT, subject TEXT,'
+            ' robocall INTEGER NOT NULL DEFAULT 0);'
+            'CREATE TABLE ingested_days (day TEXT PRIMARY KEY, rows INTEGER NOT NULL,'
+            ' ingested_at TEXT NOT NULL);'
+            "INSERT INTO reports VALUES ('8009423767','2026-09-21',NULL,'Ohio',NULL,1);"
+            "INSERT INTO ingested_days VALUES ('2026-09-22',1,'x');")
+        legacy.commit()
+        legacy.close()
+        try:
+            phone_reports.connect(path, write=True)
+            failures.append('a legacy store was opened for writing')
+        except phone_reports.LegacyStoreError:
+            check(True, 'legacy store refused')
+        result = phone_reports.reported_activity('8009423767', path=path)
+        check(result is not None and result['count'] == 1,
+              f'a legacy store stopped serving lookups: {result}')
+
+
 def test_the_app_opens_the_store_read_only():
     """Only the ingest writes. A bug in a request must not be able to corrupt a store
     the operator owns."""
@@ -215,7 +319,7 @@ def test_the_app_opens_the_store_read_only():
         phone_reports.connect(path, write=True).close()
         connection = phone_reports.connect(path)
         try:
-            connection.execute("INSERT INTO reports VALUES ('1','2','3','4','5',0)")
+            connection.execute("INSERT INTO reports VALUES ('1','2','3','4','5',0,'6')")
             failures.append('the app-side connection accepted a write')
         except Exception:
             pass
@@ -320,6 +424,10 @@ def main():
     test_a_day_is_ingested_once()
     test_force_day_replaces_rather_than_duplicates()
     test_prune_bounds_the_store()
+    test_force_day_touches_only_its_own_file()
+    test_prune_keeps_the_oldest_file_inside_the_window()
+    test_prune_forgets_old_non_publishing_days()
+    test_a_legacy_store_is_refused_for_writing_but_still_read()
     test_the_app_opens_the_store_read_only()
     test_a_zero_count_card_never_reads_as_exoneration()
     test_a_reported_number_shows_a_count_and_never_a_verdict()
