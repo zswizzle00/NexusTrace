@@ -418,3 +418,440 @@ plumbed through.
 - Raising `MAX_ENRICH_HASHES` above 3. The cap's documented justification is that the VT
   limiter blocks, so the reasoning needs revisiting now that it does not, but the cap itself
   stays until that is done deliberately.
+
+---
+
+# 2026-09-22: Capability backlog (sources, Kali tooling, infrastructure)
+
+Consolidated from a research session that probed every candidate live rather than
+trusting its documentation. Kept here so rejected options are not re-researched.
+
+Nothing below is started. Ordering rationale is at the bottom.
+
+## A. File and e-mail surface: local analysis, no network, no queue
+
+> **A1, A2 and A3 SHIPPED** in PR #18, merged 2026-09-24. `office_inspect.py`,
+> `pdf_inspect.py` and `yara_scan.py`, 20 weighted signals, three result cards, plus
+> `scripts/setup_yara_rules.py`. A4 to A9 below are still open.
+
+`file_inspect.py` today does magic sniffing, entropy, strings, embedded PE/ELF, digests
+and LNK parsing. It cannot look inside an Office document or a PDF, which are the two
+most common malicious-attachment vectors. All packages below are confirmed present in
+`kali-rolling` (index pulled 2026-09-22, 71,517 packages).
+
+| Id | Package | Licence | Closes |
+|---|---|---|---|
+| ~~A1 | `oletools` | **DONE** | BSD | Office macro extraction and deobfuscation. Importable. |
+| ~~A2 | `pdfid`, `pdf-parser` | **DONE** | public domain | `/JS`, `/OpenAction`, `/Launch`, `/EmbeddedFile` |
+| ~~A3 | `yara` | **DONE** | BSD-3 | Rule hits as weighted signals in `file_rules.py`. Importable. |
+| A4 | `libimage-exiftool-perl` | Artistic/GPL | Author, creation tool, GPS, producer software |
+| A5 | `readpe` | GPL-2 | PE imports and sections, beyond the magic-byte check |
+| A6 | `ssdeep` | GPL-2 | Fuzzy hashing; clusters near-identical samples |
+| A7 | `upx-ucl` | GPL-2 | Detects and unpacks UPX, which explains high entropy |
+| A8 | `pst-utils` | GPL | Outlook PST/OST. The e-mail surface handles `.eml` only. |
+| A9 | `clamav` | GPL-2 | A verdict where nothing leaves the box. Separate decision: 1 GB+ signature DB plus a `freshclam` timer. |
+
+**Licence rule.** GPL tools invoked as a subprocess are mere aggregation and do not
+affect the MIT licence of this tree. Importing GPL Python into it creates a derivative
+work and is the reason PhoneInfoga, BBOT and theHarvester were rejected as libraries.
+`oletools` (BSD) and `yara` (BSD-3) are the only two here that may be imported.
+
+## B. Keyless intel sources
+
+> **B1, B2 and B3 SHIPPED** in PR #19. GreyNoise, RDAP and Wayback, with a
+> `could not be checked` state kept distinct from `no archive history`. B4 (RIPEstat)
+> and B5 (Pulsedive) are still open.
+>
+> **J1a and J1i SHIPPED** in PR #23, stacked on #19: Shodan InternetDB (keyless Shodan)
+> and StopForumSpam (forum spam plus a Tor exit flag, which nothing else here provides).
+>
+> **E2 SHIPPED** in PR #22: the FTC Do Not Call store and ingest, which is now the
+> worked reference every J2 feed copies.
+
+Every endpoint below was probed with no auth header on 2026-09-22 and returned data.
+
+| Id | Source | Surface | Verified behaviour |
+|---|---|---|---|
+| ~~B1 | GreyNoise Community | IP | `noise`, `riot`, `classification`, `name`. **HTTP 404 is the "not observed" answer, not an error.** |
+| ~~B2 | RDAP via `rdap.org` | domain | Registration date, so domain age stops needing an IP2WHOIS key. 302s to a per-TLD registry, so it interacts with `url_guard`. |
+| ~~B3 | Wayback CDX | domain, URL | First-snapshot timestamp. Corroborates B2 from an independent source. |
+| B4 | RIPEstat | IP | ASN, routing and abuse contact. Team Cymru does not give the abuse contact. |
+| B5 | Pulsedive | IP, domain, URL | Risk, threats, ports, technology. **1 request/second; a second immediate call was rejected.** Its `threats` list is historical, so it needs SkipCalls-style handling: report the link and its date, never a verdict. |
+
+B1 is the highest-value single addition. AbuseIPDB says an address was *reported*;
+GreyNoise says whether it is indiscriminate background noise, which removes the false
+positive where a Shodan crawler reads as hostile.
+
+## C. Identity surface
+
+- **C1.** `socid-extractor` (MIT) turns "an account exists" into a display name, internal
+  user id and creation date. Fetches the target profile, so it needs the SSRF guard and a
+  `disclosure.py` party.
+- **C2.** user-scanner's `core/cross_scan.py`, `core/confidence.py` and `core/pivots.py`
+  are installed and never called. Cross-scan pivoting is the library's advertised
+  differentiator, so the dependency is currently being paid for without it.
+- **C3.** user-scanner ships `email_scan/adult/` (roughly 17 adult sites) which runs in
+  e-mail mode. That is in the scan path and in stored records today. Needs an explicit
+  keep-or-exclude decision rather than a default.
+
+## D. Passive recon: blocked on E1
+
+| Id | Tool | Licence | Runtime |
+|---|---|---|---|
+| D1 | `subfinder` | MIT | seconds; the pick |
+| D2 | `amass -passive` | Apache-2.0 | minutes |
+| D3 | `theHarvester` | GPL-2, subprocess only | minutes; many sources now need keys |
+
+## E. Infrastructure
+
+### E1. Local persistence: job store and the seen-before index
+
+Two things that share one storage decision, staged so each pays off on its own.
+
+**E1a. Seen-before index. Build this first.** Every indicator ever looked up, with its
+verdict and the date. Rendered as a card: "you looked at this IP on 2026-08-14, verdict
+suspicious." It is the smallest piece here and the one an analyst feels immediately,
+because it is the only question this app currently cannot answer at all. It also makes the
+rest of E1 worth building instead of being pure plumbing.
+
+Two properties that are not optional. It is a **local** lookup, so no third party learns
+what is being investigated, which is the same argument the phone spec makes for its
+offline tier. And it must honour the existing retention posture: a record deleted from a
+result page has to leave the index too, or "delete this scan" quietly stops being true.
+
+**E1b. Job store.** `data/jobs/` as a further store through `storage.validate_key()`, a
+worker as a systemd unit on the `nexustrace-purge.service` pattern, and a polling result
+page with `queued`/`running`/`done`/`failed`. Not Celery or Redis: this app has no database
+on purpose. Needed because gunicorn runs `--workers 1 --threads 8`, so a multi-minute job
+in-request holds a thread and a timeout kills the entire worker. Gates D, J2 and J6a.
+
+#### Build order, and permission to stop
+
+Each step must be useful standing alone. Stop at any point where the next one stops being
+worth it; stopping early is the expected outcome, not a failure.
+
+1. **E1a, the seen-before index.** Visible payoff, smallest piece.
+2. **J2 feeds plus J4 allowlist.** The allowlist improves every verdict the app already
+   produces, which is the highest-leverage item anywhere in this file.
+3. **J6a feed-freshness dashboard.** Now the ingested data can be trusted, rather than
+   assumed current. This is the failure that started E2.
+4. **Retro-hunt**, only if wanting it comes up in practice. Once feeds and an index both
+   exist, "check each new feed entry against a watchlist" is a loop inside the ingest job.
+   Delivery (e-mail, webhook) is the fiddly part, not the matching.
+5. **A relationship graph**, only if step 1 shows connected things are actually
+   accumulating. At this scale it is an edge table and a rendering problem, not a
+   distributed system. An empty graph answers nothing, so it has to be earned.
+
+#### What this is, said plainly
+
+This is a scope decision, not a feature. NexusTrace today is stateless triage and this
+file's own project notes open with "there is no database". A persistent index, feeds, and
+eventually a graph make it a threat-intelligence platform. That is the stated direction,
+but it should be chosen deliberately rather than arrived at, and every step above has to
+keep the triage path fast or it has made the product worse.
+
+The maintenance is also real: every feed that changes format is ours to fix, with no
+community absorbing it.
+
+#### Deliberately not rebuilt
+
+Decided against on grounds of scale, not difficulty. Roughly 80% of a platform's value at
+one analyst on one box is reachable with a small fraction of its complexity, because
+almost all of that complexity is distribution, multi-tenancy and cross-organisation
+interchange.
+
+- **The full STIX 2.1 object model.** Eighteen object types, relationship semantics,
+  deduplication and merge rules, confidence propagation. Six object types cover this app.
+  `stix2` (BSD) can still emit bundles on *export* for MISP and TAXII interchange without
+  the model being adopted internally.
+- **Elasticsearch, RabbitMQ, MinIO.** They exist to index millions of objects across
+  distributed workers. SQLite and the filesystem are correct at this scale, which is
+  already the reasoning recorded in the E2 spec.
+- **Multi-user RBAC and data segmentation.** One analyst, and the fine-grained version is
+  an Enterprise Edition feature in OpenCTI regardless.
+- **Connector parity.** Fifteen ported sources is the right number. Two hundred is not a
+  goal.
+### E2. FTC Do Not Call ingest
+
+Spec approved at `docs/superpowers/specs/2026-09-22-phone-reports-store-design.md`.
+**Implementation plan still owed.** SkipCalls self-reports `last_updated: 2026-08-02` and
+missed 33 of 80 sampled numbers carrying 2026 FCC complaints.
+
+It is also the worked reference for every J2 feed: fetch with a browser-like UA, parse,
+insert, prune, idempotent via a day ledger, on a systemd timer. Building it first means the
+rest of the feeds copy a proven shape rather than inventing one.
+
+## F. Loose ends
+
+> **F1 SHIPPED** in PR #18. The landing page now names phone and e-mail, with a new
+> `test_home_routes.py` scoped to the hero blurb (a body-wide assertion passed on the
+> pre-fix page, because the nav already links to /phone_analysis and /email_analysis).
+
+- **F1.** `templates/home.html` blurb and search placeholder list only hash and user agent.
+  No mention of phone or username, so two shipped features are invisible from the landing
+  page. Same class as the missing phone nav entry.
+- **F2.** Any new store needs wiring into `scripts/purge_data.py`, which carries its own
+  `STORES` tuple *and* hand-written per-store logic. Adding to the tuple alone is not
+  enough; that already bit the identity store.
+- **F3.** Every new outbound host needs a `disclosure.py` party or `test_disclosure.py`
+  fails. Working as designed.
+
+## G. Rejected, with reasons
+
+| Rejected | Reason |
+|---|---|
+| OSINT-Search (`am0nt31r0`) | **No LICENCE file**, so all rights reserved. Abandoned 2021-06-15. Wraps Pipl (dead), FullContact/TowerData/opencnam (paid), Censys/WhatCMS (keyed), Shodan and `phonenumbers` (already integrated). No unique capability. |
+| typo-sniper (`ChiefGyk3D`) | AGPL-3.0. Read for ideas only. |
+| PhoneInfoga, BBOT, theHarvester **as imports** | GPL/AGPL into an MIT tree creates a derivative work. Subprocess is fine. |
+| nmap, nuclei, nikto, sqlmap, gobuster, ffuf, masscan, wpscan | Active attack traffic. The public role has no browser authentication, so wiring these to a form makes the server an open attack proxy for targets the submitter does not own. Admin role at best. |
+| Censys, ZoomEye, Fofa, Onyphe, BinaryEdge, FullHunt, Netlas, Quake, CriminalIP | Keyed, and all overlap Shodan, which is already integrated. |
+| Hunter.io, Snov.io | Keyed, thin free tier, and finding a person's address is enumeration rather than indicator lookup. |
+| IntelX, SecurityTrails, Defender TI, ThreatBook | Keyed; free tiers too thin to justify a card. |
+| grep.app, mnemonic pDNS, bgp.tools, Ahmia | Probed and failed or gated: 429, 503, a required contact-bearing User-Agent, and a 302 into an HTML session respectively. |
+
+## Suggested order
+
+1. ~~**A1 to A3.**~~ Shipped, PR #18.
+2. ~~**B1 to B3.**~~ Shipped, PR #19.
+3. ~~**F1.**~~ Shipped, PR #18.
+4. **E2.** The spec is approved and the plan is owed. **Next.**
+5. **E1**, then **D1**.
+
+Also open and needing a decision rather than work: **C3**, the adult-site checkers
+user-scanner runs in e-mail mode, which are in the scan path and in stored records now.
+
+## H. OpenCTI and Kasm: pivot targets, not replacements
+
+**Decision.** Everything in sections A through G is built natively into NexusTrace.
+OpenCTI is an optional sidecar that NexusTrace can pivot to and from; it never becomes a
+dependency and it never absorbs a capability listed above. NexusTrace stays what it is:
+stateless, fast triage with no database.
+
+This matters because the temptation runs the other way. OpenCTI has STIX modelling, graph
+relationships and persistence, which are exactly the things this app refuses on purpose.
+Adopting them here means becoming a worse OpenCTI. Pivoting to the real one instead costs
+nothing and keeps both tools doing the single thing each is good at.
+
+**Do not fork OpenCTI.** It is open core: the Community Edition is Apache-2.0 but
+Enterprise Edition files carry a separate Filigran commercial licence identified by
+per-file headers, so a fork means tracking which files are which forever. It is also
+493 MB of TypeScript, React and GraphQL against this Flask tree, and it ships
+calendar-versioned releases roughly weekly (`7.260921.0`, 2026-09-21) against 2,156 open
+issues, so a fork diverges immediately and never reconverges.
+
+| Id | Integration | Depends on | Note |
+|---|---|---|---|
+| H1 | NexusTrace to OpenCTI: push findings as STIX observables via `pycti` | **E1** | Queued for human review, never automatic. `submissions.py` is the existing precedent: an outbound submission writes a `pending` record and a human approves it. |
+| H2 | OpenCTI to NexusTrace: a "seen before" card queried from the local graph | none | The sleeper. It is a local lookup, so no third party learns what is being investigated, and it gets more valuable as the graph grows. |
+| H3 | Kasm pivot: open this indicator in an isolated streamed browser | none | Non-attributable browsing, disposable containers, reachable from any device. Kasm ships an official Kali workspace image, which pairs with sections A and D. |
+
+**Hard rule for all three.** Each must degrade to absent when unconfigured, exactly like a
+missing API key makes a provider card never render. No OpenCTI, no Kasm, no `pycti` on the
+box means NexusTrace behaves precisely as it does today. That keeps the Cloud Run and
+single-container shapes working unchanged.
+
+**Cost, so it is not a surprise.** OpenCTI's compose file brings up elasticsearch, redis,
+postgres, minio, rabbitmq, the platform, a worker, `xtm-composer`, `xtm-one` and roughly
+ten connectors: sixteen-plus containers. Elasticsearch dominates and 8 GB of RAM for
+OpenCTI alone is the realistic floor. With Kasm on the same host, size for 32 GB. That
+hardware decision is the real gate here, not the licence.
+
+## I. VirusTotal: quota, persistence, and the pivot-link option
+
+The existing implementation is sound and should not be rewritten. `_QuotaExhausted` is
+raised rather than returned so `lru_cache` cannot memoize it, `try_acquire` avoids parking
+a gunicorn thread for a whole minute, and `rate_limited` is kept distinct from `skipped`
+and `no_record`. The problem is the budget, not the code: 4 requests/minute, 500/day,
+15,500/month.
+
+- **I1. Persist the VT cache to disk, keyed by SHA-256.** `timed_lru_cache` is in-memory,
+  so every restart and every deploy wipes it and the app pays full price again. A file
+  hash is immutable, so the key is perfectly stable. This converts a 500/day ceiling into
+  500 *new* hashes per day, which is a different budget entirely. Biggest single win.
+- **I2. Give VT its own TTL, measured in days.** The global 30 minutes is tuned for things
+  that change; a VT verdict on a fixed hash drifts over weeks. Caveat to encode rather
+  than rediscover: `cache.py`'s TTL is per-function, not per-key, so one expiry flushes
+  that function's entire cache. A 24-hour TTL trades constant churn for one lumpy daily
+  flush, which is an argument for doing I1 properly rather than only raising the number.
+- **I3. Model the daily and monthly quotas, not only the per-minute one.** Only the 4/min
+  limiter exists today, so crossing the daily ceiling surfaces as the same `rate_limited`
+  string. Those are different claims and need different words: "spent for this minute,
+  retry in 60 seconds" versus "spent for the day, retry tomorrow". An analyst told the
+  former against a spent daily budget refreshes for ten minutes for nothing.
+- **I4. Ask VT last.** The fan-out spends a token unconditionally, in parallel with
+  MalwareBazaar, CIRCL hashlookup and Cymru MHR, which are generous or unlimited. Once A3
+  (YARA) and A9 (ClamAV) can answer locally at zero quota, querying VT only when the cheap
+  sources came back empty is a real saving. The cost is latency on the sequential path, so
+  it is a tradeoff rather than a free win.
+- **I5. Decide the public-role terms question.** VT's Public API is **non-commercial only**
+  and its terms state it may not be used in commercial products or services. The public
+  role is internet-facing with no browser authentication. This is the same shape as the
+  IPQualityScore decision already pre-resolved in the phone spec (admin role only, off by
+  default). VT deserves the same explicit decision rather than an implicit one.
+- **I6. Keep the pivot link regardless.** `hash_service.py:87` already builds
+  `https://www.virustotal.com/gui/search/<hash>`, and `disclosure.py` already has an
+  `ON_CLICK` party class for exactly this: a destination that receives nothing unless the
+  analyst chooses to follow the link (Talos, PhishTank, Safe Browsing, Hybrid Analysis,
+  ANY.RUN, Joe Sandbox are all already modelled this way).
+
+  **This is the escape hatch for every problem above.** A VT pivot link costs no quota, no
+  key, and raises no terms question, because the analyst's own browser and their own VT
+  session make the request. If I5 resolves against calling the API from the public role,
+  demoting VT from an `ALWAYS` party to an `ON_CLICK` party keeps the capability on the
+  page and loses only the inline detection count. Keep the link present and prominent in
+  every outcome, including `rate_limited`, where it is the most useful thing on the card.
+
+**Do not rotate multiple free API keys.** It is the obvious workaround, it is an explicit
+terms violation, and it gets keys banned. VT grants uplifts to academic and research users
+on request, which is the legitimate path.
+
+Extending VT to IPs, domains and URLs is possible on the same v3 API but draws from the
+*same* quota, so it would worsen the pressure. Defer until I1 and I2 are done.
+
+**Order:** I1, I2, I3, I5, then I4. I6 is independent and should be true at all times.
+
+## J. Native connectors: everything NexusTrace can absorb without OpenCTI
+
+**Framing.** NexusTrace is the primary tool and does as much as it possibly can on its
+own. Kasm is the pivot for hands-on forensics when a lookup is not enough. OpenCTI is a
+separate thing entirely and may never be needed; nothing below depends on it.
+
+The OpenCTI **connectors** repository is **Apache-2.0**, unlike the core platform, which
+is open core. That repo holds roughly 75 enrichment connectors and 200 import connectors,
+each a small maintained Python client for one provider. It is usable at two levels:
+
+- **Read it for endpoint knowledge.** Which URL, which parameters, what the response
+  contains. Facts are not copyrightable, so this carries no licensing weight at all. Every
+  source below was found this way and then probed directly.
+- **Port client code.** Apache-2.0 into this MIT tree is fine, but those files keep their
+  Apache header and the NOTICE travels with them. Worth it only where the logic is
+  genuinely intricate, which for these sources it is not.
+
+### J1. Keyless per-indicator lookups, all probed and returning data on 2026-09-22
+
+These need no key, so unlike Shodan or VirusTotal they are never skipped for an
+unconfigured deployment, and they can serve the public role unconditionally.
+
+| Id | Source | Surface | Returns | Note |
+|---|---|---|---|---|
+| J1a | **Shodan InternetDB** `internetdb.shodan.io/<ip>` | IP | open ports, CPEs, hostnames, tags, CVEs | The standout. Shodan data with no key at all. |
+| J1b | **FIRST EPSS** `api.first.org/data/v1/epss` | CVE | exploit probability + percentile | Answers "will this actually be exploited". |
+| J1c | **CISA KEV** | CVE | authoritative actively-exploited catalogue | Public domain. Pairs with J1b: KEV is *already* exploited, EPSS is *likely to be*. |
+| J1d | **CVE record** `cve.circl.lu/api/cve/<id>` | CVE | full CVE 5.1 record | Same operator as the hashlookup already integrated. |
+| J1e | **GreyNoise Community** | IP | noise, riot, classification, actor name | **HTTP 404 is the "not observed" answer, not an error.** |
+| J1f | **RDAP** via `rdap.org` | domain | registration date, status, registrar | Makes domain age keyless. 302s to a per-TLD registry, so it touches `url_guard`. |
+| J1g | **Wayback CDX** | domain, URL | first-snapshot timestamp | Corroborates J1f independently. |
+| J1h | **RIPEstat** | IP | ASN, routing, **abuse contact** | Cymru does not give the abuse contact. |
+| J1i | **StopForumSpam** | IP | appears, frequency, lastseen, **torexit** | The Tor exit flag is free signal NexusTrace has nowhere else. |
+| J1j | **Google DoH** `dns.google/resolve` | domain | DNS over HTTPS | Independent second opinion when the system resolver is suspect. |
+| J1k | **Pulsedive** | IP, domain, URL | risk, threats, ports, technology | **1 request/second**; a second immediate call was rejected. Its `threats` list is historical, so report the link and its date, never a verdict. |
+
+A CVE surface does not exist yet. J1b, J1c and J1d only pay off once one does, or once
+J1a starts returning `vulns` for an IP, which is the natural trigger.
+
+### J2. Free bulk feeds: need a local store and a scheduled ingest
+
+All probed and returning data. These are ingests rather than lookups, so they depend on
+**E1** and follow the **E2** pattern exactly: fetch on a systemd timer, index locally,
+serve from disk, and no third party learns what is being looked up.
+
+| Id | Feed | Size | Gives |
+|---|---|---|---|
+| J2a | **CISA KEV** | 1.7 MB | Actively exploited CVEs, `catalogVersion` dated |
+| J2b | **red-flag-domains** | 818 KB, daily | Newly registered malicious `.fr` domains |
+| J2c | **IPsum** | 1.8 MB, daily | Aggregated malicious IP list with hit counts |
+| J2d | **TweetFeed** | 11 KB/day | Community IOCs, CSV, dated |
+| J2e | **Phishunt** | 38 KB | Live phishing URLs |
+| J2f | **VX Vault** | 4.5 KB | Recent malware URLs (HTML `<pre>`, needs parsing) |
+| J2g | **MISP warninglists** | 21 MB | **Allowlists**, including Tranco top 1M. See J4. |
+
+`URLhaus`, `ThreatFox`, `MalwareBazaar` and `AlienVault OTX` are also in the catalogue and
+are already integrated through their APIs. No action.
+
+#### J2h. TAXII: not now, but keep the door cheap
+
+Considered and deferred. **The free public TAXII landscape has largely collapsed**, probed
+2026-09-22:
+
+| Server | Result |
+|---|---|
+| MITRE ATT&CK, `attack-taxii.mitre.org/api/v21/` | **200, live, keyless** |
+| `cti-taxii.mitre.org`, the old MITRE server | Resolves, connection times out. Deprecated. |
+| HailATaxii | **No A record**, only MX. The site is gone. |
+| Anomali Limo | Discontinued. |
+
+That leaves MITRE ATT&CK as the only live free server, and it serves the *knowledge base*
+(techniques, groups, software, mitigations), **not indicators**. ATT&CK is also published
+as plain JSON on GitHub, so implementing a TAXII client to reach it would be strictly more
+work for the same data.
+
+TAXII genuinely pays for exactly one thing: **ISAC membership** (FS-ISAC, MS-ISAC, H-ISAC)
+and CISA AIS. That content is current, valuable, and available no other way. So the
+question is not whether TAXII is worth supporting but whether there is a server we are
+entitled to poll. Until there is, the J2 feeds above deliver more, fresher, for far less
+machinery.
+
+**Requirement that follows, and it is the actionable part.** Build the J2 ingest layer
+**source-agnostic**: a fetcher returns records and the indexer does not care whether they
+arrived as CSV, JSON, a text list, or a TAXII collection. E2 is already close to this
+shape. Do that and adding TAXII later is roughly 150 lines plus `taxii2-client` and
+`stix2` (both BSD, both OASIS), so the decision defers at near-zero cost.
+
+**Guard against one trap:** do not adopt STIX as the *internal* model in order to consume
+TAXII. That inherits the object model's full complexity, which E1 already rejects on
+scale grounds, in exchange for feeds we mostly do not have access to yet. Parse STIX at the
+boundary, store observables in the existing shape.
+
+### J3. Free tier but key-gated, lower priority
+
+`crowdsec`, `maltiverse`, `ismalicious`, `hostio` (probed: 400, token required). Each adds
+less than any J1 entry and adds key management. Revisit only if a J1 source dies.
+
+### J4. `hygiene`: the allowlist NexusTrace does not have
+
+The `hygiene` connector checks observables against MISP warninglists to suppress false
+positives. **There is no allowlist anywhere in this app today**, and several sources are
+known-noisy: the NSRL note earlier in this file is the same problem, and SkipCalls flagged
+Apple's real support line as spam.
+
+Fed by J2g, this would let a verdict say "this domain is in the Tranco top 1M, so a single
+low-confidence hit against it is probably noise". That is a quality improvement across
+every surface at once, not a new source.
+
+### J5. `dnstwist` (Apache-2.0, 5.7k stars): typosquatting, done legally
+
+Generates domain permutations and reports which resolve. Permutation generation is fully
+offline; only resolution touches the network. On a phishing-triage tool this is a real
+feature: submit `paypal.com`, see which lookalikes exist and where they point.
+
+This is the licence-clean answer to typo-sniper, which is AGPL-3.0 and therefore rejected
+in section G.
+
+### J6. Dashboards
+
+An admin activity dashboard already exists (`admin_routes.py:_dashboard`, backed by the
+append-only log in `app/utils/activity.py`). It answers "who used this app". The gap is a
+dashboard that answers "is this app currently telling the truth", which matters more here
+because there is no database and every answer comes from a source that can quietly rot.
+
+- **J6a. Feed freshness.** Once J2 lands: every local feed, its last successful ingest, its
+  entry count, and a staleness warning past a threshold. This directly addresses the
+  failure that started the FTC work, where SkipCalls was seven weeks stale and nothing on
+  the page said so.
+- **J6b. Source health and quota.** Which providers are configured, which are rate-limited
+  right now, and how much daily quota remains. Depends on **I3**, and makes the VirusTotal
+  budget visible instead of surfacing only as a `rate_limited` string mid-lookup.
+- **J6c. Verdict mix.** Counts by verdict over a window, derived from the existing stores
+  rather than new persistence. Cheap, and it makes a miscalibrated rule engine visible: a
+  week where nothing was ever `malicious` is a signal about the scoring, not the traffic.
+
+J6a and J6b belong on the **admin role**, beside the existing dashboard. J6c is arguably
+public, but it leaks aggregate usage, so default it to admin too.
+
+### Suggested order for this section
+
+1. **J1a, J1e, J1f, J1g** keyless, no infrastructure, land on IP and domain today
+2. **J5** dnstwist, self-contained and directly serves phishing triage
+3. **E1**, then **J2g + J4**, because the allowlist improves every existing verdict
+4. **J2** feeds, then **J6a**
+5. **J1b to J1d** when a CVE surface exists

@@ -5,6 +5,69 @@ Reviewed at session start and before major refactors.
 
 ---
 
+## 2026-09-24: Caching a transient failure manufactures a signal
+
+**Failure mode.** `get_wayback_history` returned `None` on timeout and was then given
+`@timed_lru_cache`. `lru_cache` memoizes `None` like any other value, so one slow
+response cached "no answer" for an hour. The page renders an absent archive history as
+**"no archive history"**, which is a *finding*: a domain with nothing archived before
+last week is exactly what a phishing site looks like. So a cached timeout did not
+degrade the result, it invented evidence.
+
+**Detection signal.** web.archive.org's CDX API was measured returning the identical
+request in 2.2s and then 10.0s seconds apart. Any source whose latency varies by more
+than its own timeout will produce this, and the symptom is a source that reports
+"nothing found" far more often than it should.
+
+**Prevention rule.** A cached function must **raise** on a transient failure, never
+return a falsy value, so `lru_cache` cannot memoize it. `hash_service._QuotaExhausted`
+already established this pattern and the docstring there explains why. Then check the
+second half: the template must render "could not be checked" and "there is nothing
+there" differently. Only one of them is a signal, and conflating them is how a timeout
+becomes a verdict.
+
+---
+
+## 2026-09-24: A test can guard a resource limit without ever reaching it
+
+**Failure mode.** The decompression-bomb test for `pdf_inspect` built an 8 MB
+compressed-zeros stream and asserted the inflated total stayed under
+`MAX_TOTAL_INFLATE`, which is 32 MB. The payload was under the cap, so the assertion
+passed identically whether the cap existed or not. The test guarding the single most
+important resource control in that module was inert. A second gap sat beside it:
+per-stream capping alone is not a bound, because 2048 streams x 4 MB is 8 GB.
+
+**Detection signal.** The test passes when you delete the code it is supposed to
+protect. Any limit test whose fixture is smaller than the limit has this shape.
+
+**Prevention rule.** Size a limit test's fixture **above** the limit, assert against the
+constant rather than a literal, and prove it by mutation: remove the guard, watch the
+test fail, restore it. For a budget that is both per-item and total, write a case for
+each; the per-item cap passing says nothing about the aggregate.
+
+---
+
+## 2026-09-24: A spec can weight a signal that nothing is able to emit
+
+**Failure mode.** The file-analysis spec named `pdf_encrypted_no_password`, gave it a
+label, and weighted it at 0.15 in `file_rules.WEIGHTS`. Nothing could ever set it:
+deciding whether an encrypted PDF opens without a password needs the `/Encrypt`
+dictionary and the trailer `/ID`, which needs the xref resolution the module explicitly
+does not do. The weight was live arithmetic in `check_band_derivation()` over a
+condition that could not occur.
+
+**Detection signal.** A signal key that appears in `WEIGHTS` and in a `SIGNAL_LABELS`
+dict but never as an argument to the code that emits signals. `grep` for the key and
+count the emit sites: zero means dead weight.
+
+**Prevention rule.** Every weighted key needs a test that makes it fire from real input,
+not from a hand-built record. `check_analyzer_partition` now asserts the reverse
+direction (every key an analyser *can* emit is weighted); this is the missing forward
+direction. A weight nothing can trigger is worse than no weight, because the scoring
+table then claims a capability that does not exist.
+
+---
+
 ## 2026-07-28: A plan can specify a security fix that silently does nothing
 
 **Failure mode.** The scanner-hardening plan specified installing the SSRF guard via

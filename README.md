@@ -14,11 +14,20 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Open ports and running services (Shodan)
 - Known CVEs and vulnerabilities (Shodan)
 - Abuse history and confidence score (AbuseIPDB)
+- Internet background-noise classification (GreyNoise, **no API key required**): separates
+  indiscriminate mass scanning from targeted traffic, so a known crawler stops reading as
+  hostile just because it accumulates abuse reports
+- Open ports, detected software and associated CVEs (Shodan InternetDB, **no API key
+  required**): the same source as the keyed Shodan card above, thinner but always available
+- Forum spam reports and Tor exit detection (StopForumSpam, **no API key required**)
 - Threat intelligence pulses (AlienVault OTX) and IOC cross-reference (ThreatFox, URLhaus)
 - Batch analysis: upload a CSV/XLSX/TXT of IPs and get an enriched CSV back
 
 ### Domain & URL Analysis
 - WHOIS registration data (IP2WHOIS)
+- Domain age from RDAP and the Internet Archive (**no API key required**): registration
+  date, registrar, and first archived capture. Two independent sources, because a
+  registration date is reset by a drop and re-registration while archive history is not
 - DNS records: A, AAAA, MX, NS, TXT, CNAME, SOA
 - SSL/TLS certificate details
 - HTTP security headers analysis
@@ -183,6 +192,22 @@ For faster lookups without API rate limits, download the IPinfo Lite MMDB databa
 2. Download and extract `ipinfo_lite.mmdb`
 3. Place it in `data/ipinfo_lite.mmdb`
 4. Set `MMDB_PATH=data/ipinfo_lite.mmdb` in `.env`
+
+### Sources that need no key
+
+Most providers are skipped when their key is unset. These answer regardless, so a
+deployment with an empty `.env` still returns useful results:
+
+| Source | Surface | Gives |
+|---|---|---|
+| GreyNoise Community | IP | Mass-scanning classification and actor |
+| Shodan InternetDB | IP | Open ports, software, CVEs, tags |
+| StopForumSpam | IP | Forum spam reports, Tor exit flag |
+| RDAP | Domain | Registration date, registrar, status |
+| Internet Archive | Domain | First archived capture |
+| crt.sh | Domain | Subdomains from certificate transparency |
+| CIRCL hashlookup, Team Cymru MHR | Hash | Known-file and malware-hash lookups |
+| FTC Do Not Call (local) | Phone | Complaint count, dates, subjects, robocall flag |
 
 ### YARA rules (optional)
 
