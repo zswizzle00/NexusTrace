@@ -78,6 +78,13 @@ def clear_caches():
                 ip_service.get_vpn_data,
                 ip_service.get_ip2location_data,
                 ip_service.get_ipapi_data,
+                ip_service.get_greynoise_data,
+                # Caching matters more for these two than for most: rdap.org bootstraps
+                # to a different registry per TLD, and web.archive.org's CDX latency was
+                # measured swinging between 2s and 10s for the SAME request seconds
+                # apart. A cached success rides out the next slow window.
+                domain_service.get_rdap_info,
+                domain_service.get_wayback_history,
                 domain_service.get_whois_info,
                 domain_service.get_dns_records,
                 domain_service.get_ssl_info,

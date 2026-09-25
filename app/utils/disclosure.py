@@ -73,6 +73,13 @@ PARTIES = (
     Party('hackertarget', 'HackerTarget', ('api.hackertarget.com',),
           'IP addresses', ALWAYS),
     Party('crtsh', 'crt.sh', ('crt.sh',), 'domain names', ALWAYS),
+    Party('greynoise', 'GreyNoise', ('api.greynoise.io',), 'IP addresses', ALWAYS),
+    # rdap.org is a bootstrap: it redirects to the authoritative registry for the TLD,
+    # so the query reaches that registry too and the notice has to say so.
+    Party('rdap', 'the RDAP bootstrap and the domain registry it redirects to',
+          ('rdap.org',), 'domain names', ALWAYS),
+    Party('wayback', 'the Internet Archive', ('web.archive.org',),
+          'domain names and URLs', ALWAYS),
     Party('urlscan', 'urlscan.io', ('urlscan.io',), 'URLs', ALWAYS),
     Party('microsoft', 'Microsoft', ('login.microsoftonline.com',),
           'AADSTS error codes', ALWAYS),

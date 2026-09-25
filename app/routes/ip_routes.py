@@ -7,6 +7,7 @@ from ..services.ip_service import (
     get_ipinfo_data,
     get_shodan_info,
     get_proxycheck_data,
+    get_greynoise_data,
     get_alienvault_data,
     get_vpn_data
 )
@@ -59,6 +60,11 @@ def check_ip():
             results['proxycheck'] = None
 
         try:
+            results['greynoise'] = get_greynoise_data(ip_address)
+        except Exception:
+            results['greynoise'] = None
+
+        try:
             results['alienvault'] = get_alienvault_data(ip_address)
         except Exception as e:
             results['alienvault'] = None
@@ -73,6 +79,8 @@ def check_ip():
             result['shodan'] = results['shodan']
         if results['proxycheck']:
             result.update(results['proxycheck'])
+        if results['greynoise']:
+            result['greynoise'] = results['greynoise']
         if results['alienvault']:
             result['alienvault'] = results['alienvault']
         

@@ -58,7 +58,11 @@
   {# ipapi is included because it is keyless: on a deployment with no API keys it is often
      the only source that answers, and leaving it out rendered a bare page. abuse.ch counts
      only when nothing identifies this as a domain report. #}
+  {# greynoise is keyless, so it is the only IP source that answers on a deployment
+     with no keys configured at all. Leaving it out of this set would mean a lookup
+     that found something rendered as if it had found nothing. #}
   {% set has_ip_cards = ipinfo or ip2location or ipapi or vpnapi or proxycheck or shodan or abuseipdb
+                        or greynoise
                         or ((tf_env or uh_env) and not has_domain_cards) %}
 
   {% if has_ip_cards %}
@@ -583,6 +587,8 @@
       </div>
     {% endif %}
 
+    {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
+
     {% if alienvault and has_ip_cards %}
       {{ render_alienvault(alienvault) }}
     {% endif %}
@@ -592,7 +598,7 @@
   </div>
   {% endif %}
 
-  {% if (alienvault and not has_ip_cards) or domain_info or url_analysis or whois_info %}
+  {% if (alienvault and not has_ip_cards) or domain_info or url_analysis or whois_info or registration or archive %}
   <div class="nt-card-grid">
     {% if alienvault and not has_ip_cards %}
       {{ render_alienvault(alienvault) }}
@@ -600,6 +606,8 @@
 
     {% if tf_env and not has_ip_cards %}{{ render_threatfox(tf_env) }}{% endif %}
     {% if uh_env and not has_ip_cards %}{{ render_urlhaus(uh_env) }}{% endif %}
+
+    {% if registration or archive %}{{ render_domain_age(registration, archive) }}{% endif %}
 
     {% if domain_info and domain_info.ssl_info %}
       <div class="nt-card is-ssl">
@@ -1385,3 +1393,130 @@
 {% endmacro %}
 
 {% block scripts %}{{ super() }}{% endblock %}
+
+
+{# Domain age, from two independent sources.
+
+   RDAP gives the registration date. The Internet Archive gives the first capture. They
+   are worth showing together because they disagree usefully: a registration date is
+   reset by a drop and re-registration, so a domain can look old to RDAP and still have
+   no history anywhere.
+
+   The absent case is NOT the same as the empty case and must never render the same.
+   `registration is none` means the lookup did not answer; `archive.archived == false`
+   means it answered and there is nothing there. The second is a signal, the first is
+   not, and web.archive.org's latency swings between 2 and 10 seconds for identical
+   requests, so this distinction fires in normal use rather than in theory. #}
+{% macro render_domain_age(registration, archive) %}
+  <div class="nt-card is-whois">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">Domain Age</h3>
+      <span class="nt-card__source">RDAP &middot; Internet Archive</span>
+    </div>
+    <div class="nt-card__body">
+      {% if registration %}
+        {% set age = registration.age_days %}
+        {% if age is not none %}
+        <div class="nt-kv">
+          <span class="nt-kv__k">Age</span>
+          <span class="nt-kv__v">
+            {{ age }} day{{ 's' if age != 1 }}
+            {% if age < 30 %}<span class="nt-pill nt-pill--warn">registered recently</span>{% endif %}
+          </span>
+        </div>
+        {% endif %}
+        <div class="nt-kv"><span class="nt-kv__k">Registered</span><span class="nt-kv__v">{{ registration.registered or 'unknown' }}</span></div>
+        {% if registration.registrar %}
+        <div class="nt-kv"><span class="nt-kv__k">Registrar</span><span class="nt-kv__v">{{ registration.registrar }}</span></div>
+        {% endif %}
+        {% if registration.expires %}
+        <div class="nt-kv"><span class="nt-kv__k">Expires</span><span class="nt-kv__v">{{ registration.expires }}</span></div>
+        {% endif %}
+      {% else %}
+        <div class="nt-kv"><span class="nt-kv__k">Registration</span><span class="nt-kv__v nt-muted">could not be checked</span></div>
+      {% endif %}
+
+      {% if archive is none %}
+        <div class="nt-kv"><span class="nt-kv__k">Archive</span><span class="nt-kv__v nt-muted">could not be checked</span></div>
+      {% elif archive.archived %}
+        <div class="nt-kv"><span class="nt-kv__k">First archived</span><span class="nt-kv__v">{{ archive.first_seen }}</span></div>
+      {% else %}
+        <div class="nt-kv">
+          <span class="nt-kv__k">First archived</span>
+          <span class="nt-kv__v">never <span class="nt-pill nt-pill--warn">no archive history</span></span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+
+{# GreyNoise: internet background noise, NOT a verdict about this connection.
+
+   This answers the one question no other IP source here answers. AbuseIPDB says an
+   address was REPORTED; GreyNoise says whether it sprays the whole internet
+   indiscriminately. That distinction is what stops a Shodan or Censys crawler, which
+   accumulates abuse reports by design, reading as hostile.
+
+   Two words are deliberately not used as verdicts. `benign` is GreyNoise's word for "a
+   known, named scanner", not "this address is safe". `riot` means the address belongs
+   to a common business service such as Google or a CDN. Neither says anything about
+   the specific connection the analyst is looking at, and the copy must not imply it
+   does. #}
+{% macro render_greynoise(greynoise) %}
+  <div class="nt-card is-otx">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12h3l2-5 3 10 3-8 2 3h5"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">GreyNoise</h3>
+      <span class="nt-card__source">Internet background noise</span>
+    </div>
+    <div class="nt-card__body">
+      {% if greynoise.observed %}
+        <div class="nt-kv">
+          <span class="nt-kv__k">Scanning</span>
+          <span class="nt-kv__v">
+            {% if greynoise.noise %}Scans the internet indiscriminately{% endif %}
+            {% if greynoise.riot %}{% if greynoise.noise %} &middot; {% endif %}Common business service{% endif %}
+          </span>
+        </div>
+        {% if greynoise.actor %}
+        <div class="nt-kv"><span class="nt-kv__k">Operator</span><span class="nt-kv__v">{{ greynoise.actor }}</span></div>
+        {% endif %}
+        {% if greynoise.classification %}
+        <div class="nt-kv">
+          <span class="nt-kv__k">Classification</span>
+          <span class="nt-kv__v">{{ greynoise.classification }}</span>
+        </div>
+        {% endif %}
+        {% if greynoise.last_seen %}
+        <div class="nt-kv"><span class="nt-kv__k">Last seen</span><span class="nt-kv__v">{{ greynoise.last_seen }}</span></div>
+        {% endif %}
+        <p class="nt-note">
+          Describes what this address does across the internet, not what it did here.
+          A named scanner accumulates abuse reports by design.
+        </p>
+      {% else %}
+        <div class="nt-kv">
+          <span class="nt-kv__k">Scanning</span>
+          <span class="nt-kv__v">Not observed scanning the internet</span>
+        </div>
+        <p class="nt-note">
+          Absence of scanning activity is not a clean result. It means this address is
+          not mass-scanning, which is what targeted traffic looks like too.
+        </p>
+      {% endif %}
+      {% if greynoise.link %}
+      <div class="nt-kv"><span class="nt-kv__k">Detail</span><span class="nt-kv__v"><a href="{{ greynoise.link }}" target="_blank" rel="noopener noreferrer">viz.greynoise.io</a></span></div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}

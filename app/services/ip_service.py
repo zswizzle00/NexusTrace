@@ -23,6 +23,17 @@ proxycheck_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1
 shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 # IP-API.com free tier: 45 req/min over HTTP
 ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
+# Keyless and undocumented, so this is a courtesy limit rather than a published one.
+greynoise_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+
+
+class _LookupUnavailable(Exception):
+    """Raised rather than returned so `timed_lru_cache` cannot memoize a transient
+    failure. Same reasoning as `hash_service._QuotaExhausted`: a 10-second stall at
+    web.archive.org must not become an hour of cached "no archive history", because
+    "we could not check" and "there is nothing there" are different claims and only
+    one of them is a signal.
+    """
 ip2location_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 shodan_key = os.getenv('SHODAN_KEY')
@@ -529,3 +540,97 @@ def get_ipapi_data(ip_address):
     except (requests.exceptions.RequestException, ValueError) as e:
         logger.error(f"IP-API.com request failed for {ip_address}: {str(e)}")
         return None 
+
+GREYNOISE_URL = 'https://api.greynoise.io/v3/community/{ip}'
+
+# GreyNoise's own vocabulary, kept verbatim rather than remapped: 'benign' here means
+# "this is a known, named internet-wide scanner", NOT "this address is safe".
+GREYNOISE_CLASSIFICATIONS = ('benign', 'suspicious', 'malicious', 'unknown')
+
+
+def map_greynoise_response(payload, status_code=200):
+    """Map a Community API response to a card, or None when nothing is known.
+
+    **A 404 is the "not observed" ANSWER, not an error.** GreyNoise returns it with a
+    JSON body for any address it has never seen scanning the internet, which is the
+    common case and is useful information. Treating it as a failure would discard the
+    single most valuable thing this source says.
+
+    `noise` means the address scans the internet indiscriminately. `riot` means it
+    belongs to a common business service (Google, Microsoft, CDNs) that generates
+    benign traffic. Neither is a verdict about this particular connection, and the
+    card must not render them as one.
+    """
+    if not isinstance(payload, dict):
+        return None
+
+    noise = bool(payload.get('noise'))
+    riot = bool(payload.get('riot'))
+    if status_code == 404 or not (noise or riot):
+        return {
+            'observed': False,
+            'noise': False,
+            'riot': False,
+            'classification': None,
+            'actor': None,
+            'last_seen': None,
+            'link': payload.get('link'),
+            'message': payload.get('message') or 'Not observed scanning the internet',
+        }
+
+    classification = payload.get('classification')
+    if classification not in GREYNOISE_CLASSIFICATIONS:
+        classification = None
+    actor = payload.get('name')
+    return {
+        'observed': True,
+        'noise': noise,
+        'riot': riot,
+        'classification': classification,
+        # 'unknown' is GreyNoise's placeholder for an unattributed scanner; rendering it
+        # as an actor name would invent an operator called "unknown".
+        'actor': None if actor in (None, '', 'unknown') else actor,
+        'last_seen': payload.get('last_seen'),
+        'link': payload.get('link'),
+        'message': payload.get('message'),
+    }
+
+
+@timed_lru_cache(seconds=1800)
+def _get_greynoise_data(ip_address, transport=None):
+    """Keyless. Returns None only when the lookup could not be made at all.
+
+    This answers a question no other IP source here answers: AbuseIPDB says an address
+    was *reported*, GreyNoise says whether it is indiscriminate background noise. That
+    distinction is what stops a Shodan or Censys crawler reading as hostile.
+    """
+    if not greynoise_limiter.try_acquire():
+        logger.debug('GreyNoise rate limit reached for %s', ip_address)
+        raise _LookupUnavailable()
+    try:
+        response = (transport or requests.get)(
+            GREYNOISE_URL.format(ip=ip_address),
+            timeout=TIMEOUT_SHORT,
+            headers={'User-Agent': 'NexusTrace/1.0', 'Accept': 'application/json'},
+        )
+        # 404 carries a real body; see map_greynoise_response.
+        if response.status_code not in (200, 404):
+            logger.debug('GreyNoise returned %s for %s', response.status_code, ip_address)
+            raise _LookupUnavailable()
+        return map_greynoise_response(response.json(), response.status_code)
+    except _LookupUnavailable:
+        raise
+    except requests.Timeout:
+        logger.warning('GreyNoise lookup timed out for %s', ip_address)
+    except Exception as exc:
+        logger.debug('GreyNoise lookup failed for %s: %s', ip_address, exc)
+    raise _LookupUnavailable()
+
+
+def get_greynoise_data(*args, **kwargs):
+    """Uncached wrapper. The cached inner function raises on a transient failure so the
+    failure is never memoized; see _LookupUnavailable."""
+    try:
+        return _get_greynoise_data(*args, **kwargs)
+    except _LookupUnavailable:
+        return None

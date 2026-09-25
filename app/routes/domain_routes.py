@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template
-from ..services.domain_service import get_domain_info, get_domain_info_quick
+from ..services.domain_service import (get_domain_info, get_domain_info_quick,
+                                       get_rdap_info, get_wayback_history)
 from ..services.ip_service import get_alienvault_data
 from ..services.url_service import analyze_url_quick, analyze_url_deep
 from app.utils.parsers import parse_alienvault_otx
@@ -73,6 +74,12 @@ def analyze_domain():
         # Hoisted out of domain_info for template compatibility.
         result_data['whois_info'] = domain_info.get('whois') if domain_info else None
 
+        # Keyless, so unlike IP2WHOIS these answer on a deployment that has configured
+        # nothing. Both return None when the lookup could not be made, which the template
+        # must render as "could not check" rather than as an absence.
+        result_data['registration'] = get_rdap_info(domain)
+        result_data['archive'] = get_wayback_history(domain)
+
         alienvault_raw = get_alienvault_data(domain)
         result_data['alienvault'] = parse_alienvault_otx(alienvault_raw) if alienvault_raw else None
 
@@ -91,13 +98,20 @@ def analyze_domain():
             (result_data['whois_info'] and result_data['whois_info'].get('domain')) or
             (alienvault_raw and alienvault_raw.get('general', {}).get('pulse_info', {}).get('count', 0) > 0) or
             _abusech_found(result_data.get('threatfox')) or
-            _abusech_found(result_data.get('urlhaus'))
+            _abusech_found(result_data.get('urlhaus')) or
+            # Registration data alone is a real answer. A domain registered four days ago
+            # with no archive history is exactly the case an analyst came here for, and it
+            # would otherwise render as "no results".
+            bool(result_data.get('registration')) or
+            bool(result_data.get('archive'))
         )
 
         if not has_meaningful_data:
             return render_template('no_results.html', indicator=indicator, error_type='domain')
 
-        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info', 'alienvault'] if result_data.get(k))
+        card_count = sum(1 for k in ['url_analysis', 'domain_info', 'whois_info',
+                                     'alienvault', 'registration', 'archive']
+                         if result_data.get(k))
     return render_template('analyze_result.html', error=error, card_count=card_count,
                            indicator=indicator, indicator_type='domain', **result_data)
 
