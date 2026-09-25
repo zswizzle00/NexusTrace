@@ -37,6 +37,12 @@ logs/
 *.mmdb
 data/*.mmdb
 data/api_keys.json
+# data/phone_reports.db holds ingested FTC Do Not Call complaints. Public domain, but it
+# is derived operator data measured in hundreds of MB after a full backfill, and it is
+# rebuilt by scripts/ingest_ftc_dnc.py rather than distributed.
+data/phone_reports.db
+data/phone_reports.db-journal
+data/phone_reports.db-wal
 # data/yara/ holds operator-fetched detection rules under their own licences.
 data/yara/
 

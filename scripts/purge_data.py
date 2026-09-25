@@ -56,6 +56,11 @@ from pathlib import Path
 DEFAULT_MAX_AGE_DAYS = 30
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
+# data/phone_reports.db is deliberately absent from this tuple. These stores are
+# directories of per-record files aged by mtime; the FTC store is one SQLite file whose
+# rows carry their own dates, so it prunes itself inside scripts/ingest_ftc_dnc.py with
+# the same --max-age-days flag. Adding it here would delete the whole store on its first
+# birthday rather than trimming it.
 STORES = ('scans', 'screenshots', 'analyses', 'submissions', 'quarantine', 'activity',
           'identity')
 

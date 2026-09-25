@@ -1,0 +1,16 @@
+[Unit]
+Description=Fetch the FTC Do Not Call complaint file daily
+Documentation=file:///opt/NexusTrace/docs/operations.md
+
+[Timer]
+# After the FTC's mid-day publication, and well clear of the 03:20 retention sweep so
+# the two never contend for the same SQLite file.
+OnCalendar=*-*-* 06:40:00
+# Persistent so a run missed while the box was off happens on next boot. The ledger
+# makes the catch-up idempotent, and a stale store is the exact failure this feature
+# exists to fix, so silently skipping days would defeat it.
+Persistent=true
+RandomizedDelaySec=20m
+
+[Install]
+WantedBy=timers.target

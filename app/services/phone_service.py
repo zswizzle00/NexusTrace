@@ -25,6 +25,7 @@ import requests
 from ..utils.cache import timed_lru_cache
 from ..utils.phone_parse import analyze
 from ..utils.rate_limiter import RateLimiter
+from ..utils.phone_reports import reported_activity
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +239,7 @@ def build_report(raw, default_region=None, live=True):
     sources are enrichment that may simply be absent.
     """
     offline = analyze(raw, default_region)
-    report = {'offline': offline, 'prefix': None, 'spam': None}
+    report = {'offline': offline, 'prefix': None, 'spam': None, 'reports': None}
     if not offline.get('ok') or not offline.get('valid') or not live:
         return report
 
@@ -247,4 +248,10 @@ def build_report(raw, default_region=None, live=True):
     if offline.get('is_nanp'):
         report['prefix'] = prefix_lookup(offline['national_number'])
         report['spam'] = spam_lookup(offline['national_number'])
+        # Local, so unlike the two above no third party learns which number is being
+        # investigated. Returns None only when the store has never been ingested, which
+        # the template renders as no card. A number with no complaints returns count 0,
+        # because the page has to be able to say that absence proves nothing and it
+        # cannot say that if the card is missing.
+        report['reports'] = reported_activity(offline['national_number'])
     return report

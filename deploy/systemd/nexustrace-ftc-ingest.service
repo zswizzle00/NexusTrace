@@ -1,0 +1,26 @@
+[Unit]
+Description=NexusTrace FTC Do Not Call ingest
+Documentation=file:///opt/NexusTrace/docs/operations.md
+# Needs the network but not the app: the web process only ever reads this store, so the
+# ingest must still run while the container is stopped.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/opt/NexusTrace
+Environment=HOME=/home/%i
+# --yes is what makes this write. Drop it to watch the timer in report-only mode.
+# --backfill-days 3 rather than 1: the FTC publishes on business days, so a Monday run
+# with a window of 1 would permanently miss the file published on Saturday morning.
+# Days already in the ledger are skipped, so the overlap costs one HEAD-sized request.
+ExecStart=/usr/bin/env uv run python scripts/ingest_ftc_dnc.py --backfill-days 3 --max-age-days 365 --yes
+Nice=10
+IOSchedulingClass=idle
+# It only ever writes inside data/, so everything else can be read-only.
+ProtectSystem=strict
+ReadWritePaths=/opt/NexusTrace/data /opt/NexusTrace/logs
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=read-only

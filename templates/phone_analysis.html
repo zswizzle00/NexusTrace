@@ -168,6 +168,68 @@
   </div>
   {% endif %}
 
+  {# FTC complaints, from the LOCAL store. Three rules here, none cosmetic.
+
+     1. A COUNT, NEVER A VERDICT. The FTC states it does not verify the facts alleged in
+        these complaints, and caller ID is routinely spoofed, so a report names a claimed
+        caller ID rather than an established originator. No score, no banner, no threat
+        palette.
+     2. ABSENCE MEANS NOTHING, AND THE PAGE SAYS SO. Complaints are voluntary and most
+        unwanted calls are never reported, so a number with no complaints has not been
+        cleared of anything. Without that line an empty card reads as exoneration.
+     3. THE COVERED WINDOW IS SHOWN, from the ingest ledger rather than from the matched
+        rows, so an analyst can see whether the store is current instead of assuming it.
+
+     The card is absent entirely when the store has never been ingested, which is a
+     different claim again and is why reported_activity returns None for that case. #}
+  {% set reports = report.get('reports') %}
+  {% if reports %}
+  <div class="nt-card p-4 mb-5">
+    <h3 class="nt-card-title mb-3">FTC complaints</h3>
+    {% if reports.get('count') %}
+      <p class="text-sm text-gray-200 mb-2">
+        Reported <span class="font-semibold">{{ reports.get('count') }}</span>
+        time{{ 's' if reports.get('count') != 1 }} to the FTC
+        {%- if reports.get('robocall_count') %}, {{ reports.get('robocall_count') }} of them
+        marked as a recorded message or robocall{% endif %}.
+      </p>
+      <dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-xs mb-3">
+        <div><dt class="text-gray-500 uppercase tracking-wide">First complaint</dt>
+             <dd class="text-gray-200 font-mono mt-0.5">{{ reports.get('first_seen') or '-' }}</dd></div>
+        <div><dt class="text-gray-500 uppercase tracking-wide">Latest complaint</dt>
+             <dd class="text-gray-200 font-mono mt-0.5">{{ reports.get('last_seen') or '-' }}</dd></div>
+        <div><dt class="text-gray-500 uppercase tracking-wide">Consumer states</dt>
+             <dd class="text-gray-200 font-mono mt-0.5">{{ reports.get('state_count') }}</dd></div>
+      </dl>
+      {% if reports.get('top_subjects') %}
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">What callers reported</p>
+      <ul class="space-y-0.5 mb-3">
+        {% for subject, n in reports.get('top_subjects') %}
+        <li class="text-xs text-gray-300">{{ subject }} <span class="text-gray-500">({{ n }})</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <p class="text-xs text-gray-500">
+        The FTC does not verify the facts alleged in these complaints, and caller ID is
+        routinely spoofed, so this names a claimed caller ID rather than an established
+        originator.
+      </p>
+    {% else %}
+      <p class="text-sm text-gray-300 mb-2">No FTC complaints name this number.</p>
+      <p class="text-xs text-yellow-300/90">
+        That is not a clean result. Complaints are voluntary and most unwanted calls are
+        never reported, so an absence here says nothing about this number.
+      </p>
+    {% endif %}
+    <p class="text-xs text-gray-600 mt-3">
+      Local data covering {{ reports.get('window_start') or 'no days yet' }}
+      {%- if reports.get('window_end') %} to {{ reports.get('window_end') }}{% endif %}.
+      This lookup is performed on this server, so no third party learns which number you
+      searched.
+    </p>
+  </div>
+  {% endif %}
+
   {% set spam = report.get('spam') %}
   {% if spam %}
   <div class="nt-card p-4 mb-5">

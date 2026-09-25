@@ -209,6 +209,29 @@ deployment with an empty `.env` still returns useful results:
 | CIRCL hashlookup, Team Cymru MHR | Hash | Known-file and malware-hash lookups |
 | FTC Do Not Call (local) | Phone | Complaint count, dates, subjects, robocall flag |
 
+### FTC Do Not Call complaints (optional)
+
+The phone surface can report federally-logged complaint history from a local store. The
+lookup is performed on this server, so no third party learns which number you searched.
+
+```bash
+uv run python scripts/ingest_ftc_dnc.py --backfill-days 365 --yes   # once, deliberately
+uv run python scripts/ingest_ftc_dnc.py --yes                       # daily
+```
+
+Dry run is the default; `--yes` is what writes. The data is US public domain, published
+every business day. It lands in `data/phone_reports.db` (git-ignored) and the store prunes
+itself to `--max-age-days`, default 365.
+
+`deploy/systemd/` carries a timer for the daily run, installed by `install.sh`. The
+initial backfill is roughly 250 requests against a public service and takes several
+minutes, so it stays a deliberate operator action rather than something a timer does on
+your behalf.
+
+This exists because SkipCalls, the phone surface's only other reputation source, was
+measured self-reporting a seven-week-old database and missing 33 of 80 sampled numbers
+that carried 2026 FCC complaints.
+
 ### YARA rules (optional)
 
 NexusTrace ships with no detection rules, so YARA matching is off and the YARA card
