@@ -27,7 +27,6 @@ storage.reset_cache()
 import json                                      # noqa: E402
 
 from app import create_app                       # noqa: E402
-from app.utils import disclosure                 # noqa: E402
 
 
 def check_isolation():
@@ -103,49 +102,20 @@ def csrf_token(client):
     return match.group(1)
 
 
-def notice_block(client, path):
-    """Just the disclosure paragraphs, so a nav link elsewhere on the page cannot
-    make a negative assertion pass or fail by accident."""
-    html = client.get(path).get_data(as_text=True)
-    start = html.index('Sent to third parties:')
-    return html[start:html.index('</div>', start)]
-
-
 def test_notice_on_upload_pages(client):
     print('\nAcceptable-use notice:')
-    pages = {'/url_scan': 'url_scan', '/email_analysis': 'email',
-             '/file_analysis': 'file'}
-    for path, surface in pages.items():
+    # The disclosure notice box was removed from every upload page on request; these
+    # pages should render clean with no trace of it left behind.
+    pages = ['/url_scan', '/email_analysis', '/file_analysis']
+    for path in pages:
         response = client.get(path)
         html = response.get_data(as_text=True)
         ok(response.status_code == 200, f'{path} renders', response.status_code)
-        ok('Do not submit anything you are not authorised to share' in html,
-           f'{path} carries the acceptable-use line')
-        ok('anyone with the link can read any result' in html,
-           f'{path} states there is no login')
-        ok('Sent to third parties:' in html, f'{path} discloses third parties')
-        data = disclosure.for_template(surface)
-        missing = [n for n in data['always'] + data['on_click'] if n not in html]
-        ok(not missing, f'{path} names every disclosed service', missing)
-        ok('Kept:' in html, f'{path} states what is retained')
-        ok(data['sends'] in html,
-           f'{path} states what is transmitted', data['sends'])
-        if data['retention']:
-            ok('30 days' in html, f'{path} states the retention period')
-        print(f'  PASS  {path:16s} {len(data["always"])} destinations, '
-              f'{len(data["on_click"])} pivot targets, all named')
-
-    # base.html's nav links out to VirusTotal and friends, so the negative check has
-    # to look at the notice block itself, not the whole page.
-    ok('VirusTotal' in notice_block(client, '/file_analysis'),
-       'the file notice names VirusTotal')
-    ok('AbuseIPDB' in notice_block(client, '/email_analysis'),
-       'the e-mail notice names AbuseIPDB')
-    scan_notice = notice_block(client, '/url_scan')
-    ok('Team Cymru' in scan_notice, 'the scan notice names Team Cymru')
-    ok('VirusTotal' not in scan_notice,
-       'the scan notice does not claim a provider the scan path never calls')
-    print('  PASS  disclosure differs per surface and matches the registry')
+        ok('Do not submit anything you are not authorised to share'
+           not in html, f'{path} has no acceptable-use line')
+        ok('Sent to third parties:' not in html,
+           f'{path} has no disclosure notice')
+        print(f'  PASS  {path:16s} notice removed, no disclosure rendered')
 
 
 def test_result_pages_and_controls(client):

@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% from "_submit_form.html" import ioc_form, sample_form %}
-{% from "_use_notice.html" import use_notice %}
 
 {% block title %}File Analysis | NexusTrace{% endblock %}
 
@@ -55,8 +54,6 @@
       </label>
       <input type="file" id="sample-file" name="file" class="hidden">
     </div>
-
-    <div class="mt-4">{{ use_notice('file') }}</div>
 
     <div class="flex items-center gap-3 mt-4">
       <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors">
