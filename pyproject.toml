@@ -38,7 +38,7 @@ dependencies = [
     # --no-dev` omits extras, so an extra would be silently missing from the Docker image.
     # RS256 needs `crypto`, which resolves to the cryptography pin pyOpenSSL already brings
     # in above; do not move that pin.
-    "PyJWT[crypto]==2.10.1",
+    "PyJWT[crypto]==2.15.0",
     # Pinned, not a floor: the browser binary is downloaded per-version in the Docker
     # build, so a drifting library version silently mismatches the installed Chromium.
     "playwright==1.61.0",
