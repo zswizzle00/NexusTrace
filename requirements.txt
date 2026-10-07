@@ -47,7 +47,7 @@ colorama==0.4.6
     #   user-scanner
 colorclass==2.2.2
     # via oletools
-cryptography==42.0.8
+cryptography==50.0.0
     # via
     #   msoffcrypto-tool
     #   pyjwt
