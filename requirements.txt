@@ -126,7 +126,7 @@ mdurl==0.1.2
     # via markdown-it-py
 msoffcrypto-tool==6.0.0 ; (platform_python_implementation != 'PyPy' and sys_platform == 'darwin') or (platform_python_implementation != 'PyPy' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'win32')
     # via oletools
-multidict==6.7.1
+multidict==6.9.1
     # via
     #   aiohttp
     #   yarl
