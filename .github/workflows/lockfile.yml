@@ -1,0 +1,33 @@
+name: lockfile
+
+# Dependabot's uv updates edit requirements.txt without touching uv.lock, and the
+# next `uv export` then silently reverts them. Fail the PR instead.
+on:
+  pull_request:
+  push:
+    branches: [latest-version]
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv stopped publishing moving major tags after v7, so pin the release commit.
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          # Must match the uv that generated requirements.txt: uv releases format
+          # markers differently (0.13 shortened msoffcrypto-tool's), and any text
+          # change fails the diff below.
+          version: "0.13.5"
+      - name: uv.lock matches pyproject.toml
+        run: uv lock --check
+      - name: requirements.txt matches uv.lock
+        run: |
+          uv export --no-dev --no-hashes -o requirements.txt
+          git diff --exit-code requirements.txt || {
+            echo "::error file=requirements.txt::out of sync with uv.lock; run: uv lock && uv export --no-dev --no-hashes -o requirements.txt"
+            exit 1
+          }
