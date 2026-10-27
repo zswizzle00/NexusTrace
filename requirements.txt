@@ -62,7 +62,7 @@ et-xmlfile==2.0.0
     # via openpyxl
 filelock==4.2.4
     # via tldextract
-flask==3.0.2
+flask==3.1.3
     # via
     #   flask-wtf
     #   nexustrace
@@ -80,7 +80,7 @@ geoip2==4.8.0
     # via nexustrace
 greenlet==3.5.3
     # via playwright
-gunicorn==21.2.0
+gunicorn==26.2.0
     # via nexustrace
 h11==0.16.0
     # via httpcore
@@ -103,12 +103,12 @@ idna==3.18
     #   yarl
 ipinfo==2.0.0
     # via nexustrace
-itsdangerous==2.1.2
+itsdangerous==2.2.0
     # via
     #   flask
     #   flask-wtf
     #   nexustrace
-jinja2==3.1.3
+jinja2==3.1.6
     # via
     #   flask
     #   nexustrace
@@ -116,6 +116,7 @@ markdown-it-py==4.2.0
     # via rich
 markupsafe==2.1.5
     # via
+    #   flask
     #   jinja2
     #   nexustrace
     #   werkzeug
@@ -148,8 +149,6 @@ openpyxl==3.1.2
     #   sherlock-project
 otxv2==1.5.12
     # via nexustrace
-packaging==26.2
-    # via gunicorn
 pandas==2.2.1
     # via
     #   nexustrace
@@ -158,7 +157,7 @@ pcodedmp==1.2.6
     # via oletools
 phonenumbers==9.0.39
     # via nexustrace
-pillow==11.2.1
+pillow==13.0.0
     # via nexustrace
 playwright==1.61.0
     # via nexustrace
@@ -187,7 +186,7 @@ python-dateutil==2.8.2
     #   nexustrace
     #   otxv2
     #   pandas
-python-dotenv==1.0.1
+python-dotenv==1.2.4
     # via nexustrace
 python-json-logger==2.0.7
     # via nexustrace
@@ -198,7 +197,7 @@ pytz==2024.1
     #   nexustrace
     #   otxv2
     #   pandas
-requests==2.31.0
+requests==2.34.2
     # via
     #   geoip2
     #   ipinfo
@@ -252,7 +251,7 @@ urllib3==2.8.0
     #   requests
 user-scanner==1.5.2
     # via nexustrace
-werkzeug==3.0.1
+werkzeug==3.1.9
     # via
     #   flask
     #   nexustrace
