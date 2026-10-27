@@ -80,4 +80,7 @@ EXPOSE 5050
 # injects PORT=8080 and fails the startup probe if the container listens elsewhere, while
 # Compose sets FLASK_PORT=5050. `exec` keeps gunicorn as PID 1 so SIGTERM still reaches it.
 # Precedence here must match main.py:resolve_port().
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-${FLASK_PORT:-5050}} --workers 1 --threads 8 --worker-class gthread --timeout 120 main:app"]
+#
+# gunicorn 25.1+ opens a control socket in $HOME by default that accepts shutdown, reload and
+# worker commands. Nothing here uses it, so it stays off.
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-${FLASK_PORT:-5050}} --workers 1 --threads 8 --worker-class gthread --timeout 120 --no-control-socket main:app"]
