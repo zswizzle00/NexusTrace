@@ -54,7 +54,7 @@ cryptography==50.0.2
     #   pyopenssl
 curl-cffi==0.16.3
     # via user-scanner
-dnspython==2.6.1
+dnspython==2.9.0
     # via nexustrace
 easygui==0.98.3
     # via oletools
