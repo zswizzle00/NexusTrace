@@ -226,14 +226,24 @@ def test_a_success_is_memoized():
 # ------------------------------------------------------------------- rendering
 
 def _render(**overrides):
+    """The rendered page with whitespace collapsed.
+
+    Flattening is not cosmetic. The templates wrap their prose, so a contiguous-string
+    assertion against raw HTML can miss a caveat that is present but split across two
+    lines. That is merely annoying for an `in` assertion and dangerous for a `not in`
+    one: `check('no archive history' not in body)` would pass silently the moment the
+    template reflowed, while the card said exactly the wrong thing.
+    """
     from app import create_app
     app = create_app()
     context = dict(indicator='x', error=None, card_count=1, alienvault=None,
                    domain_info=None, url_analysis=None, whois_info=None, abuseipdb=None,
-                   tf_env=None, uh_env=None, greynoise=None, registration=None, archive=None)
+                   tf_env=None, uh_env=None, greynoise=None, registration=None,
+                   archive=None, internetdb=None, stopforumspam=None, ripestat=None)
     context.update(overrides)
     with app.test_request_context('/'):
-        return app.jinja_env.get_template('analyze_result.html').render(**context)
+        return ' '.join(
+            app.jinja_env.get_template('analyze_result.html').render(**context).split())
 
 
 def test_a_failed_archive_lookup_never_reads_as_no_history():
@@ -279,6 +289,121 @@ def test_not_observed_does_not_read_as_clean():
           'the not-observed card is missing its caveat and reads as an all-clear')
 
 
+
+# ------------------------------------------- Shodan InternetDB and StopForumSpam
+
+def test_internetdb_maps_the_fields_that_matter():
+    payload = {'ip': '185.220.101.1', 'ports': [443, 80, 9001], 'hostnames': ['exit.example'],
+               'tags': ['tor', 'self-signed'], 'vulns': ['CVE-2021-44228'],
+               'cpes': ['cpe:/a:f5:nginx']}
+    result = ip_service.map_internetdb_response(payload)
+    check(result['ports'] == [80, 443, 9001], f'ports not sorted: {result["ports"]}')
+    check(result['tags'] == ['tor', 'self-signed'], 'tags lost')
+    check(result['vulns'] == ['CVE-2021-44228'], 'CVE list lost')
+    check(result['port_count'] == 3, 'port_count wrong')
+
+
+def test_internetdb_maps_an_empty_record_to_nothing():
+    """Shodan returns a well-formed record with every list empty for an address it has
+    indexed but learned nothing about. A card saying "ports: none, tags: none" is noise."""
+    empty = {'ip': '1.2.3.4', 'ports': [], 'hostnames': [], 'tags': [], 'vulns': [], 'cpes': []}
+    check(ip_service.map_internetdb_response(empty) is None,
+          'an all-empty InternetDB record produced a card')
+    check(ip_service.map_internetdb_response('junk') is None, 'junk did not map to None')
+
+
+def test_internetdb_caps_its_lists():
+    """The record is rendered and may be stored. A host with 900 open ports must not
+    produce a 900-entry row."""
+    payload = {'ports': list(range(1, 900)), 'hostnames': [f'h{i}.test' for i in range(80)],
+               'vulns': [f'CVE-2024-{i:05d}' for i in range(200)], 'tags': [], 'cpes': []}
+    result = ip_service.map_internetdb_response(payload)
+    check(len(result['ports']) <= ip_service.MAX_PORTS, 'port list not capped')
+    check(len(result['hostnames']) <= ip_service.MAX_HOSTNAMES, 'hostname list not capped')
+    check(len(result['vulns']) <= ip_service.MAX_VULNS, 'CVE list not capped')
+    check(result['port_count'] == 899,
+          'the true count was lost when the list was capped, so the card cannot say '
+          '"and N more"')
+
+
+def test_stopforumspam_keeps_the_tor_exit_flag():
+    """The reason this source is here. NexusTrace has no other independent Tor signal."""
+    payload = {'success': 1, 'ip': {'value': '185.220.101.1', 'appears': 1, 'frequency': 91,
+                                    'lastseen': '2026-09-19 20:09:07', 'torexit': 1,
+                                    'asn': 60729, 'country': 'de', 'confidence': 95.29}}
+    result = ip_service.map_stopforumspam_response(payload)
+    check(result['tor_exit'] is True, 'the Tor exit flag was lost')
+    check(result['frequency'] == 91, 'the report count was lost')
+    check(result['country'] == 'DE', f'country not upper-cased: {result["country"]!r}')
+    check(result['confidence'] == 95.3, f'confidence not rounded: {result["confidence"]}')
+
+
+def test_stopforumspam_says_nothing_about_a_clean_address():
+    """appears 0 and no Tor flag is not a finding, so it must not render a card that
+    invites an analyst to read one."""
+    payload = {'success': 1, 'ip': {'value': '8.8.8.8', 'frequency': 0, 'appears': 0,
+                                    'asn': 15169, 'country': 'us'}}
+    check(ip_service.map_stopforumspam_response(payload) is None,
+          'a clean address produced a StopForumSpam card')
+    check(ip_service.map_stopforumspam_response({'success': 0}) is None,
+          'an unsuccessful response produced a card')
+
+
+def test_a_tor_exit_renders_both_signals():
+    body = _render(internetdb={'ports': [9001], 'port_count': 1, 'hostnames': [],
+                               'hostname_count': 0, 'vulns': [], 'vuln_count': 0,
+                               'tags': ['tor'], 'cpes': []},
+                   stopforumspam={'appears': True, 'frequency': 91,
+                                  'last_seen': '2026-09-19 20:09:07', 'tor_exit': True,
+                                  'country': 'DE', 'asn': 60729, 'confidence': 95.3})
+    check('Known Tor exit node' in body, 'the Tor exit flag did not reach the page')
+    check('narrower than' in body,
+          'the forum-spam card is missing its scope caveat, so the count over-reads')
+
+
+def test_internetdb_cves_are_leads_not_findings():
+    """Shodan matches CVEs against a detected software VERSION. A backported patch keeps
+    the version string, so presenting these as confirmed findings would be wrong."""
+    body = _render(internetdb={'ports': [443], 'port_count': 1, 'hostnames': [],
+                               'hostname_count': 0, 'vulns': ['CVE-2021-44228'],
+                               'vuln_count': 1, 'tags': [], 'cpes': []})
+    check('CVE-2021-44228' in body, 'the CVE did not render')
+    check('leads to check' in body, 'the CVE caveat about version matching is missing')
+
+
+
+def test_ripestat_extracts_the_abuse_contact():
+    """The question nothing else in this app answers: who do I report this to."""
+    payload = {'data': {'abuse_contacts': ['abuse@artikel10.org'],
+                        'authoritative_rir': 'ripe'}}
+    result = ip_service.map_ripestat_abuse(payload)
+    check(result['contacts'] == ['abuse@artikel10.org'], 'the contact was lost')
+    check(result['rir'] == 'RIPE', f'rir not upper-cased: {result["rir"]!r}')
+
+
+def test_ripestat_with_no_contact_renders_nothing():
+    """RIPE returns a well-formed response with an empty list for an address whose
+    holder registered no abuse mailbox. An empty card would be noise."""
+    for payload in ({'data': {'abuse_contacts': []}}, {'data': {}}, {}, 'junk',
+                    {'data': {'abuse_contacts': ['not-an-address']}}):
+        check(ip_service.map_ripestat_abuse(payload) is None,
+              f'{payload!r} produced an abuse-contact card')
+
+
+def test_the_abuse_contact_is_not_presented_as_evidence():
+    """A reputable host and a bulletproof one both register an abuse mailbox, so the
+    presence of a contact must not read as a finding about the address."""
+    body = _render(ripestat={'contacts': ['abuse@example.net'], 'rir': 'RIPE'})
+    flat = body
+    check('abuse@example.net' in body, 'the contact did not reach the page')
+    check('says nothing about the address' in flat,
+          'the abuse-contact card is missing its caveat')
+    card = flat.split('Abuse Contact')[-1][:900]
+    for verdict in ('malicious', 'suspicious', 'Malicious', 'Suspicious'):
+        check(verdict not in card,
+              f'the abuse-contact card rendered a verdict word: {verdict!r}')
+
+
 def main():
     test_a_404_is_the_not_observed_answer()
     test_a_known_scanner_keeps_its_actor_name()
@@ -297,6 +422,16 @@ def main():
     test_a_genuinely_unarchived_domain_says_so()
     test_greynoise_renders_without_any_other_ip_source()
     test_not_observed_does_not_read_as_clean()
+    test_internetdb_maps_the_fields_that_matter()
+    test_internetdb_maps_an_empty_record_to_nothing()
+    test_internetdb_caps_its_lists()
+    test_stopforumspam_keeps_the_tor_exit_flag()
+    test_stopforumspam_says_nothing_about_a_clean_address()
+    test_a_tor_exit_renders_both_signals()
+    test_internetdb_cves_are_leads_not_findings()
+    test_ripestat_extracts_the_abuse_contact()
+    test_ripestat_with_no_contact_renders_nothing()
+    test_the_abuse_contact_is_not_presented_as_evidence()
 
     if failures:
         print('FAIL:')

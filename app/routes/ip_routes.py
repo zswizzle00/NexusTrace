@@ -8,6 +8,9 @@ from ..services.ip_service import (
     get_shodan_info,
     get_proxycheck_data,
     get_greynoise_data,
+    get_internetdb_data,
+    get_stopforumspam_data,
+    get_ripestat_abuse,
     get_alienvault_data,
     get_vpn_data
 )
@@ -65,6 +68,21 @@ def check_ip():
             results['greynoise'] = None
 
         try:
+            results['internetdb'] = get_internetdb_data(ip_address)
+        except Exception:
+            results['internetdb'] = None
+
+        try:
+            results['stopforumspam'] = get_stopforumspam_data(ip_address)
+        except Exception:
+            results['stopforumspam'] = None
+
+        try:
+            results['ripestat'] = get_ripestat_abuse(ip_address)
+        except Exception:
+            results['ripestat'] = None
+
+        try:
             results['alienvault'] = get_alienvault_data(ip_address)
         except Exception as e:
             results['alienvault'] = None
@@ -81,6 +99,12 @@ def check_ip():
             result.update(results['proxycheck'])
         if results['greynoise']:
             result['greynoise'] = results['greynoise']
+        if results['internetdb']:
+            result['internetdb'] = results['internetdb']
+        if results['stopforumspam']:
+            result['stopforumspam'] = results['stopforumspam']
+        if results['ripestat']:
+            result['ripestat'] = results['ripestat']
         if results['alienvault']:
             result['alienvault'] = results['alienvault']
         

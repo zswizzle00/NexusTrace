@@ -25,6 +25,10 @@ shodan_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=1))
 ipapi_limiter = RateLimiter(max_requests=1, time_window=timedelta(seconds=2))
 # Keyless and undocumented, so this is a courtesy limit rather than a published one.
 greynoise_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+# Both keyless and neither publishes a limit, so these are courtesy figures.
+internetdb_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+sfs_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
+ripestat_limiter = RateLimiter(max_requests=2, time_window=timedelta(seconds=1))
 
 
 class _LookupUnavailable(Exception):
@@ -632,5 +636,217 @@ def get_greynoise_data(*args, **kwargs):
     failure is never memoized; see _LookupUnavailable."""
     try:
         return _get_greynoise_data(*args, **kwargs)
+    except _LookupUnavailable:
+        return None
+
+
+INTERNETDB_URL = 'https://internetdb.shodan.io/{ip}'
+STOPFORUMSPAM_URL = 'https://api.stopforumspam.org/api'
+
+MAX_PORTS = 40
+MAX_HOSTNAMES = 10
+MAX_VULNS = 25
+
+
+def map_internetdb_response(payload):
+    """Map Shodan's keyless InternetDB to a card, or None when it says nothing.
+
+    This is the same data source as `get_shodan_info` above but needs **no API key**, so
+    it answers on a deployment that has configured nothing. It is thinner than the keyed
+    API: no banners, no timestamps, no per-port detail. That is the trade and the card
+    should not imply otherwise.
+
+    `tags` is the most useful field and is Shodan's own vocabulary, kept verbatim: `tor`,
+    `self-signed`, `cloud`, `cdn`, `honeypot` and so on. A tag is an observation about
+    the host, not a verdict about a connection.
+    """
+    if not isinstance(payload, dict):
+        return None
+    ports = [p for p in (payload.get('ports') or []) if isinstance(p, int)]
+    hostnames = [h for h in (payload.get('hostnames') or []) if isinstance(h, str)]
+    vulns = [v for v in (payload.get('vulns') or []) if isinstance(v, str)]
+    tags = [g for g in (payload.get('tags') or []) if isinstance(g, str)]
+    cpes = [c for c in (payload.get('cpes') or []) if isinstance(c, str)]
+    if not any((ports, hostnames, vulns, tags, cpes)):
+        return None
+    return {
+        'ports': sorted(ports)[:MAX_PORTS],
+        'port_count': len(ports),
+        'hostnames': hostnames[:MAX_HOSTNAMES],
+        'hostname_count': len(hostnames),
+        'vulns': sorted(vulns)[:MAX_VULNS],
+        'vuln_count': len(vulns),
+        'tags': tags,
+        'cpes': cpes[:MAX_HOSTNAMES],
+    }
+
+
+@timed_lru_cache(seconds=1800)
+def _get_internetdb_data(ip_address, transport=None):
+    """Cached inner lookup. Raises rather than returning None on a transient failure so
+    nothing memoizes it; callers use get_internetdb_data."""
+    if not internetdb_limiter.try_acquire():
+        logger.debug('InternetDB rate limit reached for %s', ip_address)
+        raise _LookupUnavailable()
+    try:
+        response = (transport or requests.get)(
+            INTERNETDB_URL.format(ip=ip_address),
+            timeout=TIMEOUT_SHORT,
+            headers={'User-Agent': 'NexusTrace/1.0', 'Accept': 'application/json'},
+        )
+        # 404 is "nothing indexed for this address", an ordinary answer for most of the
+        # internet. It carries no useful body, so it maps to no card rather than an error.
+        if response.status_code == 404:
+            raise _LookupUnavailable()
+        if response.status_code != 200:
+            raise _LookupUnavailable()
+        return map_internetdb_response(response.json())
+    except _LookupUnavailable:
+        raise
+    except requests.Timeout:
+        logger.warning('InternetDB lookup timed out for %s', ip_address)
+    except Exception as exc:
+        logger.debug('InternetDB lookup failed for %s: %s', ip_address, exc)
+    raise _LookupUnavailable()
+
+
+def get_internetdb_data(*args, **kwargs):
+    """Uncached wrapper; see _LookupUnavailable."""
+    try:
+        return _get_internetdb_data(*args, **kwargs)
+    except _LookupUnavailable:
+        return None
+
+
+def map_stopforumspam_response(payload):
+    """Map a StopForumSpam response, or None when it has nothing to say.
+
+    Scope matters and the card has to state it: this is **forum and comment spam**
+    reported by site operators, which is a narrower thing than AbuseIPDB's general abuse
+    reporting. An address absent here has not been cleared of anything.
+
+    `torexit` is the reason this source earns its place. It is an independent Tor exit
+    signal, and NexusTrace has no other.
+    """
+    if not isinstance(payload, dict) or not payload.get('success'):
+        return None
+    entry = payload.get('ip')
+    if not isinstance(entry, dict):
+        return None
+    appears = bool(entry.get('appears'))
+    tor_exit = bool(entry.get('torexit'))
+    if not appears and not tor_exit:
+        return None
+    confidence = entry.get('confidence')
+    return {
+        'appears': appears,
+        'frequency': entry.get('frequency') or 0,
+        'last_seen': entry.get('lastseen'),
+        'tor_exit': tor_exit,
+        'country': (entry.get('country') or '').upper() or None,
+        'asn': entry.get('asn'),
+        'confidence': round(confidence, 1) if isinstance(confidence, (int, float)) else None,
+    }
+
+
+@timed_lru_cache(seconds=1800)
+def _get_stopforumspam_data(ip_address, transport=None):
+    if not sfs_limiter.try_acquire():
+        logger.debug('StopForumSpam rate limit reached for %s', ip_address)
+        raise _LookupUnavailable()
+    try:
+        response = (transport or requests.get)(
+            STOPFORUMSPAM_URL,
+            params={'ip': ip_address, 'json': ''},
+            timeout=TIMEOUT_SHORT,
+            headers={'User-Agent': 'NexusTrace/1.0'},
+        )
+        if response.status_code != 200:
+            raise _LookupUnavailable()
+        return map_stopforumspam_response(response.json())
+    except _LookupUnavailable:
+        raise
+    except requests.Timeout:
+        logger.warning('StopForumSpam lookup timed out for %s', ip_address)
+    except Exception as exc:
+        logger.debug('StopForumSpam lookup failed for %s: %s', ip_address, exc)
+    raise _LookupUnavailable()
+
+
+def get_stopforumspam_data(*args, **kwargs):
+    """Uncached wrapper; see _LookupUnavailable."""
+    try:
+        return _get_stopforumspam_data(*args, **kwargs)
+    except _LookupUnavailable:
+        return None
+
+
+RIPESTAT_ABUSE_URL = 'https://stat.ripe.net/data/abuse-contact-finder/data.json'
+
+MAX_ABUSE_CONTACTS = 5
+
+
+def map_ripestat_abuse(payload):
+    """Abuse contacts for an address, or None when RIPE knows of none.
+
+    This answers a question nothing else in this app does: **who do I report this to.**
+    Every other IP source says what an address has been seen doing; this one says who is
+    responsible for it. That is the difference between triage and being able to act.
+
+    The contact is the one the resource holder registered with their RIR, which is the
+    correct place to send a report. It is not evidence about the address: a reputable
+    hosting provider and a bulletproof one both have an abuse mailbox.
+    """
+    if not isinstance(payload, dict):
+        return None
+    data = payload.get('data')
+    if not isinstance(data, dict):
+        return None
+    contacts = [c for c in (data.get('abuse_contacts') or [])
+                if isinstance(c, str) and '@' in c]
+    if not contacts:
+        return None
+    return {
+        'contacts': contacts[:MAX_ABUSE_CONTACTS],
+        'rir': (data.get('authoritative_rir') or '').upper() or None,
+    }
+
+
+@timed_lru_cache(seconds=3600, maxsize=500)
+def _get_ripestat_abuse(ip_address, transport=None):
+    """Cached inner lookup. Raises rather than returning None on a transient failure so
+    nothing memoizes it; callers use get_ripestat_abuse.
+
+    An hour, not the usual half: an abuse contact is a registry record that changes on
+    the scale of months, and RIPEstat's latency is uneven enough that a cached answer is
+    worth holding. Its prefix-overview endpoint timed out at 20s during development while
+    this one answered in well under a second, which is why only this endpoint is used.
+    """
+    if not ripestat_limiter.try_acquire():
+        logger.debug('RIPEstat rate limit reached for %s', ip_address)
+        raise _LookupUnavailable()
+    try:
+        response = (transport or requests.get)(
+            RIPESTAT_ABUSE_URL,
+            params={'resource': ip_address, 'sourceapp': 'NexusTrace'},
+            timeout=TIMEOUT_MEDIUM,
+            headers={'User-Agent': 'NexusTrace/1.0'},
+        )
+        if response.status_code != 200:
+            raise _LookupUnavailable()
+        return map_ripestat_abuse(response.json())
+    except _LookupUnavailable:
+        raise
+    except requests.Timeout:
+        logger.warning('RIPEstat lookup timed out for %s', ip_address)
+    except Exception as exc:
+        logger.debug('RIPEstat lookup failed for %s: %s', ip_address, exc)
+    raise _LookupUnavailable()
+
+
+def get_ripestat_abuse(*args, **kwargs):
+    """Uncached wrapper; see _LookupUnavailable."""
+    try:
+        return _get_ripestat_abuse(*args, **kwargs)
     except _LookupUnavailable:
         return None
