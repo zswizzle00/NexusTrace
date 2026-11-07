@@ -136,6 +136,16 @@ def create_app():
 
     app.csrf = csrf
 
+    # Probe blocking and per-IP throttling for the internet-facing process. Installed before
+    # the activity log so its before_request runs first; the short-circuited response still
+    # passes through activity's after_request and is recorded.
+    if app.config['NEXUSTRACE_ROLE'] != ROLE_ADMIN:
+        try:
+            from app.utils import abuse_guard
+            abuse_guard.install(app)
+        except Exception:
+            logger.exception('Abuse guard is disabled: install failed')
+
     # Request activity log. There is no authentication on the browser routes and the
     # deployment is publicly reachable through a Cloudflare Tunnel, so this is the only
     # record of who used the app and what they did. Imported and installed defensively:
