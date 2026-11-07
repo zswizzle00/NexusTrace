@@ -23,12 +23,10 @@ tools/
 .git
 .gitignore
 
-# Deployment manifests. service.yaml is applied from the developer's machine, never read
-# by the container, and it names the project's service account and secrets.
+# Deployment manifests, never read by the container.
 Dockerfile
 docker-compose.yml
 .dockerignore
-service.yaml
 nginx.conf
 
 # Logs
