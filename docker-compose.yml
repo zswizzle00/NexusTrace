@@ -1,3 +1,11 @@
+# Docker's json-file driver keeps container output forever by default. nginx logs every
+# request, scanners included, so cap each container at 3 x 10 MB.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   web:
     build: .
@@ -15,6 +23,7 @@ services:
       - FLASK_HOST=0.0.0.0
       - FLASK_PORT=5050
     restart: always
+    logging: *default-logging
     # Python, not curl: the slim image has none.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5050/api/health', timeout=5).status==200 else 1)"]
@@ -49,6 +58,7 @@ services:
       # the loopback publish above is what limits who can connect.
       - FLASK_PORT=5051
     restart: always
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5051/api/health', timeout=5).status==200 else 1)"]
       interval: 30s
@@ -70,6 +80,7 @@ services:
       web:
         condition: service_healthy
     restart: always
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
