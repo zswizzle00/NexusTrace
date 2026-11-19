@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-6">
+
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">Sign in</h1>
+    <p class="text-sm text-gray-400">
+      Sign in to save your own VirusTotal API key. Hash, file and e-mail lookups then use
+      your key and your quota.
+    </p>
+  </div>
+
+  {% include "_account_flashes.html" %}
+
+  <div class="nt-card p-5">
+    {% for name, label in providers %}
+    <a href="{{ url_for('account.login', provider=name) }}"
+       class="block w-full text-center mb-3 px-4 py-2 rounded bg-blue-700 hover:bg-blue-600 text-white font-medium">
+      Sign in with {{ label }}
+    </a>
+    {% endfor %}
+    <p class="text-xs text-gray-500 mt-2">
+      NexusTrace stores only your {{ providers | map('last') | join(' or ') }} user ID and
+      display name, plus any key you save. It never sees your password or e-mail address.
+      Saved keys are encrypted and are never shown again after you save them.
+    </p>
+  </div>
+</div>
+{% endblock %}

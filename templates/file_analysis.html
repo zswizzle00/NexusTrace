@@ -270,7 +270,11 @@
             <td class="py-2 pr-4 {{ colour }} whitespace-nowrap">{{ label }}</td>
             <td class="py-2 pr-4 text-gray-500 break-all">
               {% if state in ['skipped'] and info.get('key_env') %}
+                {% if info.get('key_env') == 'VIRUSTOTAL_API_KEY' and accounts_enabled %}
+                <a href="{{ url_for('account.account') }}" class="text-blue-400 hover:underline">Sign in and save your VirusTotal key</a> to include it
+                {% else %}
                 {{ info.get('key_env') }} not configured
+                {% endif %}
               {% elif state in ['skipped'] %}
                 API key not configured
               {% elif state == 'rate_limited' %}

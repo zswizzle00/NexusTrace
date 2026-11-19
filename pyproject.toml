@@ -37,7 +37,8 @@ dependencies = [
     # A base dependency, not an extra: /admin's authorization depends on it and `uv export
     # --no-dev` omits extras, so an extra would be silently missing from the Docker image.
     # RS256 needs `crypto`, which resolves to the cryptography pin pyOpenSSL already brings
-    # in above; do not move that pin.
+    # in above; do not move that pin. app/utils/accounts.py also imports cryptography
+    # (Fernet) through this same requirement.
     "PyJWT[crypto]==2.15.0",
     # Pinned, not a floor: the browser binary is downloaded per-version in the Docker
     # build, so a drifting library version silently mismatches the installed Chromium.

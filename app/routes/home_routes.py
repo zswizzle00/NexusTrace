@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 from app.services.hash_service import get_hash_info_quick, has_reputation_record, unknown_hash_report
+from app.utils.accounts import virustotal_key
 from app.services.ip_service import get_ipinfo_data, get_shodan_info, check_abuseipdb, get_vpn_data, get_proxycheck_data, get_alienvault_data, get_ip2location_data, get_ipapi_data
 from app.services.domain_service import get_domain_info
 from app.services.url_service import analyze_url_quick
@@ -134,8 +135,10 @@ def _run_analysis(indicator):
     logger.debug(f"indicator_type: {indicator_type}")
 
     if indicator_type == 'hash':
+        # Resolved here: the lambdas run in a thread pool, which has no session.
+        vt_key = virustotal_key()
         raw = _run_parallel({
-            'hash_info':     lambda: get_hash_info_quick(indicator),
+            'hash_info':     lambda: get_hash_info_quick(indicator, vt_key=vt_key),
             'alienvault_raw': lambda: get_alienvault_data(indicator),
         }, max_workers=2, label='Hash')
         hash_info = raw.get('hash_info')

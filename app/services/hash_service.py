@@ -2,6 +2,8 @@ import os
 import re
 import requests
 import logging
+import threading
+from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -10,6 +12,7 @@ import dns.resolver
 
 from . import abusech
 from ..utils import hash_reputation
+from ..utils.accounts import SHARED_KEY, ProviderKey, shared_virustotal_key
 from ..utils.cache import timed_lru_cache
 from ..utils.rate_limiter import RateLimiter
 from ..utils.constants import TIMEOUT_SHORT, TIMEOUT_MEDIUM
@@ -18,6 +21,13 @@ from datetime import timedelta
 logger = logging.getLogger(__name__)
 
 virustotal_limiter = RateLimiter(max_requests=4, time_window=timedelta(minutes=1))  # VT free tier: 4/min
+
+# One limiter per user key, so a user spends only their own quota and the shared key's
+# limiter never throttles them. Bounded so an endless stream of keys cannot grow it.
+_user_limiters = OrderedDict()
+_user_limiters_lock = threading.Lock()
+MAX_USER_LIMITERS = 1000
+
 
 # The two keyless sources. Both are free community services, so both get a limiter even
 # though neither publishes a limit.
@@ -96,11 +106,46 @@ def reference_links(hash_value: str) -> Dict[str, str]:
     }
 
 
+def _limiter_for(vt_key: ProviderKey) -> RateLimiter:
+    if vt_key.owner != 'user':
+        return virustotal_limiter
+    with _user_limiters_lock:
+        limiter = _user_limiters.get(vt_key.fingerprint)
+        if limiter is None:
+            limiter = RateLimiter(max_requests=4, time_window=timedelta(minutes=1))
+            _user_limiters[vt_key.fingerprint] = limiter
+            while len(_user_limiters) > MAX_USER_LIMITERS:
+                _user_limiters.popitem(last=False)
+        else:
+            _user_limiters.move_to_end(vt_key.fingerprint)
+        return limiter
+
+
+def _resolve_key(vt_key):
+    return shared_virustotal_key() if vt_key is SHARED_KEY else vt_key
+
+
+def verify_virustotal_key(value: str, transport=None) -> str:
+    """'ok', 'invalid' (VirusTotal refused the key) or 'unavailable' (no answer either
+    way). Reads the key's own user record, the cheapest call that proves the key works."""
+    try:
+        response = (transport or _get)(
+            f'https://www.virustotal.com/api/v3/users/{value}',
+            headers={'x-apikey': value}, timeout=TIMEOUT_MEDIUM)
+    except requests.RequestException:
+        return 'unavailable'
+    if response.status_code == 200:
+        return 'ok'
+    if response.status_code in (401, 403, 404):
+        return 'invalid'
+    return 'unavailable'
+
+
 @timed_lru_cache(seconds=1800, maxsize=500)
-def _virustotal_report(hash_value: str, transport=None) -> Optional[Dict]:
-    api_key = os.getenv('VIRUSTOTAL_API_KEY')
-    if not api_key:
-        logger.debug("VIRUSTOTAL_API_KEY not configured")
+def _virustotal_report(hash_value: str, transport=None,
+                       vt_key: Optional[ProviderKey] = None) -> Optional[Dict]:
+    if vt_key is None:
+        logger.debug("No VirusTotal key for this request")
         return None
 
     # try_acquire, not acquire: the window is a whole minute, so blocking here parks a
@@ -109,13 +154,13 @@ def _virustotal_report(hash_value: str, transport=None) -> Optional[Dict]:
     # answer must not be cached for the 30-minute TTL, or the hash would keep reporting
     # `rate_limited` long after the quota freed. It also means a cache *hit* never reaches
     # the limiter, so a repeated lookup does not burn a token.
-    if not virustotal_limiter.try_acquire():
+    if not _limiter_for(vt_key).try_acquire():
         raise _QuotaExhausted()
 
     try:
         response = (transport or _get)(
             f'https://www.virustotal.com/api/v3/files/{hash_value}',
-            headers={'x-apikey': api_key},
+            headers={'x-apikey': vt_key.value},
             timeout=TIMEOUT_MEDIUM
         )
 
@@ -180,14 +225,14 @@ def _virustotal_report(hash_value: str, transport=None) -> Optional[Dict]:
         return None
 
 
-def get_virustotal_report(hash_value: str, transport=None) -> Optional[Dict]:
+def get_virustotal_report(hash_value: str, transport=None, vt_key=SHARED_KEY) -> Optional[Dict]:
     """`rate_limited` is a fifth state alongside `found` / `no_record` / `skipped` /
     `unavailable`, and is deliberately none of them: `skipped` means no key and no request,
     which says nothing about the hash, whereas this means the key exists and the quota for
     this minute is spent, so the answer is available and will arrive on a retry.
     """
     try:
-        return _virustotal_report(hash_value, transport)
+        return _virustotal_report(hash_value, transport, _resolve_key(vt_key))
     except _QuotaExhausted:
         logger.info("VirusTotal per-minute quota spent; not querying %s", hash_value)
         return {'status': 'rate_limited',
@@ -341,9 +386,19 @@ def get_threatfox_iocs(hash_value: str) -> Optional[Dict]:
     }
 
 
-@timed_lru_cache(seconds=1800, maxsize=500)
 def get_hash_info(hash_value: str, deep_scan: bool = False,
-                  md5: Optional[str] = None) -> Dict:
+                  md5: Optional[str] = None, vt_key=SHARED_KEY) -> Dict:
+    """`vt_key` is the VirusTotal key to use: a `ProviderKey`, None for no VirusTotal
+    lookup, or the default, the operator's shared key. It is resolved here, before the
+    cache, so results are cached per key: a user without a key never sees a VirusTotal
+    answer another user's key paid for, and a user with one never gets a cached 'skipped'.
+    """
+    return _hash_info(hash_value, deep_scan, md5, _resolve_key(vt_key))
+
+
+@timed_lru_cache(seconds=1800, maxsize=500)
+def _hash_info(hash_value: str, deep_scan: bool, md5: Optional[str],
+               vt_key: Optional[ProviderKey]) -> Dict:
     """`deep_scan` waits for every source; otherwise shorter timeouts apply.
 
     `md5` exists only for Cymru MHR, whose zone has no sha256 records: an uploaded file
@@ -365,6 +420,7 @@ def get_hash_info(hash_value: str, deep_scan: bool = False,
     result = {
         'hash': hash_value,
         'type': hash_type,
+        'virustotal_configured': vt_key is not None,
         'sources': {},
         'summary': {
             'is_malicious': False,
@@ -383,7 +439,7 @@ def get_hash_info(hash_value: str, deep_scan: bool = False,
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
-            executor.submit(get_virustotal_report, hash_value): 'virustotal',
+            executor.submit(get_virustotal_report, hash_value, None, vt_key): 'virustotal',
             executor.submit(get_malwarebazaar_report, hash_value): 'malwarebazaar',
             executor.submit(get_threatfox_iocs, hash_value): 'threatfox',
             executor.submit(get_circl_hashlookup, hash_value): CIRCL_SOURCE,
@@ -450,12 +506,12 @@ def get_hash_info(hash_value: str, deep_scan: bool = False,
     return result
 
 
-def get_hash_info_quick(hash_value: str, md5: Optional[str] = None) -> Dict:
-    return get_hash_info(hash_value, deep_scan=False, md5=md5)
+def get_hash_info_quick(hash_value: str, md5: Optional[str] = None, vt_key=SHARED_KEY) -> Dict:
+    return get_hash_info(hash_value, deep_scan=False, md5=md5, vt_key=vt_key)
 
 
-def get_hash_info_deep(hash_value: str, md5: Optional[str] = None) -> Dict:
-    return get_hash_info(hash_value, deep_scan=True, md5=md5)
+def get_hash_info_deep(hash_value: str, md5: Optional[str] = None, vt_key=SHARED_KEY) -> Dict:
+    return get_hash_info(hash_value, deep_scan=True, md5=md5, vt_key=vt_key)
 
 
 # Shared by every hash entry point (GET /i/<hash>, POST /analyze,
@@ -572,9 +628,15 @@ def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_r
     if alienvault_raw is not None:
         otx_status = 'found' if _otx_pulse_count(alienvault_raw) else 'not_found'
 
+    # Whether a key was used comes from the lookup itself, since it may have been a
+    # signed-in user's rather than VIRUSTOTAL_API_KEY. A hash_info without the field (every
+    # lookup failed) falls back to the environment.
+    vt_configured = hash_info.get('virustotal_configured')
+    if vt_configured is None:
+        vt_configured = bool(os.getenv('VIRUSTOTAL_API_KEY'))
     sources = [
         {'name': 'VirusTotal', 'key_env': 'VIRUSTOTAL_API_KEY', 'url': links.get('virustotal'),
-         'state': source_state(bool(os.getenv('VIRUSTOTAL_API_KEY')), status_of('virustotal')),
+         'state': source_state(vt_configured, status_of('virustotal')),
          'detail': None},
         # Both are abuse.ch and share one mandatory key, so both are 'skipped' (not
         # 'unavailable') when it is missing.

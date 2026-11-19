@@ -15,6 +15,7 @@ from flask import (Blueprint, flash, jsonify, render_template, request,
 from werkzeug.utils import secure_filename
 
 from ..services.file_service import analyze_file
+from ..utils.accounts import virustotal_key
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ def _analyze_upload(uploaded, filename):
         os.chmod(temp_path, 0o600)
         logger.info('Analyzing file: %s (%s bytes on disk)',
                     filename, os.path.getsize(temp_path))
-        return analyze_file(temp_path, filename)
+        return analyze_file(temp_path, filename, vt_key=virustotal_key())
     finally:
         try:
             if os.path.exists(temp_path):

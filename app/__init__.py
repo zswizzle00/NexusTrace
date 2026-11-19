@@ -173,6 +173,13 @@ def create_app():
             version = '1'
         return {'asset_v': version}
 
+    @app.context_processor
+    def inject_account():
+        from app.utils import accounts
+        on = accounts.enabled()
+        return {'accounts_enabled': on,
+                'current_account': accounts.current_user() if on else None}
+
     # Prevent HTML pages from being cached so CSRF tokens are never served stale
     @app.after_request
     def set_cache_control(response):

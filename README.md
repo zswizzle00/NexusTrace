@@ -79,6 +79,11 @@ Built for security analysts, incident responders, and researchers who need fast,
 - Records (scans, e-mail analyses) can be deleted on demand from their own result page
 - 30-day default retention for stored analysis records
 
+### Accounts (optional)
+- Sign in with GitHub or Google and save your own VirusTotal API key, so lookups use your
+  quota instead of the shared one. No passwords or e-mail addresses are stored, and saved
+  keys are encrypted. See [`docs/accounts.md`](docs/accounts.md).
+
 ### Programmatic Access
 - **Enrichment API** (`/api/enrich/*`): API-key-authenticated endpoints for IP, domain/URL, and
   batch (up to 20 mixed indicators) lookups, built for SIEM/SOAR and EDR triage pipelines.
@@ -183,6 +188,12 @@ FLASK_PORT=5050
 ```
 
 > **All API keys are optional.** The tool gracefully skips any service whose key is not configured; cards for that service simply won't appear in results. CIRCL hashlookup and Team Cymru MHR need no key at all.
+
+### Accounts (optional)
+
+Set `ACCOUNTS_ENCRYPTION_KEY`, `OAUTH_REDIRECT_BASE` and a GitHub or Google OAuth client
+to let users sign in and bring their own VirusTotal key. `VIRUSTOTAL_SHARED_KEY` decides
+who may still use the deployment's own key. See [`docs/accounts.md`](docs/accounts.md).
 
 ### IPinfo MMDB (optional, offline mode)
 
@@ -403,7 +414,7 @@ uv run gunicorn --bind 0.0.0.0:5050 --workers 1 --threads 8 --worker-class gthre
 ## Caching & Rate Limiting
 
 - **Response cache:** 30-minute TTL, LRU eviction. Repeated lookups for the same indicator return instantly.
-- **Rate limiting:** Per-service sliding window limits (e.g., 2 req/sec for WHOIS and abuse.ch, 4 req/sec for AlienVault and Team Cymru MHR, 4 req/**min** for VirusTotal's free tier). Prevents API key bans under load.
+- **Rate limiting:** Per-service sliding window limits (e.g., 2 req/sec for WHOIS and abuse.ch, 4 req/sec for AlienVault and Team Cymru MHR, 4 req/**min** for VirusTotal's free tier). Prevents API key bans under load. A signed-in user's own VirusTotal key gets its own 4 req/min limit and its own cache entries.
 
 ---
 

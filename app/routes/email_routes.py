@@ -5,6 +5,7 @@ from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 
 from ..services.email_service import analyze_email, get_analysis, save_analysis
+from ..utils.accounts import virustotal_key
 from ..utils.storage import store, validate_key
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def email_analysis_submit():
         return redirect(url_for('email.email_analysis_form'))
 
     try:
-        analysis = analyze_email(raw, source=source)
+        analysis = analyze_email(raw, source=source, vt_key=virustotal_key())
         save_analysis(analysis)
     except Exception:
         logger.exception('E-mail analysis failed')

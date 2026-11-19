@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Account | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+
+  <div class="mb-5 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-100 mb-1">Account</h1>
+      <p class="text-sm text-gray-400">
+        Signed in as <span class="text-gray-200">{{ user.login }}</span>
+        with {{ 'GitHub' if user.provider == 'github' else 'Google' }}.
+      </p>
+    </div>
+    <form method="POST" action="{{ url_for('account.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="px-3 py-1.5 rounded text-sm bg-gray-800 hover:bg-gray-700 text-gray-200">Sign out</button>
+    </form>
+  </div>
+
+  {% include "_account_flashes.html" %}
+
+  <div class="nt-card p-5 mb-5">
+    <h2 class="text-lg font-semibold text-blue-400 mb-2">VirusTotal API key</h2>
+    {% set vt = keys.get('virustotal') %}
+    {% if vt %}
+    <p class="text-sm text-gray-300 mb-3">
+      A key ending in <span class="font-mono text-gray-100">{{ vt.hint }}</span> is saved
+      (since {{ vt.created_at }}). Your hash, file and e-mail lookups use it.
+    </p>
+    <form method="POST" action="{{ url_for('account.delete_virustotal_key') }}" class="mb-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="px-3 py-1.5 rounded text-sm bg-red-900/60 hover:bg-red-800 text-red-200">Remove key</button>
+    </form>
+    <p class="text-xs text-gray-500 mb-2">To replace it, save a new key below.</p>
+    {% else %}
+    <p class="text-sm text-gray-300 mb-3">
+      {% if shared_policy == 'nobody' %}
+      VirusTotal results appear only after you save your own key.
+      {% else %}
+      No key is saved, so lookups use this site's shared key, which is limited to
+      4 lookups a minute for everyone. Save your own key to use your own quota.
+      {% endif %}
+    </p>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('account.save_virustotal_key') }}" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="api_key" class="text-xs text-gray-500 uppercase tracking-wide block mb-1">API key</label>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input id="api_key" name="api_key" type="password" required minlength="64" maxlength="64"
+               spellcheck="false" autocomplete="off"
+               class="flex-1 min-w-0 px-3 py-2 rounded bg-gray-900 border border-gray-700 text-gray-100 font-mono text-sm">
+        <button type="submit" class="px-4 py-2 rounded bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium">Check and save</button>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Find your key on VirusTotal under your profile, then <span class="text-gray-300">API key</span>.
+        NexusTrace checks it with VirusTotal before saving and stores it encrypted.
+      </p>
+    </form>
+  </div>
+
+  <div class="nt-card p-5">
+    <h2 class="text-lg font-semibold text-red-400 mb-2">Delete account</h2>
+    <p class="text-sm text-gray-300 mb-3">Deletes your account and every key you saved. This cannot be undone.</p>
+    <form method="POST" action="{{ url_for('account.delete_account') }}"
+          onsubmit="return confirm('Delete your account and saved keys?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="px-3 py-1.5 rounded text-sm bg-red-900/60 hover:bg-red-800 text-red-200">Delete account</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
