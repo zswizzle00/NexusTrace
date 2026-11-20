@@ -99,3 +99,7 @@ docs/superpowers/*
 !docs/superpowers/specs/
 cleanup-step1-untrack.sh
 cleanup-step2-history-rewrite.sh
+# data/accounts.db holds sign-in identities and encrypted user API keys.
+data/accounts.db
+data/accounts.db-wal
+data/accounts.db-shm

@@ -116,6 +116,12 @@
                             </div>
                         </div>
                     </div>
+                    {% if accounts_enabled %}
+                    <div class="nav-sep" role="separator" aria-hidden="true"></div>
+                    <div class="nav-group">
+                        <a href="{{ url_for('account.account') }}" class="nav-link{% if request.path.startswith('/account') %} active{% endif %}">{{ 'Account' if current_account else 'Sign in' }}</a>
+                    </div>
+                    {% endif %}
                 </nav>
 
                 <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobile-nav">
@@ -137,6 +143,9 @@
                 <a href="/phone_analysis" class="mobile-nav-link">Phone Analysis</a>
                 <a href="/ad_event_search" class="mobile-nav-link">Windows Event Search</a>
                 <a href="/azure_error_search" class="mobile-nav-link">Azure Error Search</a>
+                {% if accounts_enabled %}
+                <a href="{{ url_for('account.account') }}" class="mobile-nav-link">{{ 'Account' if current_account else 'Sign in' }}</a>
+                {% endif %}
                 <div class="mobile-nav-heading">Tools</div>
                 <a href="https://www.virustotal.com/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">VirusTotal</a>
                 <a href="https://www.shodan.io/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Shodan</a>

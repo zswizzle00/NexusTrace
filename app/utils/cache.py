@@ -105,7 +105,7 @@ def clear_caches():
                 hash_service.get_threatfox_iocs,
                 hash_service.get_circl_hashlookup,
                 hash_service.get_cymru_mhr,
-                hash_service.get_hash_info,
+                hash_service._hash_info,
                 abusech.threatfox_lookup,
                 abusech.threatfox_hash,
                 abusech.urlhaus_host,

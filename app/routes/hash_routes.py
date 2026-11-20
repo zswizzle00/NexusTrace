@@ -5,6 +5,7 @@ from ..services.hash_service import (
 )
 from ..services.ip_service import get_alienvault_data
 from app.utils.parsers import parse_alienvault_otx
+from app.utils.accounts import virustotal_key
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,8 @@ def check_hash():
         if not hash_value:
             return jsonify({'error': 'Hash is required'}), 400
 
-        hash_info = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
+        lookup = get_hash_info_deep if deep_scan else get_hash_info_quick
+        hash_info = lookup(hash_value, vt_key=virustotal_key())
 
         if 'error' in hash_info:
             return jsonify(hash_info), 400
@@ -45,7 +47,8 @@ def analyze_hash():
         if not hash_value:
             error = 'Hash is required'
         else:
-            result = get_hash_info_deep(hash_value) if deep_scan else get_hash_info_quick(hash_value)
+            lookup = get_hash_info_deep if deep_scan else get_hash_info_quick
+            result = lookup(hash_value, vt_key=virustotal_key())
 
             if result.get('error'):
                 # Bad hash format: a real input error, not an unknown hash.

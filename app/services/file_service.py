@@ -29,6 +29,7 @@ from ..utils.file_inspect import (
 from ..utils.iocs import extract_iocs
 from ..utils.lnk_parse import analyze_lnk
 from .hash_service import (
+    SHARED_KEY,
     get_hash_info_quick,
     reference_links,
     unknown_hash_report,
@@ -199,12 +200,13 @@ def looks_like_lnk(magic_type, filename):
     return magic_type == 'LNK' or file_extension(filename) == 'lnk'
 
 
-def reputation_report(sha256, md5=None):
+def reputation_report(sha256, md5=None, vt_key=SHARED_KEY):
     """Exactly one `get_hash_info_quick` call plus OTX. Embedded executables are **not**
-    looked up: `virustotal_limiter` is a process-wide 4-per-minute limiter, so a per-hit
-    loop would spend the whole minute's quota on one upload and leave concurrent
-    /hash_analysis users with `rate_limited` (see the MAX_ENRICH_HASHES note in
-    email_service.py).
+    looked up: VirusTotal allows each key 4 lookups a minute, so a per-hit loop would
+    spend the whole minute's quota on one upload and leave the key's other lookups with
+    `rate_limited` (see the MAX_ENRICH_HASHES note in email_service.py).
+
+    `vt_key` is as for `hash_service.get_hash_info`.
 
     `md5` is passed only for Cymru MHR, whose zone has no sha256 records at all, so
     without it that source can never answer for an upload.
@@ -214,7 +216,7 @@ def reputation_report(sha256, md5=None):
     'rate_limited' (queried nothing, quota spent, retry will answer).
     """
     try:
-        hash_info = get_hash_info_quick(sha256, md5=md5) or {}
+        hash_info = get_hash_info_quick(sha256, md5=md5, vt_key=vt_key) or {}
     except Exception as exc:
         logger.warning('Hash reputation lookup failed for %s: %s', sha256, exc)
         hash_info = {}
@@ -314,7 +316,7 @@ def _scored(record):
     return record
 
 
-def analyze_file(file_path, filename):
+def analyze_file(file_path, filename, vt_key=SHARED_KEY):
     """Never raises for a bad or unreadable file: an unreadable upload comes back with
     `error` set and every other field at its empty value, so the result page renders the
     same as any other analysis.
@@ -356,7 +358,7 @@ def analyze_file(file_path, filename):
 
     return _scored(_assemble(
         filename, size_bytes, digests, inspection, lnk, iocs,
-        reputation_report(digests['sha256'], md5=digests['md5']),
+        reputation_report(digests['sha256'], md5=digests['md5'], vt_key=vt_key),
         len(window) < size_bytes, None,
         office=office, pdf=pdf, yara=yara,
     ))

@@ -32,6 +32,7 @@ from ..utils.email_parse import (
     received_chain,
     sender_domain,
 )
+from ..utils.accounts import SHARED_KEY
 from ..utils.iocs import defang, extract_iocs
 from ..utils.storage import store
 from ..utils.url_guard import is_scannable
@@ -122,7 +123,7 @@ def is_enrichable_host(host):
         return False
 
 
-def _enrich(domain, ips, hashes):
+def _enrich(domain, ips, hashes, vt_key=SHARED_KEY):
     """Never raises: a failing source is logged and comes back None. Bounded by
     ``ENRICH_DEADLINE`` overall; a source unfinished by then is treated the same as one
     that raised, so a single hung lookup degrades to a null result rather than blocking.
@@ -149,7 +150,7 @@ def _enrich(domain, ips, hashes):
             'alienvault': get_alienvault_data(i),
         }
     for digest in (hashes or [])[:MAX_ENRICH_HASHES]:
-        tasks[('hash', digest)] = lambda h=digest: get_hash_info_quick(h)
+        tasks[('hash', digest)] = lambda h=digest: get_hash_info_quick(h, vt_key=vt_key)
     first_ip = (ips or [None])[0]
     if first_ip:
         tasks[('dnsbl', first_ip)] = lambda i=first_ip: dnsbl_lookup(i)
@@ -225,7 +226,7 @@ def _assemble(analysis_id, source, status, error, headers, domain, auth, spoofin
     }
 
 
-def analyze_email(raw, source='upload'):
+def analyze_email(raw, source='upload', vt_key=SHARED_KEY):
     """Never raises for bad input: an unparseable message returns status='error' with an
     'unknown' verdict, still savable and renderable."""
     analysis_id = str(uuid.uuid4())
@@ -250,7 +251,7 @@ def analyze_email(raw, source='upload'):
     live_urls = extract_urls(msg)
     attachments = attachment_metadata(msg)
 
-    enrichment = _enrich(domain, ips, [a['sha256'] for a in attachments])
+    enrichment = _enrich(domain, ips, [a['sha256'] for a in attachments], vt_key=vt_key)
 
     verdict = email_rules.score({
         'parsed_ok': True,
