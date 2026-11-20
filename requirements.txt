@@ -228,7 +228,7 @@ six==1.16.0
     #   python-dateutil
 socksio==1.0.0
     # via user-scanner
-soupsieve==2.9
+soupsieve==4.0
     # via beautifulsoup4
 stem==1.8.2
     # via sherlock-project
