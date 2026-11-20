@@ -91,11 +91,16 @@ treated as not saved.
 
 ## Disable an account
 
-Accounts have no admin page yet. To disable one, run this from the deployment directory
-(it needs the `sqlite3` command):
+Accounts have no admin page; use the operator tool from the deployment directory. Pick the
+account by the ID that `list` prints, because a display name is not unique.
 
 ```sh
-sqlite3 data/accounts.db "UPDATE users SET disabled = 1 WHERE login = '<login>';"
+python3 scripts/manage_accounts.py list
+python3 scripts/manage_accounts.py disable <id>
+python3 scripts/manage_accounts.py enable <id>
+python3 scripts/manage_accounts.py delete <id>
 ```
 
-A disabled account is signed out on its next request and cannot sign in again.
+A disabled account is signed out on its next request and cannot sign in again, and its
+saved keys stay in place. `delete` removes the account and every key it saved. In Docker,
+run it inside the container (`docker compose exec web python scripts/manage_accounts.py list`).
