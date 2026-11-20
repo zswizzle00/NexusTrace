@@ -48,7 +48,8 @@ def analyze_hash():
             error = 'Hash is required'
         else:
             lookup = get_hash_info_deep if deep_scan else get_hash_info_quick
-            result = lookup(hash_value, vt_key=virustotal_key())
+            vt_key = virustotal_key()
+            result = lookup(hash_value, vt_key=vt_key)
 
             if result.get('error'):
                 # Bad hash format: a real input error, not an unknown hash.
@@ -64,7 +65,8 @@ def analyze_hash():
                         'hash_analysis.html',
                         indicator=hash_value,
                         indicator_type='hash',
-                        unknown_hash=unknown_hash_report(hash_value, result, alienvault_raw)
+                        unknown_hash=unknown_hash_report(hash_value, result, alienvault_raw,
+                                                         vt_key=vt_key)
                     )
 
     return render_template(

@@ -222,7 +222,7 @@ def reputation_report(sha256, md5=None, vt_key=SHARED_KEY):
         hash_info = {}
     otx_raw = get_alienvault_analysis(sha256)
 
-    report = unknown_hash_report(sha256, hash_info, otx_raw)
+    report = unknown_hash_report(sha256, hash_info, otx_raw, vt_key=vt_key)
     provider_data = hash_info.get('sources') or {}
     sources = {}
     for entry in report['sources']:

@@ -389,6 +389,48 @@ def test_virustotal_quota_and_cache_per_key():
     check(report['sources'][0]['state'] == 'skipped', 'a lookup with no key is not skipped')
 
 
+def test_unknown_hash_report_without_hash_info_follows_the_key_policy():
+    def vt_state(vt_key):
+        report = hash_service.unknown_hash_report('1' * 64, None, None, vt_key=vt_key)
+        return report['sources'][0]['state']
+
+    with Sandbox(VIRUSTOTAL_API_KEY='c' * 64, VIRUSTOTAL_SHARED_KEY='nobody'):
+        check(vt_state(None) == 'skipped',
+              'a request with no usable key reports VirusTotal as queried')
+        check(vt_state(accounts.ProviderKey('d' * 64, 'user')) == 'unavailable',
+              "a request with the user's own key reports VirusTotal as skipped")
+    with Sandbox(VIRUSTOTAL_API_KEY=None):
+        check(vt_state(hash_service.SHARED_KEY) == 'skipped',
+              'no shared key configured, yet VirusTotal reads as queried')
+
+
+def test_warns_when_the_redirect_base_is_missing():
+    import logging
+
+    class Capture(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.messages = []
+
+        def emit(self, record):
+            self.messages.append(record.getMessage())
+
+    def warnings_for(**env):
+        handler = Capture()
+        logging.getLogger('app').addHandler(handler)
+        try:
+            with Sandbox(**env) as box:
+                box.app()
+        finally:
+            logging.getLogger('app').removeHandler(handler)
+        return [m for m in handler.messages if 'OAUTH_REDIRECT_BASE' in m]
+
+    check(warnings_for(OAUTH_REDIRECT_BASE=None), 'no warning with accounts on and no base')
+    check(not warnings_for(), 'a warning with the base set')
+    check(not warnings_for(OAUTH_REDIRECT_BASE=None, ACCOUNTS_ENCRYPTION_KEY=None),
+          'a warning with accounts off')
+
+
 def test_verify_virustotal_key():
     for status, want in ((200, 'ok'), (404, 'ok'), (401, 'invalid'), (403, 'invalid'),
                          (429, 'unavailable'), (500, 'unavailable')):
@@ -492,6 +534,8 @@ TESTS = [
     test_oauth_complete,
     test_key_policy,
     test_virustotal_quota_and_cache_per_key,
+    test_unknown_hash_report_without_hash_info_follows_the_key_policy,
+    test_warns_when_the_redirect_base_is_missing,
     test_verify_virustotal_key,
     test_routes,
 ]

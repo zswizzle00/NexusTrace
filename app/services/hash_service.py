@@ -619,8 +619,10 @@ def advisory_rows(envelopes: Optional[Dict]) -> List[Dict]:
     return rows
 
 
-def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_raw) -> Dict:
-    """Per-source accounting for a hash that no source has a record of."""
+def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_raw,
+                        vt_key=SHARED_KEY) -> Dict:
+    """Per-source accounting for a hash that no source has a record of. `vt_key` is as for
+    `get_hash_info`, and only matters when `hash_info` is absent."""
     hash_info = hash_info or {}
     provider = hash_info.get('sources') or {}
     # hash_info is absent exactly when every lookup failed, which is when the
@@ -636,10 +638,10 @@ def unknown_hash_report(hash_value: str, hash_info: Optional[Dict], alienvault_r
 
     # Whether a key was used comes from the lookup itself, since it may have been a
     # signed-in user's rather than VIRUSTOTAL_API_KEY. A hash_info without the field (every
-    # lookup failed) falls back to the environment.
+    # lookup failed) falls back to the key this request would have used.
     vt_configured = hash_info.get('virustotal_configured')
     if vt_configured is None:
-        vt_configured = bool(os.getenv('VIRUSTOTAL_API_KEY'))
+        vt_configured = _resolve_key(vt_key) is not None
     sources = [
         {'name': 'VirusTotal', 'key_env': 'VIRUSTOTAL_API_KEY', 'url': links.get('virustotal'),
          'state': source_state(vt_configured, status_of('virustotal')),
