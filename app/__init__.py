@@ -180,6 +180,14 @@ def create_app():
         return {'accounts_enabled': on,
                 'current_account': accounts.current_user() if on else None}
 
+    from app.utils import accounts as _accounts, oauth as _oauth
+    if _accounts.enabled() and not _oauth.redirect_base():
+        # Behind cloudflared and nginx the fallback URL says http://, which the providers
+        # reject, so sign-in would show up in the nav and then fail on every attempt.
+        logger.warning(
+            'Accounts are on but OAUTH_REDIRECT_BASE is not set; sign-in will fail behind '
+            'a TLS-terminating proxy')
+
     # Prevent HTML pages from being cached so CSRF tokens are never served stale
     @app.after_request
     def set_cache_control(response):

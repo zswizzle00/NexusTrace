@@ -153,7 +153,8 @@ def _run_analysis(indicator):
                                    indicator=indicator,
                                    indicator_type=indicator_type,
                                    unknown_hash=unknown_hash_report(
-                                       indicator, result_data['hash_info'], alienvault_raw))
+                                       indicator, result_data['hash_info'], alienvault_raw,
+                                       vt_key=vt_key))
 
         card_count = sum(1 for k in ['alienvault', 'hash_info'] if result_data.get(k))
         return render_template('hash_analysis.html',

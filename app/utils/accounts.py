@@ -20,6 +20,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,14 @@ def _fernet():
     """A MultiFernet over every key in ACCOUNTS_ENCRYPTION_KEY (comma-separated, newest
     first, so a key can be rotated without losing what the old one encrypted), or None
     when it is unset or malformed."""
-    raw = os.environ.get(ENCRYPTION_ENV, '')
+    return _build_fernet(os.environ.get(ENCRYPTION_ENV, ''))
+
+
+# Keyed on the raw setting, so the context processor's per-request enabled() does not
+# rebuild the ciphers (or repeat the malformed-key error) while a changed setting still
+# takes effect.
+@lru_cache(maxsize=4)
+def _build_fernet(raw):
     keys = [k.strip() for k in raw.split(',') if k.strip()]
     if not keys:
         return None
