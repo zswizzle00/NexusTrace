@@ -125,18 +125,24 @@ def _resolve_key(vt_key):
     return shared_virustotal_key() if vt_key is SHARED_KEY else vt_key
 
 
+# A hash nobody has uploaded, so a valid key always gets a clean 404 for it.
+_KEY_CHECK_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+
 def verify_virustotal_key(value: str, transport=None) -> str:
     """'ok', 'invalid' (VirusTotal refused the key) or 'unavailable' (no answer either
-    way). Reads the key's own user record, the cheapest call that proves the key works."""
+    way). Looks up a hash that is not in VirusTotal: a good key gets 200 or 404, a bad one
+    401, and the key travels only in the header, never in a URL that a proxy or log could
+    record."""
     try:
         response = (transport or _get)(
-            f'https://www.virustotal.com/api/v3/users/{value}',
+            f'https://www.virustotal.com/api/v3/files/{_KEY_CHECK_HASH}',
             headers={'x-apikey': value}, timeout=TIMEOUT_MEDIUM)
     except requests.RequestException:
         return 'unavailable'
-    if response.status_code == 200:
+    if response.status_code in (200, 404):
         return 'ok'
-    if response.status_code in (401, 403, 404):
+    if response.status_code in (401, 403):
         return 'invalid'
     return 'unavailable'
 

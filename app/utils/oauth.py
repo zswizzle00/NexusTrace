@@ -145,6 +145,8 @@ def complete(provider, args, pending, redirect_uri, transport=None):
                                    headers={'Accept': 'application/json'},
                                    timeout=TIMEOUT_MEDIUM)
         token = token_response.json() if token_response.ok else {}
+        if not isinstance(token, dict):
+            token = {}
         access_token = token.get('access_token')
         if not access_token:
             logger.warning('%s token exchange failed: HTTP %s %s', provider,
@@ -160,6 +162,8 @@ def complete(provider, args, pending, redirect_uri, transport=None):
                            user_response.status_code)
             raise OAuthError('Sign-in failed. Please try again.')
         profile = user_response.json()
+        if not isinstance(profile, dict):
+            raise OAuthError('Sign-in failed. Please try again.')
     except requests.RequestException as exc:
         logger.warning('%s sign-in request failed: %s', provider, type(exc).__name__)
         raise OAuthError('Could not reach the sign-in provider. Please try again.') from None

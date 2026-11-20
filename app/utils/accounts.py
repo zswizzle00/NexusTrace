@@ -17,6 +17,7 @@ import hashlib
 import logging
 import os
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -145,18 +146,31 @@ def shared_key_policy():
     return policy
 
 
+_initialised = set()
+_init_lock = threading.Lock()
+
+
+def _initialise(connection, target):
+    # Once per file: concurrent first connections each switching to WAL make SQLite
+    # answer "database is locked" at once, without waiting out the busy timeout.
+    with _init_lock:
+        if target in _initialised and os.path.exists(target):
+            return
+        connection.executescript(SCHEMA)
+        connection.execute('PRAGMA journal_mode = WAL')
+        _initialised.add(target)
+
+
 def connect(path=None):
     target = path or DB_PATH
     os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
+    # Create the file private before SQLite does: it gives the -wal and -shm sidecars the
+    # main file's mode, so this one call covers all three with no world-readable window.
+    os.close(os.open(target, os.O_CREAT | os.O_WRONLY, 0o600))
     connection = sqlite3.connect(target, timeout=10)
     connection.row_factory = sqlite3.Row
-    connection.executescript(SCHEMA)
-    connection.execute('PRAGMA journal_mode = WAL')
+    _initialise(connection, target)
     connection.execute('PRAGMA foreign_keys = ON')
-    try:
-        os.chmod(target, 0o600)
-    except OSError:
-        pass
     return connection
 
 
@@ -177,6 +191,9 @@ def sign_in(provider, subject, login, path=None):
     identity past the cap, and AccountDisabled for a disabled one."""
     subject = str(subject)
     with _session(path) as db:
+        # Take the write lock before counting, or two workers can both see room under the
+        # cap and both insert.
+        db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT * FROM users WHERE provider = ? AND subject = ?',
                          (provider, subject)).fetchone()
         if row is not None:

@@ -196,6 +196,45 @@ def test_store():
         check(left == 0, 'deleting an account left its keys behind')
 
 
+def test_database_files_are_private():
+    with Sandbox():
+        db = accounts.connect()
+        try:
+            db.execute("INSERT INTO users (provider, subject, login, created_at, last_login_at) "
+                       "VALUES ('github', '1', 'a', 'now', 'now')")
+            db.commit()
+            for suffix in ('', '-wal', '-shm'):
+                path = accounts.DB_PATH + suffix
+                if os.path.exists(path):
+                    mode = oct(os.stat(path).st_mode & 0o777)
+                    check(mode == '0o600', f'{os.path.basename(path)} is {mode}, not 0o600')
+        finally:
+            db.close()
+
+
+def test_signup_cap_holds_under_concurrency():
+    import threading
+    with Sandbox(ACCOUNTS_MAX_USERS='3'):
+        barrier = threading.Barrier(10)
+        outcomes = []
+
+        def attempt(n):
+            barrier.wait()
+            try:
+                accounts.sign_in('github', 1000 + n, f'user{n}')
+                outcomes.append('in')
+            except accounts.SignupClosed:
+                outcomes.append('closed')
+
+        threads = [threading.Thread(target=attempt, args=(n,)) for n in range(10)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        check(outcomes.count('in') == 3 and outcomes.count('closed') == 7,
+              f'a cap of 3 gave {outcomes}')
+
+
 def test_oauth_begin():
     with Sandbox():
         url, pending = oauth.begin('google', 'https://nexustrace.example/account/callback/google')
@@ -244,7 +283,9 @@ def test_oauth_complete():
 
         for label, fake in (('a refused token', FakeProvider(token={'error': 'bad_verification_code'})),
                             ('a failed profile', FakeProvider(profile_status=401)),
-                            ('a profile with no ID', FakeProvider(profile={'login': 'x'}))):
+                            ('a profile with no ID', FakeProvider(profile={'login': 'x'})),
+                            ('a token answer that is a list', FakeProvider(token=['x'])),
+                            ('a profile that is a list', FakeProvider(profile=['x']))):
             try:
                 oauth.complete('github', good, pending, redirect, transport=fake)
                 check(False, f'{label} signed someone in')
@@ -349,10 +390,16 @@ def test_virustotal_quota_and_cache_per_key():
 
 
 def test_verify_virustotal_key():
-    for status, want in ((200, 'ok'), (401, 'invalid'), (404, 'invalid'), (429, 'unavailable'),
-                         (500, 'unavailable')):
+    for status, want in ((200, 'ok'), (404, 'ok'), (401, 'invalid'), (403, 'invalid'),
+                         (429, 'unavailable'), (500, 'unavailable')):
         got = hash_service.verify_virustotal_key(VT_KEY, lambda *a, **k: FakeResponse(status, {}))
         check(got == want, f'HTTP {status} read as {got}, wanted {want}')
+
+    seen = []
+    hash_service.verify_virustotal_key(
+        VT_KEY, lambda url, **k: seen.append((url, k)) or FakeResponse(404, {}))
+    check(VT_KEY not in seen[0][0], 'the key is in the request URL')
+    check(seen[0][1]['headers'] == {'x-apikey': VT_KEY}, 'the key is not sent as a header')
 
 
 def test_routes():
@@ -439,6 +486,8 @@ TESTS = [
     test_provider_key_never_shows_the_key,
     test_accounts_are_off_without_configuration,
     test_store,
+    test_database_files_are_private,
+    test_signup_cap_holds_under_concurrency,
     test_oauth_begin,
     test_oauth_complete,
     test_key_policy,
