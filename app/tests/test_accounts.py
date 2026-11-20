@@ -196,6 +196,73 @@ def test_store():
         check(left == 0, 'deleting an account left its keys behind')
 
 
+def _run_tool(*argv, stdin=None):
+    import contextlib
+    import importlib.util
+    import io
+    spec = importlib.util.spec_from_file_location(
+        'manage_accounts', os.path.join(os.path.dirname(__file__), '..', '..', 'scripts',
+                                        'manage_accounts.py'))
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    out, err = io.StringIO(), io.StringIO()
+    saved_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin or '')
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = tool.main(list(argv))
+    finally:
+        sys.stdin = saved_stdin
+    return code, out.getvalue(), err.getvalue()
+
+
+def test_operator_tool():
+    with Sandbox():
+        user = accounts.sign_in('google', 'sub-1', 'Ada')
+        accounts.sign_in('google', 'sub-2', 'Ada')
+        accounts.save_key(user['id'], accounts.VIRUSTOTAL, VT_KEY)
+
+        code, out, _ = _run_tool('list')
+        check(code == 0 and out.count('Ada') == 2, 'list does not show both same-named accounts')
+        check('sub-1' in out and 'sub-2' in out, 'list does not show the provider subject')
+        check(VT_KEY not in out and VT_KEY[-4:] not in out, 'list leaks a saved key')
+        check('virustotal' in out, 'list does not say which keys are saved')
+
+        check(_run_tool('disable', str(user['id']))[0] == 0, 'disable failed')
+        check(accounts.get_user(user['id']) is None, 'a disabled account is still served')
+        try:
+            accounts.sign_in('google', 'sub-1', 'Ada')
+            check(False, 'a disabled account signed in')
+        except accounts.AccountDisabled:
+            pass
+        check('disabled' in _run_tool('list')[1], 'list does not show the disabled state')
+        check(accounts.load_key(user['id'], accounts.VIRUSTOTAL) == VT_KEY,
+              'disabling removed the saved key')
+        check(_run_tool('enable', str(user['id']))[0] == 0, 'enable failed')
+        check(accounts.get_user(user['id']) is not None, 'an enabled account is not served')
+
+        check(_run_tool('disable', '999')[0] == 2, 'a missing account did not exit 2')
+        check(_run_tool('delete', str(user['id']), stdin='no\n')[0] == 3
+              and accounts.get_user(user['id']) is not None, 'delete went ahead without yes')
+        check(_run_tool('delete', str(user['id']), '--yes')[0] == 0
+              and accounts.get_user(user['id']) is None, 'delete --yes did not delete')
+        check(accounts.key_summary(user['id']) == {}, 'delete left the saved keys behind')
+
+
+def test_users_own_copy_of_the_shared_key_uses_the_shared_limiter():
+    with Sandbox(VIRUSTOTAL_API_KEY=VT_KEY):
+        user = accounts.sign_in('github', 7, 'octo')
+        accounts.save_key(user['id'], accounts.VIRUSTOTAL, VT_KEY)
+        saved_current_user = accounts.current_user
+        accounts.current_user = lambda: accounts.get_user(user['id'])
+        try:
+            key = accounts.virustotal_key()
+        finally:
+            accounts.current_user = saved_current_user
+        check(key is not None and key.owner == 'shared',
+              'the operator key saved by a user got its own limiter')
+
+
 def test_database_files_are_private():
     with Sandbox():
         db = accounts.connect()
@@ -528,6 +595,8 @@ TESTS = [
     test_provider_key_never_shows_the_key,
     test_accounts_are_off_without_configuration,
     test_store,
+    test_operator_tool,
+    test_users_own_copy_of_the_shared_key_uses_the_shared_limiter,
     test_database_files_are_private,
     test_signup_cap_holds_under_concurrency,
     test_oauth_begin,

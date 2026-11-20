@@ -230,6 +230,26 @@ def get_user(user_id, path=None):
     return dict(row) if row else None
 
 
+def list_users(path=None):
+    """Every account, disabled ones included, oldest first, with the services it has keys
+    saved for. For the operator tool; never carries a key or its hint."""
+    with _session(path) as db:
+        users = db.execute('SELECT * FROM users ORDER BY id').fetchall()
+        saved = db.execute('SELECT user_id, service FROM api_keys ORDER BY service').fetchall()
+    services = {}
+    for row in saved:
+        services.setdefault(row['user_id'], []).append(row['service'])
+    return [dict(user, services=services.get(user['id'], [])) for user in users]
+
+
+def set_disabled(user_id, disabled, path=None):
+    """Disables or re-enables an account. False when there is no such account."""
+    with _session(path) as db:
+        cursor = db.execute('UPDATE users SET disabled = ? WHERE id = ?',
+                            (1 if disabled else 0, user_id))
+    return cursor.rowcount > 0
+
+
 def delete_user(user_id, path=None):
     """Removes the account and, through the foreign key, every key it saved."""
     with _session(path) as db:
@@ -334,6 +354,12 @@ def virustotal_key():
     if user is not None:
         own = load_key(user['id'], VIRUSTOTAL)
         if own:
+            shared = shared_virustotal_key()
+            # The operator's own key saved by a user is still one quota: keep it on the
+            # shared limiter instead of giving the same key a second 4-per-minute budget.
+            if shared is not None and shared.fingerprint == hashlib.sha256(
+                    own.encode('utf-8')).hexdigest():
+                return shared
             return ProviderKey(own, 'user')
 
     if not enabled():
