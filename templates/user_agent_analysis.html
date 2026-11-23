@@ -1,28 +1,22 @@
 {% extends "base.html" %}
 
-{% block main_content_class %}full-width{% endblock %}
+{% from "_search_form.html" import search_form %}
+{% from "_page.html" import page_header %}
+
+{% block title %}User Agent Analysis | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="w-full py-10 tailwind-tables">
-    <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">User Agent Analysis</h2>
+<div class="max-w-7xl mx-auto px-4 py-6 tailwind-tables">
+    {{ page_header('User Agent Analysis', 'Decode a user-agent string into its browser, operating system and device, and flag known bots and crawlers.') }}
 
-    <div class="flex flex-col items-center justify-center mb-10 gap-4 w-full max-w-2xl mx-auto">
-        <form action="/analyze" method="POST" class="flex flex-col sm:flex-row gap-4 w-full">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="indicator" placeholder="Enter a user agent string to analyze..." class="form-input bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 w-full text-lg py-3 px-4 rounded-lg" required>
-            <button type="submit" class="btn btn-primary whitespace-nowrap px-6 py-3 text-lg rounded-lg flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                Analyze
-            </button>
-        </form>
+    <div class="nt-card p-5 mb-5">
+        {{ search_form('Paste a user-agent string', layout='panel') }}
     </div>
 
     {% if user_agent %}
-    <div class="w-full max-w-4xl mx-auto">
-        <div class="grid gap-6 grid-cols-1 md:grid-cols-2">
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+    <div>
+        <div class="grid gap-5 grid-cols-1 md:grid-cols-2">
+            <div class="nt-card p-5">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
@@ -38,7 +32,7 @@
                 </table>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+            <div class="nt-card p-5">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -54,7 +48,7 @@
                 </table>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+            <div class="nt-card p-5">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -72,7 +66,7 @@
                 </table>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl shadow-lg p-6">
+            <div class="nt-card p-5">
                 <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -108,39 +102,18 @@
             </div>
         </div>
 
-        <div class="mt-6">
-            <details class="bg-gray-900 rounded-2xl shadow-lg p-6 nt-raw nt-raw--card"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+        <div class="mt-5">
+            <details class="nt-card p-5 nt-raw nt-raw--card"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
                 <pre>{{ user_agent | tojson(indent=2) }}</pre>
             </details>
         </div>
     </div>
 
     {% elif user_agent_error %}
-    <div class="w-full max-w-2xl mx-auto">
-        <div class="bg-red-900/50 border border-red-700 rounded-2xl shadow-lg p-8 flex flex-col items-center justify-center text-red-300">
-            <svg class="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            <span class="text-lg">{{ user_agent_error }}</span>
-        </div>
-    </div>
+    <div class="nt-card p-5 text-sm text-red-300">{{ user_agent_error }}</div>
     {% else %}
-    <div class="text-center py-12">
-        <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
-        </svg>
-        <p class="text-gray-400 text-lg">Enter a user agent string above to analyze</p>
-        <p class="text-gray-500 text-sm mt-2">Example: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0</p>
-    </div>
+    <div class="nt-card p-5 text-sm text-gray-500">Enter a user-agent string above, for example <span class="font-mono text-gray-400">Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0</span>.</div>
     {% endif %}
 
-    <div class="flex justify-center mt-12">
-        <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            Return to Home
-        </a>
-    </div>
 </div>
 {% endblock %}

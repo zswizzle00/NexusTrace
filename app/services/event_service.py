@@ -29,8 +29,11 @@ def get_event_info(event_id):
         if summary_p:
             event_info['summary'] = summary_p.get_text(strip=True)
             next_p = summary_p.find_next_sibling('p')
-            if next_p:
-                event_info['summary'] += '\n' + next_p.get_text(strip=True)
+            next_text = next_p.get_text(strip=True) if next_p else ''
+            # The source page follows the summary with its "On this page" navigation
+            # heading, which is not part of the description.
+            if next_text and next_text.lower() != 'on this page':
+                event_info['summary'] += '\n' + next_text
 
         table = soup.find('table', attrs={'border': '1'})
         if table:
