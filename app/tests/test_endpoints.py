@@ -79,16 +79,16 @@ def test_pages(s):
     # page names in the body and would match anywhere.
     pages = [
         ('/',                    200, None, 'A tool for analyzing IP addresses'),
-        ('/ip_search',           200, None, 'IP Address Analysis'),
-        ('/domain_search',       200, None, 'Domain/URL Analysis'),
-        ('/hash_analysis',       200, None, 'Hash Analysis'),
-        ('/ad_event_search',     200, None, 'Windows Event and AD Event Lookup'),
-        ('/azure_error_search',  200, None, 'Azure Error Code Search'),
-        ('/user_agent_search',   200, None, 'User Agent Analysis'),
+        ('/ip_search',           200, 'IP Analysis | NexusTrace', None),
+        ('/domain_search',       200, 'Domain Analysis | NexusTrace', None),
+        ('/hash_analysis',       200, 'Hash Analysis | NexusTrace', None),
+        ('/ad_event_search',     200, 'Windows Event Lookup | NexusTrace', None),
+        ('/azure_error_search',  200, 'Azure Error Lookup | NexusTrace', None),
+        ('/user_agent_search',   200, 'User Agent Analysis | NexusTrace', None),
         ('/url_scan',            200, 'URL Scan | NexusTrace', None),
         ('/email_analysis',      200, 'E-mail Analysis | NexusTrace', None),
         ('/cyberchef',           200, 'CyberChef | NexusTrace', None),
-        ('/no_results',          200, 'None of the sources returned anything', None),
+        ('/no_results',          200, 'No results | NexusTrace', None),
     ]
     for path, status, want_title, want_body in pages:
         r = s.get(BASE_URL + path, timeout=30)
