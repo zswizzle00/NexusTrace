@@ -98,7 +98,7 @@ Built for security analysts, incident responders, and researchers who need fast,
 - **Azure AD Error Decoder**: Look up AADSTS error codes with descriptions and remediation steps
 - **Windows Event ID Reference**: Decode Windows Security event IDs
 - **User Agent Parser**: Break down browser, OS, device, and bot flags from any UA string
-- **CyberChef**: Embedded CyberChef v11.3.0 for in-browser data encoding, decoding, and transformation
+- **CyberChef**: Embedded CyberChef v11.6.0 for in-browser data encoding, decoding, and transformation
 
 ---
 
@@ -329,7 +329,7 @@ NexusTrace/
 │
 ├── templates/           # Jinja2 HTML templates
 ├── static/              # CSS, JS, images, PWA service worker
-├── CyberChef_v11.3.0/   # Embedded CyberChef (offline capable)
+├── CyberChef_v11.6.0/   # Embedded CyberChef (offline capable)
 ├── main.py              # App entry point
 ├── pyproject.toml       # Project metadata + dependencies (uv)
 ├── uv.lock              # Pinned, resolved dependency lockfile
