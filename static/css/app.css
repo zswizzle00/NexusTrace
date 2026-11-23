@@ -1125,6 +1125,12 @@ body {
     font-weight: 500;
 }
 .nt-otx-empty svg { color: #4ade80; flex-shrink: 0; }
+/* Green is only for "checked, nothing known"; a source that was not queried or failed
+   is not a clean result. */
+.nt-otx-empty.is-muted { background: rgba(100,116,139,.10); border-color: rgba(100,116,139,.30); color: #cbd5e1; }
+.nt-otx-empty.is-muted svg { color: #94a3b8; }
+.nt-otx-empty.is-warn { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.30); color: #fde68a; }
+.nt-otx-empty.is-warn svg { color: #fbbf24; }
 
 .nt-stub-status {
     margin: 0 0 0.85rem;
@@ -1176,23 +1182,24 @@ body {
 }
 .nt-card__external-link svg { opacity: 0.75; }
 
-.nt-reports-table { table-layout: fixed; width: 100%; }
-/* DATE col: YYYY-MM-DD = 10 chars */
-.nt-reports-table th:nth-child(1),
-.nt-reports-table td:nth-child(1) { width: 25%; overflow: hidden; }
-.nt-reports-table th:nth-child(3),
-.nt-reports-table td:nth-child(3) { width: 27%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-reports-table td { text-align: left; vertical-align: top; }
-.nt-reports-table__comment {
-    max-width: 0;
-    color: #cbd5e1;
+.nt-reports { margin: 0; padding: 0; list-style: none; }
+.nt-report { padding: 0.6rem 0.1rem; border-top: 1px solid rgba(96,165,250,.10); }
+.nt-report:first-child { border-top: 0; }
+.nt-report__meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    font-size: 0.72rem;
+    color: #94a3b8;
 }
-/* Two lines, then an ellipsis; the cell's title attribute carries the full text. */
-.nt-clamp {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+/* Full text, never cut: reporters paste log lines with long unbroken tokens. */
+.nt-report__comment {
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+    white-space: pre-line;
     overflow-wrap: anywhere;
 }
 
