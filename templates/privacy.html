@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_page.html" import page_header %}
+
+{% block title %}Privacy | NexusTrace{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+ <div class="nt-narrow nt-prose">
+  {{ page_header('Privacy', 'What NexusTrace collects, why, and how long it keeps it.') }}
+
+  <div class="nt-card p-5">
+    <h2>Using NexusTrace without an account</h2>
+    <p>You can use every lookup without signing in. To run and protect the site, each
+      request is logged with its time, your IP address and country, your browser's user
+      agent, the page or tool you used, and the response status. The log records which
+      tool you used, not what you looked up. It is used to spot abuse and to understand
+      how the site is used, and it is never sold or shared.</p>
+
+    <h2>What you look up</h2>
+    <p>To answer a lookup, NexusTrace sends the indicator you entered (an IP address,
+      domain, URL, hash, or similar) to the threat intelligence providers listed on the
+      result page. Each result page names the providers it contacted and what it sent
+      them. Those providers handle the data under their own privacy policies.</p>
+    <p>Scans, e-mail analyses, and other saved results are stored so that you can come
+      back to them. You can delete a saved result from its own result page at any
+      time.</p>
+
+    <h2>Accounts</h2>
+    <p>Accounts are optional. When you sign in with GitHub or Google, NexusTrace stores
+      only:</p>
+    <ul>
+      <li>your user ID at that provider, and your display name</li>
+      <li>when you created the account and when you last signed in</li>
+      <li>any API key you choose to save, encrypted</li>
+    </ul>
+    <p>NexusTrace never sees your password, and it doesn't ask GitHub or Google for your
+      e-mail address. A sign-in lasts 24 hours and uses a single session cookie. Deleting
+      your account on the Account page removes it and every key you saved, right
+      away.</p>
+
+    <h2>How long data is kept</h2>
+    <p>Saved results and the request log are deleted automatically after 30 days. Account
+      records are kept until you delete your account.</p>
+
+    <h2>Cookies</h2>
+    <p>NexusTrace uses only the cookies it needs to work: a session cookie that keeps you
+      signed in and protects forms against cross-site request forgery. There are no
+      advertising or tracking cookies.</p>
+
+    <h2>Hosting</h2>
+    <p>The site is served through Cloudflare, which processes requests on the way to
+      NexusTrace under
+      <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">its own privacy policy</a>.</p>
+
+    <h2>Contact</h2>
+    <p>For questions or to ask for your data to be removed, e-mail
+      <a href="mailto:bobsherwood@proton.me">bobsherwood@proton.me</a>.</p>
+  </div>
+ </div>
+</div>
+{% endblock %}

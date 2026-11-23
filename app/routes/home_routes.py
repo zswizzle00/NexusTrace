@@ -34,6 +34,10 @@ home_bp = Blueprint('home', __name__)
 def home():
     return render_template('home.html')
 
+@home_bp.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
 @home_bp.route('/ip_search', methods=['GET', 'POST'])
 def ip_search():
     error = None

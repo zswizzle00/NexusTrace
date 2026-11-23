@@ -34,7 +34,7 @@ ADMIN_EMAILS = 'owner@example.com, analyst@example.com'
 
 ADMIN_REQUESTS = (('get', '/admin'), ('post', '/admin'), ('post', '/admin/logout'))
 
-PUBLIC_PAGES = ('/', '/ip_search', '/url_scan', '/hash_analysis', '/file_analysis',
+PUBLIC_PAGES = ('/', '/privacy', '/ip_search', '/url_scan', '/hash_analysis', '/file_analysis',
                 '/email_analysis', '/user_agent_search', '/ad_event_search',
                 '/azure_error_search', '/api/health')
 
