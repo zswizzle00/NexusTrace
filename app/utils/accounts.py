@@ -18,6 +18,7 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -41,6 +42,11 @@ VIRUSTOTAL = 'virustotal'
 SERVICES = (VIRUSTOTAL,)
 
 SESSION_KEY = 'account_id'
+SIGNED_IN_AT_KEY = 'account_signed_in_at'
+# A sign-in lasts this long from the moment it happens, however active the visitor is:
+# the session cookie is refreshed on every request, so without this check an active
+# visitor would never have to sign in again.
+SESSION_LIFETIME_SECONDS = 24 * 60 * 60
 
 # The default `vt_key` of every lookup function: the operator's VIRUSTOTAL_API_KEY,
 # exactly as before accounts. Routes pass virustotal_key() instead, which may be a user's
@@ -321,11 +327,22 @@ def current_user():
         return None
     if 'account' not in g:
         user_id = session.get(SESSION_KEY)
+        if user_id is not None and _sign_in_expired(session.get(SIGNED_IN_AT_KEY)):
+            session.pop(SESSION_KEY, None)
+            session.pop(SIGNED_IN_AT_KEY, None)
+            user_id = None
         g.account = get_user(user_id) if user_id is not None else None
         if user_id is not None and g.account is None:
             # Deleted or disabled since the cookie was issued.
             session.pop(SESSION_KEY, None)
     return g.account
+
+
+def _sign_in_expired(signed_in_at):
+    try:
+        return time.time() - float(signed_in_at) >= SESSION_LIFETIME_SECONDS
+    except (TypeError, ValueError):
+        return True
 
 
 def start_session(user):
@@ -334,6 +351,7 @@ def start_session(user):
     # carries over into the signed-in one.
     session.clear()
     session[SESSION_KEY] = user['id']
+    session[SIGNED_IN_AT_KEY] = time.time()
     session.permanent = True
 
 

@@ -378,7 +378,7 @@ def test_key_policy():
             with app.test_request_context('/'):
                 from flask import session
                 if signed_in:
-                    session[accounts.SESSION_KEY] = user['id']
+                    accounts.start_session(user)
                 return accounts.virustotal_key()
 
         for policy, anonymous, member in (('everyone', 'shared', 'shared'),
@@ -581,6 +581,27 @@ def test_routes():
                   'and 2 were already used')
         finally:
             account_routes.verify_virustotal_key = saved_verify
+
+        check(app.permanent_session_lifetime.total_seconds() == 24 * 60 * 60,
+              'the signed-in session cookie does not last 24 hours')
+        import time
+        with client.session_transaction() as session:
+            signed_in_at = session[accounts.SIGNED_IN_AT_KEY]
+            session[accounts.SIGNED_IN_AT_KEY] = time.time() - 23 * 60 * 60
+        check(b'Check and save' in client.get('/account').data,
+              'a 23-hour-old sign-in was ended early')
+        with client.session_transaction() as session:
+            session[accounts.SIGNED_IN_AT_KEY] = time.time() - 24 * 60 * 60 - 1
+        check(b'Sign in with GitHub' in client.get('/account').data,
+              'a sign-in older than 24 hours was still accepted')
+        with client.session_transaction() as session:
+            session[accounts.SESSION_KEY] = 1
+            session.pop(accounts.SIGNED_IN_AT_KEY, None)
+        check(b'Sign in with GitHub' in client.get('/account').data,
+              'a session with no sign-in time (issued before the limit) was accepted')
+        with client.session_transaction() as session:
+            session[accounts.SESSION_KEY] = 1
+            session[accounts.SIGNED_IN_AT_KEY] = signed_in_at
 
         client.post('/account/logout')
         check(b'Sign in with GitHub' in client.get('/account').data, 'sign-out did not sign out')

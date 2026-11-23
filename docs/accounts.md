@@ -70,6 +70,8 @@ the result page shows VirusTotal as not queried, with a link to sign in.
 
 ## Limits
 
+- **Sessions:** a sign-in lasts 24 hours, however active the user is; after that they sign
+  in again. Accounts are optional: everyone can use every tool without signing in.
 - **Sign-ups:** `ACCOUNTS_MAX_USERS` (default 50) caps the number of accounts. Past the cap,
   new identities are refused and existing accounts can still sign in.
 - **Rate limits:** each user key gets its own limit of 4 lookups a minute, the VirusTotal
