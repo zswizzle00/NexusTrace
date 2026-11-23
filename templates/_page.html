@@ -1,0 +1,8 @@
+{# Shared tool-page header, so every lookup page opens the same way: a left-aligned
+   title, one line on what the tool does, then its form in an nt-card panel. #}
+{% macro page_header(title, description) -%}
+  <div class="mb-5">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-1">{{ title }}</h1>
+    {% if description %}<p class="text-sm text-gray-400">{{ description }}</p>{% endif %}
+  </div>
+{%- endmacro %}

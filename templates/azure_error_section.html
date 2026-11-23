@@ -1,79 +1,63 @@
 {% extends "base.html" %}
 {% from "_search_form.html" import search_form %}
+{% from "_page.html" import page_header %}
+
+{% block title %}Azure Error Lookup | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
-    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
-        <div class="card p-8 md:p-14 space-y-12">
-            <div class="text-center mb-4 md:mb-8">
-                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                    Azure Error Code Search
-                </h1>
-                <p class="text-lg md:text-2xl text-gray-300">
-                    Search and analyze Azure/Microsoft Entra ID error codes for troubleshooting and resolution.
-                    <br>
-                    <br>
-                    <span class="text-blue-400">
-                        Powered by Microsoft's official error lookup service
-                    </span>
-                </p>
+<div class="max-w-7xl mx-auto px-4 py-6">
+  {{ page_header('Azure Error Code Lookup', "Look up a Microsoft Entra ID or Azure sign-in error code (AADSTS) and get Microsoft's description and fixes.") }}
+  <div class="nt-card p-5 mb-5">
+    {{ search_form('Error code, e.g. AADSTS50058 or 50058', button_label='Search', name='error_code', form_id='azureErrorForm', input_id='errorCodeInput', layout='panel') }}
+  </div>
+    <div id="resultsSection" class="hidden">
+        <div class="nt-card p-5">
+            <div id="loadingSpinner" class="hidden text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p class="mt-4 text-gray-300">Searching for error information...</p>
             </div>
-
-            <div class="unified-search">
-                {{ search_form('Enter Azure Error Code (e.g., AADSTS50058 or 50058)', button_label='Search', name='error_code', form_id='azureErrorForm', input_id='errorCodeInput') }}
+            
+            <div id="errorMessage" class="hidden text-center py-8">
+                <div class="text-red-400 text-lg font-semibold mb-2">Error</div>
+                <p id="errorText" class="text-gray-300"></p>
             </div>
-
-            <div id="resultsSection" class="hidden">
-                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <div id="loadingSpinner" class="hidden text-center py-8">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        <p class="mt-4 text-gray-300">Searching for error information...</p>
+            
+            <div id="resultsContent" class="hidden space-y-6">
+                <div class="border-b border-gray-700 pb-4">
+                    <h2 id="errorTitle" class="text-2xl font-bold text-white mb-2"></h2>
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <span id="errorType" class="px-3 py-1 bg-blue-600 text-white rounded-full"></span>
+                        <span id="errorSeverity" class="px-3 py-1 bg-yellow-600 text-white rounded-full"></span>
                     </div>
-                    
-                    <div id="errorMessage" class="hidden text-center py-8">
-                        <div class="text-red-400 text-lg font-semibold mb-2">Error</div>
-                        <p id="errorText" class="text-gray-300"></p>
-                    </div>
-                    
-                    <div id="resultsContent" class="hidden space-y-6">
-                        <div class="border-b border-gray-700 pb-4">
-                            <h2 id="errorTitle" class="text-2xl font-bold text-white mb-2"></h2>
-                            <div class="flex flex-wrap gap-4 text-sm">
-                                <span id="errorType" class="px-3 py-1 bg-blue-600 text-white rounded-full"></span>
-                                <span id="errorSeverity" class="px-3 py-1 bg-yellow-600 text-white rounded-full"></span>
-                            </div>
-                        </div>
-                        
-                        <div id="descriptionSection" class="hidden">
-                            <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
-                            <p id="errorDescription" class="text-gray-300 leading-relaxed"></p>
-                        </div>
-                        
-                        <div id="solutionsSection" class="hidden">
-                            <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
-                            <ul id="solutionsList" class="list-disc list-inside space-y-2 text-gray-300"></ul>
-                        </div>
-                        
-                        <div id="additionalInfoSection" class="hidden">
-                            <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
-                            <p id="additionalInfo" class="text-gray-300 leading-relaxed"></p>
-                        </div>
-                        
-                        <div class="border-t border-gray-700 pt-4">
-                            <div class="flex flex-wrap gap-4">
-                                <a href="https://login.microsoftonline.com/error" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
-                                    Microsoft Error Lookup
-                                </a>
-                                <a href="https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes" target="_blank" class="text-blue-400 hover:text-blue-300 underline">
-                                    Official Documentation
-                                </a>
-                            </div>
-                        </div>
+                </div>
+                
+                <div id="descriptionSection" class="hidden">
+                    <h3 class="text-lg font-semibold text-white mb-3">Description</h3>
+                    <p id="errorDescription" class="text-gray-300 leading-relaxed"></p>
+                </div>
+                
+                <div id="solutionsSection" class="hidden">
+                    <h3 class="text-lg font-semibold text-white mb-3">Solutions & Recommendations</h3>
+                    <ul id="solutionsList" class="list-disc list-inside space-y-2 text-gray-300"></ul>
+                </div>
+                
+                <div id="additionalInfoSection" class="hidden">
+                    <h3 class="text-lg font-semibold text-white mb-3">Additional Information</h3>
+                    <p id="additionalInfo" class="text-gray-300 leading-relaxed"></p>
+                </div>
+                
+                <div class="border-t border-gray-700 pt-4">
+                    <div class="flex flex-wrap gap-4">
+                        <a href="https://login.microsoftonline.com/error" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">
+                            Microsoft Error Lookup
+                        </a>
+                        <a href="https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">
+                            Official Documentation
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
 <script>

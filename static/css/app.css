@@ -1355,7 +1355,7 @@ body {
    300px lets 4 columns fit on ~1300px viewports, avoiding a 3-col orphan card. */
 .nt-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
     gap: 2rem;
     margin: 0 0 1.25rem;
     /* Cards keep their own height: stretching them to the tallest in the row left

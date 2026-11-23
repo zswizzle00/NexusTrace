@@ -82,13 +82,13 @@ def test_pages(s):
         ('/ip_search',           200, None, 'IP Address Analysis'),
         ('/domain_search',       200, None, 'Domain/URL Analysis'),
         ('/hash_analysis',       200, None, 'Hash Analysis'),
-        ('/ad_event_search',     200, None, 'Windows Event ID and AD Event Search'),
+        ('/ad_event_search',     200, None, 'Windows Event and AD Event Lookup'),
         ('/azure_error_search',  200, None, 'Azure Error Code Search'),
         ('/user_agent_search',   200, None, 'User Agent Analysis'),
         ('/url_scan',            200, 'URL Scan | NexusTrace', None),
         ('/email_analysis',      200, 'E-mail Analysis | NexusTrace', None),
         ('/cyberchef',           200, 'CyberChef | NexusTrace', None),
-        ('/no_results',          200, 'No Results Found', None),
+        ('/no_results',          200, 'None of the sources returned anything', None),
     ]
     for path, status, want_title, want_body in pages:
         r = s.get(BASE_URL + path, timeout=30)
@@ -199,7 +199,7 @@ def test_domain_api(s, tok):
                                                        'csrf_token': tok}, timeout=120)
     check('POST /api/domain/analyze -> 200', r.status_code == 200, f'got {r.status_code}')
     check('POST /api/domain/analyze renders a result or no-results page',
-          'Threat Intelligence Report' in r.text or 'No Results Found' in r.text,
+          'Threat Intelligence Report' in r.text or 'None of the sources returned anything' in r.text,
           f'title={title_of(r.text)!r}')
 
     r = s.get(f'{BASE_URL}/api/domain/analyze', timeout=60)
@@ -296,14 +296,14 @@ def test_lookup_apis(s, tok):
 CHROME_UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
              '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
-# (label, indicator, any-one-of markers). 'No Results Found' is acceptable
+# (label, indicator, any-one-of markers). 'None of the sources returned anything' is acceptable
 # everywhere: with no keys it is the correct outcome.
 ANALYSIS_CASES = [
-    ('ip',          '8.8.8.8',                          ['Threat Intelligence Report', 'No Results Found']),
-    ('hash',        'd41d8cd98f00b204e9800998ecf8427e',  ['Hash Analysis', 'No Results Found']),
-    ('azure_error', 'AADSTS50011',                       ['Azure Error', 'No Results Found']),
-    ('ad_code',     '4625',                              ['Windows Event / AD Event Analysis', 'No Results Found']),
-    ('user_agent',  CHROME_UA,                           ['User Agent Analysis', 'No Results Found']),
+    ('ip',          '8.8.8.8',                          ['Threat Intelligence Report', 'None of the sources returned anything']),
+    ('hash',        'd41d8cd98f00b204e9800998ecf8427e',  ['Hash Analysis', 'None of the sources returned anything']),
+    ('azure_error', 'AADSTS50011',                       ['Azure Error', 'None of the sources returned anything']),
+    ('ad_code',     '4625',                              ['Windows Event / AD Event Analysis', 'None of the sources returned anything']),
+    ('user_agent',  CHROME_UA,                           ['User Agent Analysis', 'None of the sources returned anything']),
 ]
 
 
