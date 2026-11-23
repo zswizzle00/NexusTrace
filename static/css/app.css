@@ -1617,3 +1617,25 @@ summary.nt-admin-chip::before { display: none; }
 .pt-3 { padding-top: 0.75rem; }
 .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem; }
 .whitespace-pre-line { white-space: pre-line; }
+
+/* Account pages and flash messages. Their colors were Tailwind opacity variants the
+   prebuilt stylesheet does not contain, so they rendered unstyled. */
+.nt-narrow { max-width: 42rem; }
+.nt-btn-danger {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #fecaca;
+    background: rgba(127,29,29,.55);
+    border: 1px solid rgba(239,68,68,.35);
+    cursor: pointer;
+}
+.nt-btn-danger:hover { background: rgba(153,27,27,.8); }
+.nt-flash { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.875rem; border: 1px solid; }
+.nt-flash.is-error { color: #fca5a5; background: rgba(127,29,29,.3); border-color: rgba(153,27,27,.8); }
+.nt-flash.is-success { color: #86efac; background: rgba(20,83,45,.3); border-color: rgba(22,101,52,.8); }
+.nt-flash.is-info { color: #93c5fd; background: rgba(30,58,138,.3); border-color: rgba(30,64,175,.8); }
+/* .btn-primary is sized for the search bars; buttons inside a card use this instead. */
+.btn.btn-compact { font-size: 0.9rem; padding: 0.55rem 1rem; min-height: 0; }
