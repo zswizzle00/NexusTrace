@@ -271,8 +271,8 @@
                 </div>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ vt | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ vt | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -308,8 +308,8 @@
                 </div>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-purple-400">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ mb | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ mb | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -338,8 +338,8 @@
                 {% endfor %}
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-orange-400">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ tf | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ tf | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -367,8 +367,8 @@
                 </ul>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
             </details>
         </div>
         {% endif %}

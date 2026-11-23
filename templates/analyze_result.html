@@ -298,7 +298,7 @@
             <tr><th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Bogon</th><td class="py-2">{{ bool_badge(ipinfo.bogon) }}</td></tr>
           {% endif %}
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ ipinfo | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -330,7 +330,7 @@
           {{ kv_row('Net Speed', ip2location.net_speed or ip2location.speed) }}
           {{ kv_row('Usage Type', ip2location.usage_type) }}
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ ip2location | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -375,7 +375,7 @@
           </table>
         {% endif %}
 
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ vpnapi | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -427,7 +427,7 @@
           {% if pc.attack_history is defined and pc.attack_history %}{{ kv_row('Attack History', pc.attack_history) }}{% endif %}
         </table>
 
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ proxycheck | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -489,7 +489,7 @@
           </div>
         {% endif %}
 
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ shodan.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -557,31 +557,31 @@
                 {% set ts = report.reportedAt or report.timestamp or '' %}
                 <tr class="border-t border-gray-800">
                   <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
-                  <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
+                  <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}"><span class="nt-clamp">{{ report.comment or 'N/A' }}</span></td>
                   <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
           {% if abuseipdb.tables.reports|length > 5 %}
-            <details class="mt-1"><summary class="text-red-400 cursor-pointer text-xs">Show All Reports ({{ abuseipdb.tables.reports|length }})</summary>
+            <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ abuseipdb.tables.reports|length }} reports</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
               <table class="w-full text-xs mt-1 nt-reports-table">
                 <tbody>
                   {% for report in abuseipdb.tables.reports[5:] %}
                     {% set ts = report.reportedAt or report.timestamp or '' %}
                     <tr class="border-t border-gray-800">
                       <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
-                      <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}">{{ (report.comment or 'N/A')[:60] }}{% if report.comment and report.comment|length > 60 %}…{% endif %}</td>
+                      <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}"><span class="nt-clamp">{{ report.comment or 'N/A' }}</span></td>
                       <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>
               </table>
-            </details>
+            </div></details>
           {% endif %}
         {% endif %}
 
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ abuseipdb.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -644,11 +644,11 @@
                       <div>{{ item[:80] if item is string else item }}{% if item is string and item|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-green-400 underline text-xs">more</a><span class="hidden">{{ item }}</span>{% endif %}</div>
                     {% endfor %}
                     {% if v|length > 3 %}
-                      <details><summary class="text-green-400 cursor-pointer text-xs">Show All ({{ v|length }})</summary>
+                      <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ v|length }}</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
                         <ul class="list-disc list-inside text-xs">
                           {% for item in v[3:] %}<li>{{ item }}</li>{% endfor %}
                         </ul>
-                      </details>
+                      </div></details>
                     {% endif %}
                   {% else %}
                     {{ v if v else 'N/A' }}
@@ -658,7 +658,7 @@
             {% endfor %}
           </tbody>
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ domain_info.ssl_info | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -690,11 +690,11 @@
                       <div class="font-mono text-xs">{{ rec[:80] if rec is string else rec }}{% if rec is string and rec|length > 80 %}... <a href="#" onclick="this.nextElementSibling.classList.toggle('hidden');return false;" class="text-blue-400 underline text-xs">more</a><span class="hidden">{{ rec }}</span>{% endif %}</div>
                     {% endfor %}
                     {% if v|length > 3 %}
-                      <details><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ v|length }})</summary>
+                      <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ v|length }}</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
                         <ul class="font-mono text-xs space-y-1 mt-1">
                           {% for rec in v[3:] %}<li>{{ rec }}</li>{% endfor %}
                         </ul>
-                      </details>
+                      </div></details>
                     {% endif %}
                   {% else %}
                     <span class="font-mono text-xs">{{ v if v else 'N/A' }}</span>
@@ -704,7 +704,7 @@
             {% endfor %}
           </tbody>
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ domain_info.dns_records | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -795,7 +795,7 @@
             </tbody>
           </table>
           {% if ua.get('meta_tags', [])|length > 5 %}
-            <details><summary class="text-blue-400 cursor-pointer text-xs">Show All</summary>
+            <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
               <table class="w-full text-xs">
                 <tbody>
                   {% for tag in ua.get('meta_tags', [])[5:] %}
@@ -803,7 +803,7 @@
                   {% endfor %}
                 </tbody>
               </table>
-            </details>
+            </div></details>
           {% endif %}
         {% endif %}
 
@@ -859,7 +859,7 @@
           </div>
         {% endif %}
 
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ ua | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -904,15 +904,15 @@
                 {% set ns_list = [whois_info.nameservers] if whois_info.nameservers is string else whois_info.nameservers %}
                 {% for ns in ns_list[:3] %}<div class="text-xs font-mono">{{ ns }}</div>{% endfor %}
                 {% if ns_list|length > 3 %}
-                  <details class="mt-1"><summary class="text-indigo-400 cursor-pointer text-xs">+{{ ns_list|length - 3 }} more</summary>
+                  <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">+{{ ns_list|length - 3 }} more</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
                     {% for ns in ns_list[3:] %}<div class="text-xs font-mono">{{ ns }}</div>{% endfor %}
-                  </details>
+                  </div></details>
                 {% endif %}
               </td>
             </tr>
           {% endif %}
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ whois_info | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -954,7 +954,7 @@
             </tr>
           {% endfor %}
         </table>
-        <details class="nt-raw"><summary>Show Raw Data</summary>
+        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ es | tojson(indent=2) }}</pre>
         </details>
       </div>
@@ -990,11 +990,11 @@
               {% for d in domains[:5] %}<li class="break-all">{{ d }}</li>{% endfor %}
             </ul>
             {% if domains|length > 5 %}
-              <details class="mt-2"><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ domains|length }})</summary>
+              <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ domains|length }}</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
                 <ul class="list-disc list-inside text-sm mt-1 space-y-1">
                   {% for d in domains[5:] %}<li class="break-all">{{ d }}</li>{% endfor %}
                 </ul>
-              </details>
+              </div></details>
             {% endif %}
           {% else %}
             <span class="text-yellow-400 text-sm">No other domains found on this IP.</span>
@@ -1020,11 +1020,11 @@
             {% for sub in subs[:5] %}<li class="break-all font-mono text-xs">{{ sub }}</li>{% endfor %}
           </ul>
           {% if subs|length > 5 %}
-            <details class="mt-2"><summary class="text-blue-400 cursor-pointer text-xs">Show All ({{ subs|length }})</summary>
+            <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ subs|length }}</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
               <ul class="list-disc list-inside text-sm mt-1 space-y-1">
                 {% for sub in subs[5:] %}<li class="break-all font-mono text-xs">{{ sub }}</li>{% endfor %}
               </ul>
-            </details>
+            </div></details>
           {% endif %}
         {% else %}
           <span class="text-yellow-400 text-sm">No subdomains found.</span>
@@ -1165,7 +1165,7 @@
         {% endfor %}
       </ul>
       {% if alienvault.tables.pulses|length > 5 %}
-        <details class="mt-1"><summary class="text-orange-400 cursor-pointer text-xs">Show All Pulses ({{ alienvault.tables.pulses|length }})</summary>
+        <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ alienvault.tables.pulses|length }} pulses</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
           <ul class="space-y-2 mt-2">
             {% for pulse in alienvault.tables.pulses[5:] %}
               <li class="text-sm">
@@ -1174,7 +1174,7 @@
               </li>
             {% endfor %}
           </ul>
-        </details>
+        </div></details>
       {% endif %}
     {% endif %}
     {% set otx_indicator = alienvault.summary.indicator if alienvault.summary and alienvault.summary.indicator else (indicator if indicator is defined else '') %}
@@ -1185,7 +1185,7 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
     {% endif %}
-    <details class="nt-raw"><summary>Show Raw Data</summary>
+    <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
       <pre>{{ alienvault.raw | tojson(indent=2) }}</pre>
     </details>
   </div>
@@ -1307,7 +1307,7 @@
       <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme, not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
-    <details class="nt-raw"><summary>Show Raw Data</summary>
+    <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
       <pre>{{ (e.get('raw') if e.get('raw') is not none else {}) | tojson(indent=2) }}</pre>
     </details>
   </div>
@@ -1389,7 +1389,7 @@
       <p class="text-gray-500 text-xs break-all" title="Non-HTTP scheme, not rendered as a link">Reference: {{ ref }}</p>
     {% endif %}
 
-    <details class="nt-raw"><summary>Show Raw Data</summary>
+    <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
       <pre>{{ (e.get('raw') if e.get('raw') is not none else {}) | tojson(indent=2) }}</pre>
     </details>
   </div>
