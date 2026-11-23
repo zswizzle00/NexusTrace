@@ -123,6 +123,9 @@ def create_app():
     from app.routes import ROLE_ADMIN, admin_rules, register_routes
     register_routes(app)
 
+    from app.utils.location_summary import reporting_sources, summarize
+    app.jinja_env.globals.update(location_summary=summarize, location_sources=reporting_sources)
+
     # register_routes() already skips the admin blueprint on the public role. This
     # re-checks the built url_map, so an admin route smuggled onto some other blueprint
     # cannot quietly ship to the internet-facing process: absence is the whole control,
