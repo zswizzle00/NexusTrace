@@ -42,12 +42,12 @@
     <div class="app-container flex-1 flex flex-col">
         {% if request.endpoint != 'index' %}
         <header class="main-header" role="banner">
-            <div class="flex items-center w-full">
-                <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity pr-6">
-                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <div class="main-header__inner">
+                <a href="/" class="nt-brand hover:opacity-80 transition-opacity">
+                    <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
                     </svg>
-                    <span class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
+                    <span class="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">NexusTrace</span>
                 </a>
                 <nav aria-label="Primary" class="desktop-nav">
                     <div class="nav-group">
@@ -116,13 +116,13 @@
                             </div>
                         </div>
                     </div>
-                    {% if accounts_enabled %}
-                    <div class="nav-sep" role="separator" aria-hidden="true"></div>
-                    <div class="nav-group">
-                        <a href="{{ url_for('account.account') }}" class="nav-link{% if request.path.startswith('/account') %} active{% endif %}">{{ 'Account' if current_account else 'Sign in' }}</a>
-                    </div>
-                    {% endif %}
                 </nav>
+                {% if accounts_enabled %}
+                <a href="{{ url_for('account.account') }}" class="nt-account-link{% if request.path.startswith('/account') %} active{% endif %}">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.1a7.5 7.5 0 0115 0"/></svg>
+                    <span>{{ 'Account' if current_account else 'Sign in' }}</span>
+                </a>
+                {% endif %}
 
                 <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobile-nav">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -132,6 +132,9 @@
             </div>
 
             <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation">
+                {% if accounts_enabled %}
+                <a href="{{ url_for('account.account') }}" class="mobile-nav-link">{{ 'Account' if current_account else 'Sign in' }}</a>
+                {% endif %}
                 <a href="/cyberchef" class="mobile-nav-link">CyberChef</a>
                 <a href="/user_agent_search" class="mobile-nav-link">User Agent Search</a>
                 <a href="/identity_scan" class="mobile-nav-link">Identity Scan</a>
@@ -143,9 +146,6 @@
                 <a href="/phone_analysis" class="mobile-nav-link">Phone Analysis</a>
                 <a href="/ad_event_search" class="mobile-nav-link">Windows Event Search</a>
                 <a href="/azure_error_search" class="mobile-nav-link">Azure Error Search</a>
-                {% if accounts_enabled %}
-                <a href="{{ url_for('account.account') }}" class="mobile-nav-link">{{ 'Account' if current_account else 'Sign in' }}</a>
-                {% endif %}
                 <div class="mobile-nav-heading">Tools</div>
                 <a href="https://www.virustotal.com/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">VirusTotal</a>
                 <a href="https://www.shodan.io/" target="_blank" rel="noopener" class="mobile-nav-link mobile-nav-sub">Shodan</a>

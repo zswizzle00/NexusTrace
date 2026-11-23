@@ -221,6 +221,41 @@ body {
     align-self: center;
 }
 
+/* Same 80rem column as the page content, so the logo lines up with page titles and the
+   account link sits on the right edge instead of trailing the last nav group. */
+.main-header__inner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+.nt-brand { display: flex; align-items: center; gap: 0.625rem; flex-shrink: 0; }
+.main-header__inner .nav-toggle { margin-left: auto; }
+.nt-account-link {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid rgba(37, 99, 235, 0.45);
+    border-radius: 9999px;
+    transition: var(--transition-fast);
+}
+.nt-account-link svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.nt-account-link:hover { color: #fff; background: rgba(37, 99, 235, 0.15); border-color: #3b82f6; }
+.nt-account-link.active { color: #60A5FA; background: rgba(37, 99, 235, 0.12); border-color: #3b82f6; }
+.btn-secondary { background: #1f2937; color: #e5e7eb; border: 1px solid #374151; }
+.btn-secondary:hover { background: #374151; }
+.nt-label-danger { color: #f87171; }
+
 /* The full inline nav shows at 1200px+; below that a hamburger toggles a vertical
    panel, preventing horizontal overflow on phones/tablets. */
 .desktop-nav {
@@ -290,6 +325,7 @@ body {
 
 @media (min-width: 1200px) {
     .desktop-nav { display: flex; }
+    .nt-account-link { display: inline-flex; }
     .nav-toggle { display: none; }
     .mobile-nav { display: none !important; }
 }
