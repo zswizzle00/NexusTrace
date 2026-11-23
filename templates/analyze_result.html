@@ -11,6 +11,20 @@
   {% endif %}
 {% endmacro %}
 
+{# One AbuseIPDB report: date and reporter country on a line of their own, then the full
+   comment. A table cut both the comment and long country names to fit a card's width;
+   reporters' comments are often multi-line log excerpts, so line breaks are kept. #}
+{% macro abuse_report(report) -%}
+  {% set ts = report.reportedAt or report.timestamp or '' %}
+  <li class="nt-report">
+    <div class="nt-report__meta">
+      <span>{{ ts[:10] if ts else 'Date unknown' }}</span>
+      <span>{{ report.reporterCountryName or report.reporter_country_name or 'Country unknown' }}</span>
+    </div>
+    <p class="nt-report__comment">{{ report.comment or 'No comment' }}</p>
+  </li>
+{%- endmacro %}
+
 {% macro kv_row(label, value) %}
   {% if value is defined and value is not none and value != '' %}
     <tr>
@@ -245,97 +259,77 @@
   {% endif %}
 
   {% if has_ip_cards %}
+  {# Reputation first: the cards that answer "is this address bad?" #}
   <div class="nt-card-grid">
-
-    {% if ipinfo %}
-      <div class="nt-card">
+    {% if abuseipdb %}
+      <div class="nt-card is-abuse">
         <div class="nt-card__head">
           <span class="nt-card__icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>
+              <path d="M12 2L3 6v6c0 5 4 9.5 9 10 5-.5 9-5 9-10V6l-9-4z"/>
+              <path d="M12 8v5M12 17h.01"/>
             </svg>
           </span>
-          <h3 class="nt-card__title">IPInfo</h3>
-          <span class="nt-card__source">Geolocation</span>
+          <h3 class="nt-card__title">AbuseIPDB</h3>
+          <span class="nt-card__source">Abuse Reports</span>
         </div>
-        <table class="w-full text-sm">
-          {{ kv_row('IP', ipinfo.ip) }}
-          {% if ipinfo.city or ipinfo.region or ipinfo.country %}
-            <tr>
-              <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Location</th>
-              <td class="py-2 break-words">
-                {% if cc %}{{ flag(cc) }} {% endif %}
-                {% if ipinfo.city %}{{ ipinfo.city }}{% endif %}
-                {% if ipinfo.region %}{% if ipinfo.city %}, {% endif %}{{ ipinfo.region }}{% endif %}
-                {% if ipinfo.country %}{% if ipinfo.city or ipinfo.region %}, {% endif %}{{ ipinfo.country }}{% endif %}
-              </td>
-            </tr>
+
+        {% if abuseipdb.summary %}
+          {% set score = abuseipdb.summary.abuseConfidenceScore or abuseipdb.summary.get('abuse_confidence_score') or abuseipdb.summary.get('confidence_score') or abuseipdb.summary.get('risk_score') %}
+          {% if score is not none %}
+            {% set score_int = score|int %}
+            {% set gauge_cls = 'is-high' if score_int > 50 else ('is-medium' if score_int > 25 else 'is-low') %}
+            <div class="nt-gauge-row">
+              <div class="nt-gauge {{ gauge_cls }}" style="--val: {{ score_int }};" role="img" aria-label="Abuse confidence score {{ score_int }} percent">
+                <span class="nt-gauge__value">{{ score_int }}<span class="nt-gauge__unit">%</span></span>
+              </div>
+              <div class="nt-gauge-meta">
+                <span class="nt-gauge-meta__label">Abuse Confidence</span>
+                <span class="nt-gauge-meta__text">
+                  {% if score_int >= 75 %}<strong>High-confidence malicious</strong>{% elif score_int >= 25 %}<strong>Suspicious activity</strong>{% else %}<strong>No significant abuse history</strong>{% endif %}<br>
+                  {% if abuseipdb.summary.totalReports %}{{ abuseipdb.summary.totalReports }} reports{% elif abuseipdb.summary.get('total_reports') %}{{ abuseipdb.summary.get('total_reports') }} reports{% else %}No reports{% endif %}
+                </span>
+              </div>
+            </div>
           {% endif %}
-          {% if ipinfo.continent %}
-            {{ kv_row('Continent', ipinfo.continent ~ (' (' ~ ipinfo.continent_code ~ ')' if ipinfo.continent_code else '')) }}
+
+          <table class="w-full text-sm">
+            {% set lr = abuseipdb.summary.lastReportedAt or abuseipdb.summary.get('last_reported_at') or abuseipdb.summary.get('last_reported') or '' %}
+            {{ kv_row('Last Reported', lr[:10] if lr else '') }}
+            {% set shown_keys = ['abuseConfidenceScore', 'abuse_confidence_score', 'confidence_score', 'risk_score', 'totalReports', 'total_reports', 'lastReportedAt', 'last_reported_at', 'last_reported', 'countryName', 'country_name', 'country', 'isp', 'domain', 'usageType', 'usage_type', 'ipAddress', 'ip_address', 'ip', 'countryCode', 'country_code'] %}
+            {% for k, v in abuseipdb.summary.items() %}
+              {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
+            {% endfor %}
+          </table>
+        {% endif %}
+
+        {% if abuseipdb.tables is defined and abuseipdb.tables.reports %}
+          <p class="nt-card__section-title">Recent Reports</p>
+          <ul class="nt-reports">
+            {% for report in abuseipdb.tables.reports[:5] %}{{ abuse_report(report) }}{% endfor %}
+          </ul>
+          {% if abuseipdb.tables.reports|length > 5 %}
+            <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ abuseipdb.tables.reports|length }} reports</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
+              <ul class="nt-reports">
+                {% for report in abuseipdb.tables.reports[5:] %}{{ abuse_report(report) }}{% endfor %}
+              </ul>
+            </div></details>
           {% endif %}
-          {{ kv_row('Organization', ipinfo.org) }}
-          {% if ipinfo.asn %}
-            <tr>
-              <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">ASN</th>
-              <td class="py-2 break-words">
-                {% if ipinfo.as_name %}{{ ipinfo.as_name }} {% endif %}({{ ipinfo.asn }})
-                {% if ipinfo.as_domain %}<br><span class="text-gray-500">Domain: {{ ipinfo.as_domain }}</span>{% endif %}
-              </td>
-            </tr>
-          {% endif %}
-          {{ kv_row('Hostname', ipinfo.hostname) }}
-          {{ kv_row('Coordinates', ipinfo.loc) }}
-          {{ kv_row('Postal Code', ipinfo.postal) }}
-          {{ kv_row('Timezone', ipinfo.timezone) }}
-          {{ kv_row('Company', ipinfo.company) }}
-          {{ kv_row('Carrier', ipinfo.carrier) }}
-          {{ kv_row('Privacy', ipinfo.privacy) }}
-          {% if ipinfo.anycast %}
-            <tr><th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Anycast</th><td class="py-2">{{ bool_badge(ipinfo.anycast) }}</td></tr>
-          {% endif %}
-          {% if ipinfo.bogon %}
-            <tr><th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Bogon</th><td class="py-2">{{ bool_badge(ipinfo.bogon) }}</td></tr>
-          {% endif %}
-        </table>
+        {% endif %}
+
         <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
-          <pre>{{ ipinfo | tojson(indent=2) }}</pre>
+          <pre>{{ abuseipdb.raw | tojson(indent=2) }}</pre>
         </details>
       </div>
     {% endif %}
 
-    {% if ip2location %}
-      <div class="nt-card">
-        <div class="nt-card__head">
-          <span class="nt-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 21s-7-6.5-7-12a7 7 0 1114 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>
-            </svg>
-          </span>
-          <h3 class="nt-card__title">IP2Location</h3>
-          <span class="nt-card__source">Geolocation</span>
-        </div>
-        <table class="w-full text-sm">
-          {{ kv_row('IP', ip2location.ip) }}
-          {{ kv_row('Country', ip2location.country_name) }}
-          {{ kv_row('Region', ip2location.region_name or ip2location.region) }}
-          {{ kv_row('City', ip2location.city_name or ip2location.city) }}
-          {{ kv_row('Latitude', ip2location.latitude) }}
-          {{ kv_row('Longitude', ip2location.longitude) }}
-          {{ kv_row('ZIP Code', ip2location.zip_code or ip2location.zipcode) }}
-          {{ kv_row('Time Zone', ip2location.time_zone or ip2location.timezone) }}
-          {{ kv_row('ISP', ip2location.isp) }}
-          {{ kv_row('Domain', ip2location.domain) }}
-          {{ kv_row('ASN', ip2location.asn or ip2location.as_) }}
-          {{ kv_row('Net Speed', ip2location.net_speed or ip2location.speed) }}
-          {{ kv_row('Usage Type', ip2location.usage_type) }}
-        </table>
-        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
-          <pre>{{ ip2location | tojson(indent=2) }}</pre>
-        </details>
-      </div>
+    {% if alienvault and has_ip_cards %}
+      {{ render_alienvault(alienvault) }}
     {% endif %}
-
+    {% if tf_env %}{{ render_threatfox(tf_env) }}{% endif %}
+    {% if uh_env %}{{ render_urlhaus(uh_env) }}{% endif %}
+    {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
+    {% if stopforumspam %}{{ render_stopforumspam(stopforumspam) }}{% endif %}
     {% if vpnapi %}
       <div class="nt-card is-vpn">
         <div class="nt-card__head">
@@ -364,16 +358,6 @@
             <span class="nt-pill__dot"></span> Relay {{ 'Detected' if vpnapi.security and vpnapi.security.relay else 'Clear' }}
           </span>
         </div>
-
-        {% if vpnapi.location %}
-          <p class="nt-card__section-title">Location</p>
-          <table class="w-full text-sm">
-            {{ kv_row('Country', vpnapi.location.country) }}
-            {{ kv_row('Region', vpnapi.location.region) }}
-            {{ kv_row('City', vpnapi.location.city) }}
-            {{ kv_row('ISP', vpnapi.network.autonomous_system_organization if vpnapi.network else None) }}
-          </table>
-        {% endif %}
 
         <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
           <pre>{{ vpnapi | tojson(indent=2) }}</pre>
@@ -408,11 +392,6 @@
         </div>
 
         <table class="w-full text-sm">
-          {% if pc.provider is defined and pc.provider %}{{ kv_row('Provider', pc.provider) }}{% endif %}
-          {% if pc.country is defined and pc.country %}{{ kv_row('Country', pc.country) }}{% endif %}
-          {% if pc.isp is defined and pc.isp %}{{ kv_row('ISP', pc.isp) }}{% endif %}
-          {% if pc.asn is defined and pc.asn %}{{ kv_row('ASN', pc.asn) }}{% endif %}
-          {% if pc.organisation is defined and pc.organisation %}{{ kv_row('Organization', pc.organisation) }}{% endif %}
           {% if pc.risk is defined and pc.risk is not none %}
             <tr>
               <th class="pr-4 py-2 text-gray-400 text-left whitespace-nowrap">Risk Score</th>
@@ -433,6 +412,63 @@
       </div>
     {% endif %}
 
+  </div>
+
+  {# Location and network facts from every provider, said once. Disagreements stay
+     visible: each distinct value is listed with the providers that gave it. IPinfo and
+     IP2Location have no card of their own; their remaining details live here. #}
+  {% set loc_rows = location_summary(ipinfo=ipinfo, ip2location=ip2location, vpnapi=vpnapi,
+                                     proxycheck=proxycheck, shodan=shodan, abuseipdb=abuseipdb) %}
+  {% if loc_rows or ipinfo or ip2location %}
+  <div class="nt-card nt-card--wide is-location">
+    <div class="nt-card__head">
+      <span class="nt-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>
+        </svg>
+      </span>
+      <h3 class="nt-card__title">Location and Network</h3>
+      {% set loc_sources = location_sources(ipinfo=ipinfo, ip2location=ip2location, vpnapi=vpnapi, proxycheck=proxycheck, shodan=shodan, abuseipdb=abuseipdb) %}
+      <span class="nt-card__source" title="{{ loc_sources | join(', ') }}">{{ loc_sources | length }} source{{ 's' if loc_sources | length != 1 }}</span>
+    </div>
+    <dl class="nt-loc">
+      {% for row in loc_rows %}
+      <div class="nt-loc__item{% if not row.agree %} is-split{% endif %}">
+        <dt>{{ row.label }}{% if not row.agree %} <span class="nt-loc__differ">sources differ</span>{% endif %}</dt>
+        {% for group in row['values'] %}
+        <dd>{{ group.value }} <span class="nt-loc__src">{{ group.sources | join(', ') }}</span></dd>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      {% set extras = [] %}
+      {% if ipinfo %}
+        {% for label, value in [('Hostname', ipinfo.hostname), ('Continent', ipinfo.continent), ('Company', ipinfo.company),
+                                ('Carrier', ipinfo.carrier), ('Privacy', ipinfo.privacy)] if value %}
+          {% set _ = extras.append((label, value, 'IPinfo')) %}
+        {% endfor %}
+        {% if ipinfo.anycast %}{% set _ = extras.append(('Anycast', 'Yes', 'IPinfo')) %}{% endif %}
+        {% if ipinfo.bogon %}{% set _ = extras.append(('Bogon', 'Yes', 'IPinfo')) %}{% endif %}
+      {% endif %}
+      {% if ip2location and (ip2location.net_speed or ip2location.speed) %}
+        {% set _ = extras.append(('Net speed', ip2location.net_speed or ip2location.speed, 'IP2Location')) %}
+      {% endif %}
+      {% for label, value, source in extras %}
+      <div class="nt-loc__item">
+        <dt>{{ label }}</dt>
+        <dd>{{ value }} <span class="nt-loc__src">{{ source }}</span></dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% if ipinfo or ip2location %}
+    <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data (IPinfo, IP2Location)</span><span class="nt-toggle__open">Hide raw data</span></summary>
+      <pre>{{ {'IPinfo': ipinfo or none, 'IP2Location': ip2location or none} | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if shodan or internetdb or ripestat %}
+  <div class="nt-card-grid">
     {% if shodan %}
       <div class="nt-card is-shodan">
         <div class="nt-card__head">
@@ -448,17 +484,12 @@
 
         {% if shodan.summary %}
           <table class="w-full text-sm">
-            {{ kv_row('IP', shodan.summary.ip or shodan.summary.get('ip_str')) }}
-            {{ kv_row('Organization', shodan.summary.org or shodan.summary.organization) }}
-            {{ kv_row('ISP', shodan.summary.isp) }}
-            {{ kv_row('Country', shodan.summary.country or shodan.summary.country_name) }}
-            {{ kv_row('City', shodan.summary.city) }}
             {{ kv_row('Hostnames', shodan.summary.hostnames) }}
             {{ kv_row('OS', shodan.summary.os) }}
             {% if shodan.summary.last_update %}
               {{ kv_row('Last Updated', (shodan.summary.last_update | string | replace('T', ' '))[:16]) }}
             {% endif %}
-            {% set shown_keys = ['ip', 'ip_str', 'org', 'organization', 'isp', 'country', 'country_name', 'city', 'hostnames', 'os', 'last_update'] %}
+            {% set shown_keys = ['ip', 'ip_str', 'org', 'organization', 'isp', 'country', 'country_name', 'city', 'hostnames', 'os', 'last_update', 'country_code', 'region_code', 'latitude', 'longitude', 'asn'] %}
             {% for k, v in shodan.summary.items() %}
               {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
             {% endfor %}
@@ -495,110 +526,10 @@
       </div>
     {% endif %}
 
-    {% if abuseipdb %}
-      <div class="nt-card is-abuse">
-        <div class="nt-card__head">
-          <span class="nt-card__icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 2L3 6v6c0 5 4 9.5 9 10 5-.5 9-5 9-10V6l-9-4z"/>
-              <path d="M12 8v5M12 17h.01"/>
-            </svg>
-          </span>
-          <h3 class="nt-card__title">AbuseIPDB</h3>
-          <span class="nt-card__source">Abuse Reports</span>
-        </div>
-
-        {% if abuseipdb.summary %}
-          {% set score = abuseipdb.summary.abuseConfidenceScore or abuseipdb.summary.get('abuse_confidence_score') or abuseipdb.summary.get('confidence_score') or abuseipdb.summary.get('risk_score') %}
-          {% if score is not none %}
-            {% set score_int = score|int %}
-            {% set gauge_cls = 'is-high' if score_int > 50 else ('is-medium' if score_int > 25 else 'is-low') %}
-            <div class="nt-gauge-row">
-              <div class="nt-gauge {{ gauge_cls }}" style="--val: {{ score_int }};" role="img" aria-label="Abuse confidence score {{ score_int }} percent">
-                <span class="nt-gauge__value">{{ score_int }}<span class="nt-gauge__unit">%</span></span>
-              </div>
-              <div class="nt-gauge-meta">
-                <span class="nt-gauge-meta__label">Abuse Confidence</span>
-                <span class="nt-gauge-meta__text">
-                  {% if score_int >= 75 %}<strong>High-confidence malicious</strong>{% elif score_int >= 25 %}<strong>Suspicious activity</strong>{% else %}<strong>No significant abuse history</strong>{% endif %}<br>
-                  {% if abuseipdb.summary.totalReports %}{{ abuseipdb.summary.totalReports }} reports{% elif abuseipdb.summary.get('total_reports') %}{{ abuseipdb.summary.get('total_reports') }} reports{% else %}No reports{% endif %}
-                </span>
-              </div>
-            </div>
-          {% endif %}
-
-          <table class="w-full text-sm">
-            {% set lr = abuseipdb.summary.lastReportedAt or abuseipdb.summary.get('last_reported_at') or abuseipdb.summary.get('last_reported') or '' %}
-            {{ kv_row('Last Reported', lr[:10] if lr else '') }}
-            {{ kv_row('Country', abuseipdb.summary.countryName or abuseipdb.summary.get('country_name') or abuseipdb.summary.get('country')) }}
-            {{ kv_row('ISP', abuseipdb.summary.isp) }}
-            {{ kv_row('Domain', abuseipdb.summary.domain) }}
-            {{ kv_row('Usage Type', abuseipdb.summary.usageType or abuseipdb.summary.get('usage_type')) }}
-            {{ kv_row('IP', abuseipdb.summary.ipAddress or abuseipdb.summary.get('ip_address') or abuseipdb.summary.get('ip')) }}
-            {% set shown_keys = ['abuseConfidenceScore', 'abuse_confidence_score', 'confidence_score', 'risk_score', 'totalReports', 'total_reports', 'lastReportedAt', 'last_reported_at', 'last_reported', 'countryName', 'country_name', 'country', 'isp', 'domain', 'usageType', 'usage_type', 'ipAddress', 'ip_address', 'ip'] %}
-            {% for k, v in abuseipdb.summary.items() %}
-              {% if k not in shown_keys and v %}{{ kv_row(k|replace('_', ' ')|title, v) }}{% endif %}
-            {% endfor %}
-          </table>
-        {% endif %}
-
-        {% if abuseipdb.tables is defined and abuseipdb.tables.reports %}
-          <p class="nt-card__section-title">Recent Reports</p>
-          <table class="w-full text-xs nt-reports-table">
-            <thead>
-              <tr>
-                <th class="px-2 py-1.5 text-left">Date</th>
-                <th class="px-2 py-1.5 text-left">Comment</th>
-                <th class="px-2 py-1.5 text-left">Country</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for report in abuseipdb.tables.reports[:5] %}
-                {% set ts = report.reportedAt or report.timestamp or '' %}
-                <tr class="border-t border-gray-800">
-                  <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
-                  <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}"><span class="nt-clamp">{{ report.comment or 'N/A' }}</span></td>
-                  <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% if abuseipdb.tables.reports|length > 5 %}
-            <details class="nt-more"><summary class="nt-toggle"><span class="nt-toggle__closed">Show all {{ abuseipdb.tables.reports|length }} reports</span><span class="nt-toggle__open">Show fewer</span></summary><div class="nt-more__body">
-              <table class="w-full text-xs mt-1 nt-reports-table">
-                <tbody>
-                  {% for report in abuseipdb.tables.reports[5:] %}
-                    {% set ts = report.reportedAt or report.timestamp or '' %}
-                    <tr class="border-t border-gray-800">
-                      <td class="px-2 py-1.5 whitespace-nowrap text-gray-400">{{ ts[:10] if ts else 'N/A' }}</td>
-                      <td class="px-2 py-1.5 nt-reports-table__comment" title="{{ report.comment or '' }}"><span class="nt-clamp">{{ report.comment or 'N/A' }}</span></td>
-                      <td class="px-2 py-1.5 whitespace-nowrap">{{ report.reporterCountryName or report.reporter_country_name or 'N/A' }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div></details>
-          {% endif %}
-        {% endif %}
-
-        <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
-          <pre>{{ abuseipdb.raw | tojson(indent=2) }}</pre>
-        </details>
-      </div>
-    {% endif %}
-
-    {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
     {% if internetdb %}{{ render_internetdb(internetdb) }}{% endif %}
-    {% if stopforumspam %}{{ render_stopforumspam(stopforumspam) }}{% endif %}
     {% if ripestat %}{{ render_ripestat(ripestat) }}{% endif %}
-
-    {% if alienvault and has_ip_cards %}
-      {{ render_alienvault(alienvault) }}
-    {% endif %}
-
-    {% if tf_env %}{{ render_threatfox(tf_env) }}{% endif %}
-    {% if uh_env %}{{ render_urlhaus(uh_env) }}{% endif %}
   </div>
+  {% endif %}
   {% endif %}
 
   {% if (alienvault and not has_ip_cards) or domain_info or url_analysis or whois_info or registration or archive %}
@@ -1146,7 +1077,6 @@
         </div>
       {% endif %}
       <table class="w-full text-sm">
-        {{ kv_row('Indicator', alienvault.summary.indicator) }}
         {{ kv_row('Tags', alienvault.summary.tags) }}
         {% set shown_keys = ['indicator', 'reputation', 'pulse_count', 'tags'] %}
         {% for k, v in alienvault.summary.items() %}
@@ -1213,12 +1143,12 @@
       <span>Nothing known about this indicator</span>
     </div>
   {% elif state == 'skipped' %}
-    <div class="nt-otx-empty">
+    <div class="nt-otx-empty is-muted">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
       <span>ABUSECH_AUTH_KEY not configured, so this source was never queried</span>
     </div>
   {% elif state != 'found' %}
-    <div class="nt-otx-empty">
+    <div class="nt-otx-empty is-warn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
       <span>Lookup failed or the key was rejected; treat as no information</span>
     </div>
