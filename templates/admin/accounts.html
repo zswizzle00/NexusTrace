@@ -1,0 +1,72 @@
+{% extends "admin/_layout.html" %}
+{% set admin_title = 'Accounts' %}
+{% set admin_description = 'People who signed in with GitHub or Google, and the settings that govern accounts.' %}
+
+{% macro yes_no(value) -%}
+  <span class="nt-pill {{ 'is-ok' if value else 'is-neutral' }}">{{ 'yes' if value else 'no' }}</span>
+{%- endmacro %}
+
+{% block admin_content %}
+<div class="nt-card p-5 mb-5">
+  <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Configuration</p>
+  <div class="nt-admin-kv">
+    <span>Accounts</span>
+    <span>{% if config.enabled %}<span class="nt-pill is-ok">on</span>{% else %}<span class="nt-pill is-neutral">off</span>
+      <span class="text-xs text-gray-500 ml-2">needs ACCOUNTS_ENCRYPTION_KEY and at least one sign-in provider</span>{% endif %}</span>
+    <span>Encryption key set</span><span>{{ yes_no(config.encryption_key) }}</span>
+    <span>Sign-in providers</span><span>{{ config.providers | join(', ') if config.providers else 'none configured' }}</span>
+    <span>Redirect base</span><span class="font-mono">{{ config.redirect_base or 'not set' }}</span>
+    <span>Sign-up cap</span><span>{{ active }} active of {{ config.max_users }}</span>
+    <span>Shared VirusTotal key used by</span><span>{{ {'everyone': 'everyone', 'accounts': 'signed-in users only', 'nobody': 'nobody (users bring their own)'}[config.shared_key_policy] }}</span>
+  </div>
+</div>
+
+<div class="nt-card p-5">
+  <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Accounts ({{ users | length }})</p>
+  {% if users %}
+  <div class="overflow-x-auto">
+    <table class="nt-admin-table">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Provider</th><th>Created</th><th>Last sign-in</th><th>Saved keys</th><th>Status</th><th class="text-right">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td class="font-mono">{{ user.id }}</td>
+          <td>{{ user.login }}</td>
+          <td>{{ {'github': 'GitHub', 'google': 'Google'}.get(user.provider, user.provider) }}</td>
+          <td class="whitespace-nowrap">{{ (user.created_at or '')[:10] }}</td>
+          <td class="whitespace-nowrap">{{ (user.last_login_at or '')[:16] | replace('T', ' ') }}</td>
+          <td>{{ user.services | join(', ') if user.services else 'none' }}</td>
+          <td><span class="nt-pill {{ 'is-warn' if user.disabled else 'is-ok' }}">{{ 'disabled' if user.disabled else 'active' }}</span></td>
+          <td>
+            <div class="flex flex-wrap justify-end gap-2">
+              <form method="POST" action="{{ url_for('admin.admin_account_action', user_id=user.id, action='enable' if user.disabled else 'disable') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="nt-admin-chip">{{ 'Enable' if user.disabled else 'Disable' }}</button>
+              </form>
+              <details class="nt-admin-confirm">
+                <summary class="nt-admin-chip is-danger">Delete</summary>
+                <form method="POST" action="{{ url_for('admin.admin_account_action', user_id=user.id, action='delete') }}" class="nt-admin-confirm__form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="text-xs text-gray-400" for="confirm-{{ user.id }}">Type {{ user.id }} to delete the account and its keys</label>
+                  <div class="flex gap-2 mt-1">
+                    <input id="confirm-{{ user.id }}" name="confirm" inputmode="numeric" autocomplete="off" required
+                           class="form-input w-20 bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm">
+                    <button type="submit" class="nt-admin-chip is-danger">Delete</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-500 mt-3">A disabled account is signed out on its next request and cannot sign in; its saved keys stay. Deleting removes the account and every key it saved.</p>
+  {% else %}
+  <p class="text-sm text-gray-500">No accounts yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

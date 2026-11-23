@@ -40,22 +40,24 @@ services:
   admin:
     build: .
     ports:
-      # Published on all interfaces so it is reachable on the local network.
-      # Make sure ADMIN_TOKEN is set: the token is the only door when Cloudflare
-      # Access is not in use, and /admin returns 404 without it.
+      # The operator console: http://<host>:5051/admin from the LAN or Tailscale. nginx
+      # has no /admin route, so it is not reachable through Cloudflare, and the app
+      # itself 404s any request that is not a direct connection from ADMIN_NETWORKS
+      # (private, loopback and Tailscale ranges by default). Set ADMIN_TOKEN: without it
+      # /admin returns 404.
       - "5051:5051"
     volumes:
       - app_logs:/app/logs
       # The same records as `web`. This container is less REACHABLE, not less privileged:
-      # it has full read/write access to every stored record, which is why ADMIN_TOKEN and
-      # Cloudflare Access still apply inside it.
+      # it has full read/write access to every stored record, which is why ADMIN_TOKEN
+      # still applies inside it.
       - ./data:/app/data
     env_file:
       - .env
     environment:
       - NEXUSTRACE_ROLE=admin
-      # No FLASK_HOST: the Dockerfile CMD always binds 0.0.0.0 inside the container, and
-      # the loopback publish above is what limits who can connect.
+      # No FLASK_HOST: the Dockerfile CMD always binds 0.0.0.0 inside the container; the
+      # network check in admin_routes is what limits who can connect.
       - FLASK_PORT=5051
     restart: always
     logging: *default-logging

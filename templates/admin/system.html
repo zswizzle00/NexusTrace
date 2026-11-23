@@ -1,0 +1,53 @@
+{% extends "admin/_layout.html" %}
+{% set admin_title = 'System' %}
+{% set admin_description = 'How this deployment is configured, and what it has stored.' %}
+
+{% macro human_bytes(n) -%}
+  {%- if n >= 1073741824 %}{{ (n / 1073741824) | round(1) }} GB
+  {%- elif n >= 1048576 %}{{ (n / 1048576) | round(1) }} MB
+  {%- elif n >= 1024 %}{{ (n / 1024) | round(1) }} KB
+  {%- else %}{{ n }} B{% endif -%}
+{%- endmacro %}
+
+{% block admin_content %}
+<div class="grid gap-5 md:grid-cols-2 mb-5">
+  <div class="nt-card p-5">
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Settings</p>
+    <div class="nt-admin-kv">
+      {% for label, value in settings %}
+      <span>{{ label }}</span><span>{{ value }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="nt-card p-5">
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Console reachable from</p>
+    <ul class="font-mono text-sm text-gray-300 space-y-1">
+      {% for network in networks %}<li>{{ network }}</li>{% endfor %}
+    </ul>
+    <p class="text-xs text-gray-500 mt-3">Direct connections only: a request that came through Cloudflare or a reverse proxy gets a 404. Set ADMIN_NETWORKS to narrow the list.</p>
+  </div>
+</div>
+
+<div class="nt-card p-5">
+  <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Stored data</p>
+  <div class="overflow-x-auto">
+    <table class="nt-admin-table">
+      <thead><tr><th>Store</th><th>Items</th><th>Size</th><th>Newest</th></tr></thead>
+      <tbody>
+        {% for s in stores %}
+        <tr>
+          <td class="text-gray-100">{{ s.name }}</td>
+          {% if s.error %}
+          <td colspan="3" class="text-yellow-300">Could not be read</td>
+          {% else %}
+          <td>{{ s.count }}</td>
+          <td>{{ human_bytes(s.bytes) }}</td>
+          <td class="whitespace-nowrap">{{ s.newest or '-' }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

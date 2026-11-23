@@ -91,8 +91,9 @@ treated as not saved.
 
 ## Disable an account
 
-Accounts have no admin page; use the operator tool from the deployment directory. Pick the
-account by the ID that `list` prints, because a display name is not unique.
+Use the **Accounts** page of the [operator console](admin.md), or the operator tool from
+the deployment directory. Pick the account by its ID, because a display name is not
+unique.
 
 ```sh
 python3 scripts/manage_accounts.py list

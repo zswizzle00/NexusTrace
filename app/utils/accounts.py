@@ -136,7 +136,12 @@ def _build_fernet(raw):
 
 def enabled():
     from . import oauth
-    return _fernet() is not None and bool(oauth.configured_providers())
+    return encryption_configured() and bool(oauth.configured_providers())
+
+
+def encryption_configured():
+    """True when ACCOUNTS_ENCRYPTION_KEY holds at least one valid key."""
+    return _fernet() is not None
 
 
 def max_users():
