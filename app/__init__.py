@@ -63,44 +63,38 @@ def create_app():
 
     from flask_talisman import Talisman
 
+    # CyberChef needs eval and blob: workers, and its blueprint sends its own looser
+    # policy (app/services/cyberchef.py), so neither is allowed here. Lookups run on the
+    # server, so the browser only ever connects to this origin.
     csp = {
         'default-src': "'self'",
         'script-src': [
             "'self'",
-            "'unsafe-inline'",  # Required: the app uses inline <script> blocks across templates
-            "'unsafe-eval'",  # Required for CyberChef
-            "blob:",  # Required for CyberChef web workers
+            "'unsafe-inline'",  # templates still carry inline <script> blocks
         ],
         'style-src': [
             "'self'",
-            "'unsafe-inline'",  # Required: inline <style> blocks + style attributes
+            "'unsafe-inline'",  # inline <style> blocks and style attributes
         ],
         'img-src': [
             "'self'",
             "data:",
-            "blob:",  # Required for CyberChef image processing
-            "https:",
+            "blob:",
+            "https:",  # urlscan.io screenshots and favicons of scanned sites
         ],
         'font-src': [
             "'self'",
-            "data:",  # fonts are now self-hosted under /static/fonts
+            "data:",  # fonts are self-hosted under /static/fonts
         ],
-        'connect-src': [
-            "'self'",
-            "blob:",  # Required for CyberChef
-            "https://api.ipinfo.io",
-            "https://api.abuseipdb.com",
-            "https://api.shodan.io",
-            "https://otx.alienvault.com",
-            "https://vpnapi.io",
-        ],
-        'worker-src': ["'self'", "blob:"],  # Required for CyberChef web workers
-        'child-src': ["'self'", "blob:"],  # Required for CyberChef workers
-        'frame-ancestors': "'self'",  # Allow same-origin framing for embedded CyberChef
+        'connect-src': "'self'",
+        'object-src': "'none'",
+        'base-uri': "'self'",
+        'frame-ancestors': "'self'",  # the /cyberchef page frames /cyberchef_app
         'form-action': "'self'",
     }
 
-    Talisman(
+    # Kept on the app so a blueprint can override the policy per view (see cyberchef.py).
+    app.talisman = Talisman(
         app,
         force_https=False,  # Set to True in production with HTTPS
         strict_transport_security=False,
