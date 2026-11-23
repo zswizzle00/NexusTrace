@@ -6,7 +6,7 @@ Thank you for your interest in contributing to NexusTrace! This document provide
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.12 or higher (the version the Docker image runs)
 - Git
 - uv (Python package manager) - Install with: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Docker (optional, for containerized development)
