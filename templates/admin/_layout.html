@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_page.html" import page_header %}
+
+{% block title %}{{ admin_title }} | NexusTrace admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <nav class="nt-admin-tabs" aria-label="Admin sections">
+      {% for key, label, endpoint in [('activity', 'Activity', 'admin.admin_dashboard'),
+                                       ('accounts', 'Accounts', 'admin.admin_accounts'),
+                                       ('sources', 'Sources', 'admin.admin_sources'),
+                                       ('system', 'System', 'admin.admin_system')] %}
+      <a href="{{ url_for(endpoint) }}" class="nt-admin-tab{% if section == key %} is-active{% endif %}"
+         {% if section == key %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <form method="POST" action="{{ url_for('admin.admin_logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="text-sm text-gray-400 hover:text-gray-200">Sign out</button>
+    </form>
+  </div>
+
+  {{ page_header(admin_title, admin_description) }}
+  {% include "_account_flashes.html" %}
+  {% block admin_content %}{% endblock %}
+</div>
+{% endblock %}

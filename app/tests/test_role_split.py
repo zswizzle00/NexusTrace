@@ -296,7 +296,9 @@ def test_startup_guard_refuses_to_start_the_public_app():
 def test_admin_role_registers_the_admin_surface():
     with Sandbox():
         app = build(role=ROLE_ADMIN, token=RIGHT_TOKEN)
-        case(admin_paths(app) == {'/admin', '/admin/logout'},
+        case(admin_paths(app) == {'/admin', '/admin/logout', '/admin/accounts',
+                                  '/admin/accounts/<int:user_id>/<action>',
+                                  '/admin/sources', '/admin/system'},
              f'the admin role registered {sorted(admin_paths(app))}')
         case(app.config['NEXUSTRACE_ROLE'] == ROLE_ADMIN,
              f'role recorded as {app.config["NEXUSTRACE_ROLE"]!r}')

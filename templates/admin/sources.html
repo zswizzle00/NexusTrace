@@ -1,0 +1,25 @@
+{% extends "admin/_layout.html" %}
+{% set admin_title = 'Sources' %}
+{% set admin_description = 'Which intelligence providers have an API key. A provider without one is skipped and its card does not render.' %}
+
+{% block admin_content %}
+<div class="nt-card p-5">
+  <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">{{ configured }} of {{ sources | length }} configured</p>
+  <div class="overflow-x-auto">
+    <table class="nt-admin-table">
+      <thead><tr><th>Provider</th><th>Used for</th><th>Status</th><th>Environment variable</th></tr></thead>
+      <tbody>
+        {% for s in sources %}
+        <tr>
+          <td class="text-gray-100">{{ s.name }}</td>
+          <td>{{ s.purpose }}</td>
+          <td><span class="nt-pill {{ 'is-ok' if s.configured else 'is-neutral' }}">{{ 'configured' if s.configured else 'not set' }}</span></td>
+          <td class="font-mono text-xs">{{ s.configured or s.variables | join(' or ') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-500 mt-3">Keys are read from the deployment's .env at startup and never shown here. Change one there and restart the stack.</p>
+</div>
+{% endblock %}

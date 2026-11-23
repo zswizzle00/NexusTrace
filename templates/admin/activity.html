@@ -1,0 +1,107 @@
+{% extends "admin/_layout.html" %}
+{% set admin_title = 'Activity' %}
+{% set admin_description = 'Requests to the public site: the last 24 h at a glance, and every request in the selected window.' %}
+
+{% macro window_link(label, d, p) -%}
+  <a href="{{ url_for('admin.admin_dashboard', days=d, per=p) }}"
+     class="nt-admin-chip{% if days == d and per_page == p %} is-active{% endif %}">{{ label }}</a>
+{%- endmacro %}
+
+{% block admin_content %}
+<p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Last 24 h</p>
+<div class="nt-admin-stats mb-5">
+  {% for label, value in [('Requests', summary.total), ('Unique IPs', summary.unique_ips),
+                          ('Uploads', summary.uploads), ('Errors', summary.errors),
+                          ('Error rate', (summary.error_rate | string) ~ '%'),
+                          ('Countries', summary.top_countries | length)] %}
+  <div class="nt-card nt-admin-stat">
+    <span class="nt-admin-stat__label">{{ label }}</span>
+    <span class="nt-admin-stat__value">{{ value }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="nt-card p-5 mb-5">
+  <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Requests per hour (UTC)</p>
+  {% set hour_max = (hours_data | map(attribute='count') | max) or 1 %}
+  <div class="nt-admin-bars" role="img" aria-label="Requests per hour over the last 24 hours">
+    {% for h in hours_data %}
+    <div class="nt-admin-bar" title="{{ h.label }}: {{ h.count }} requests{% if h.errors %}, {{ h.errors }} errors{% endif %}">
+      <span class="nt-admin-bar__fill" style="height: {{ ((h.count / hour_max) * 100) | round(1) }}%">
+        {% if h.errors %}<span class="nt-admin-bar__err" style="height: {{ ((h.errors / h.count) * 100) | round(1) }}%"></span>{% endif %}
+      </span>
+      <span class="nt-admin-bar__label">{{ h.label[:2] if loop.index0 % 3 == 0 else '' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="nt-admin-grid3 mb-5">
+  {% for title, rows in [('Top paths', summary.top_paths), ('Top IPs', summary.top_ips), ('Top countries', summary.top_countries)] %}
+  <div class="nt-card p-5">
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">{{ title }}</p>
+    {% if rows %}
+    {% set top = rows[0][1] or 1 %}
+    <ul class="space-y-2">
+      {% for name, count in rows %}
+      <li>
+        <div class="flex justify-between gap-3 text-sm">
+          <span class="font-mono text-gray-300 truncate" title="{{ name }}">{{ name }}</span>
+          <span class="text-gray-400">{{ count }}</span>
+        </div>
+        <div class="nt-admin-meter"><span style="width: {{ ((count / top) * 100) | round(1) }}%"></span></div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-500">No requests in the last 24 h.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="nt-card p-5">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+    <p class="text-xs text-gray-500 uppercase tracking-wide">Requests, newest first ({{ total }} in {{ days }} day{{ 's' if days != 1 }})</p>
+    <div class="flex flex-wrap gap-2">
+      {% for d in [1, 3, 7, 14, 30] %}{{ window_link(d ~ ' d', d, per_page) }}{% endfor %}
+      <span class="text-gray-600">|</span>
+      {% for n in [25, 50, 100, 200] %}{{ window_link(n ~ ' per page', days, n) }}{% endfor %}
+    </div>
+  </div>
+
+  {% if entries %}
+  <div class="overflow-x-auto">
+    <table class="nt-admin-table">
+      <thead>
+        <tr><th>Time (UTC)</th><th>IP</th><th>Country</th><th>Method</th><th>Path</th><th>Status</th><th>ms</th><th>Upload</th></tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        {% set code = e.get('status') or 0 %}
+        <tr title="{{ e.get('ua') or '' }}">
+          <td class="whitespace-nowrap">{{ (e.get('ts') or '-')[:19] | replace('T', ' ') }}</td>
+          <td class="font-mono">{{ e.get('ip') or '-' }}</td>
+          <td>{{ e.get('country') or '-' }}</td>
+          <td><span class="nt-pill is-neutral">{{ e.get('method') or '-' }}</span></td>
+          <td class="font-mono nt-admin-table__path">{{ e.get('path') or '-' }}{% if not e.get('matched') %} <span class="text-gray-500">(no route)</span>{% endif %}</td>
+          <td><span class="nt-pill {{ 'is-bad' if code >= 500 else 'is-warn' if code >= 400 else 'is-ok' if code >= 200 and code < 300 else 'is-neutral' }}">{{ code or '-' }}</span></td>
+          <td>{{ e.get('ms') or 0 }}</td>
+          <td>{{ 'yes' if e.get('upload') else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex items-center justify-between mt-4 text-sm">
+    {% if page > 1 %}<a class="nt-admin-chip" href="{{ url_for('admin.admin_dashboard', page=page - 1, per=per_page, days=days) }}">Newer</a>{% else %}<span></span>{% endif %}
+    <span class="text-gray-500">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="nt-admin-chip" href="{{ url_for('admin.admin_dashboard', page=page + 1, per=per_page, days=days) }}">Older</a>{% else %}<span></span>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="text-sm text-gray-500">No requests recorded in this window.</p>
+  {% endif %}
+</div>
+{% endblock %}

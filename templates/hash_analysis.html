@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_search_form.html" import search_form %}
+{% from "_page.html" import page_header %}
 
 {# Keyless sources reported apart from the four reputation sources. `found` is not red on
    purpose: neither of them is a malicious verdict on its own. #}
@@ -31,12 +32,14 @@
 
 {% block main_content_class %}full-width{% endblock %}
 
-{% block content %}
-<div class="w-full py-10">
-    <h2 class="text-4xl font-extrabold mb-6 text-blue-400 text-center">Hash Analysis</h2>
+{% block title %}Hash Analysis | NexusTrace{% endblock %}
 
-    <div class="mb-10 w-full">
-        {{ search_form('Enter MD5, SHA1, or SHA256 hash...') }}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+    {{ page_header('Hash Analysis', 'Check an MD5, SHA-1 or SHA-256 file hash against VirusTotal, MalwareBazaar, ThreatFox and AlienVault OTX.') }}
+
+    <div class="nt-card p-5 mb-5">
+        {{ search_form('MD5, SHA-1 or SHA-256 hash', layout='panel') }}
     </div>
 
     {% if error %}
@@ -271,8 +274,8 @@
                 </div>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ vt | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ vt | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -308,8 +311,8 @@
                 </div>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-purple-400">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ mb | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ mb | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -338,8 +341,8 @@
                 {% endfor %}
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-orange-400">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ tf | tojson(indent=2) }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ tf | tojson(indent=2) }}</pre>
             </details>
         </div>
         {% endif %}
@@ -367,8 +370,8 @@
                 </ul>
             </div>
             {% endif %}
-            <details class="mt-2"><summary class="cursor-pointer text-gray-500 text-xs hover:text-gray-300">Show Raw Data</summary>
-                <pre class="bg-gray-800 text-gray-200 rounded p-2 text-xs overflow-x-auto mt-2">{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
+            <details class="nt-raw"><summary class="nt-toggle"><span class="nt-toggle__closed">Show raw data</span><span class="nt-toggle__open">Hide raw data</span></summary>
+                <pre>{{ alienvault.raw | tojson(indent=2) if alienvault.raw else '{}' }}</pre>
             </details>
         </div>
         {% endif %}
@@ -398,25 +401,11 @@
 
     </div>
     {% else %}
-    <div class="text-center py-12">
-        <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <p class="text-gray-400 text-lg">Enter a hash above to analyze</p>
-        <p class="text-gray-500 text-sm mt-2">Supports MD5, SHA1, and SHA256 hashes</p>
-    </div>
+    <div class="nt-card p-5 text-sm text-gray-500">Enter a hash above to see its reputation, detections and malware family, if any source knows it.</div>
     {% endif %}
 
     {% endif %}
 
-    <div class="flex justify-center mt-12">
-        <a href="/" class="btn btn-secondary px-6 py-3 text-lg rounded-lg shadow flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-            </svg>
-            Return to Home
-        </a>
-    </div>
 </div>
 {% endblock %}
 

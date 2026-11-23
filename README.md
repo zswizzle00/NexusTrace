@@ -84,6 +84,11 @@ Built for security analysts, incident responders, and researchers who need fast,
   quota instead of the shared one. No passwords or e-mail addresses are stored, and saved
   keys are encrypted. See [`docs/accounts.md`](docs/accounts.md).
 
+### Operator console
+- LAN- and Tailscale-only console at `http://<host>:5051/admin`: site activity, account
+  management, which intelligence sources have keys, and stored data. See
+  [`docs/admin.md`](docs/admin.md).
+
 ### Programmatic Access
 - **Enrichment API** (`/api/enrich/*`): API-key-authenticated endpoints for IP, domain/URL, and
   batch (up to 20 mixed indicators) lookups, built for SIEM/SOAR and EDR triage pipelines.

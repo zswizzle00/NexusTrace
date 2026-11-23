@@ -3,7 +3,8 @@
 {% block title %}Account | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 py-6">
+<div class="max-w-7xl mx-auto px-4 py-6">
+ <div class="nt-narrow">
 
   <div class="mb-5 flex items-start justify-between gap-4">
     <div>
@@ -27,11 +28,11 @@
     {% if vt %}
     <p class="text-sm text-gray-300 mb-3">
       A key ending in <span class="font-mono text-gray-100">{{ vt.hint }}</span> is saved
-      (since {{ vt.created_at }}). Your hash, file and e-mail lookups use it.
+      (since {{ vt.created_at[:10] }}). Your hash, file and e-mail lookups use it.
     </p>
     <form method="POST" action="{{ url_for('account.delete_virustotal_key') }}" class="mb-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="px-3 py-1.5 rounded text-sm bg-red-900/60 hover:bg-red-800 text-red-200">Remove key</button>
+      <button type="submit" class="nt-btn-danger">Remove key</button>
     </form>
     <p class="text-xs text-gray-500 mb-2">To replace it, save a new key below.</p>
     {% else %}
@@ -52,7 +53,7 @@
         <input id="api_key" name="api_key" type="password" required minlength="64" maxlength="64"
                spellcheck="false" autocomplete="off"
                class="flex-1 min-w-0 px-3 py-2 rounded bg-gray-900 border border-gray-700 text-gray-100 font-mono text-sm">
-        <button type="submit" class="px-4 py-2 rounded bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium">Check and save</button>
+        <button type="submit" class="btn btn-primary btn-compact rounded-lg">Check and save</button>
       </div>
       <p class="text-xs text-gray-500 mt-2">
         Find your key on VirusTotal under your profile, then <span class="text-gray-300">API key</span>.
@@ -67,8 +68,9 @@
     <form method="POST" action="{{ url_for('account.delete_account') }}"
           onsubmit="return confirm('Delete your account and saved keys?');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="px-3 py-1.5 rounded text-sm bg-red-900/60 hover:bg-red-800 text-red-200">Delete account</button>
+      <button type="submit" class="nt-btn-danger">Delete account</button>
     </form>
   </div>
 </div>
+ </div>
 {% endblock %}

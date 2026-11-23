@@ -1182,12 +1182,18 @@ body {
 .nt-reports-table td:nth-child(1) { width: 25%; overflow: hidden; }
 .nt-reports-table th:nth-child(3),
 .nt-reports-table td:nth-child(3) { width: 27%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-reports-table td { text-align: left; vertical-align: top; }
 .nt-reports-table__comment {
     max-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: #cbd5e1;
+}
+/* Two lines, then an ellipsis; the cell's title attribute carries the full text. */
+.nt-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
 }
 
 .nt-kv {
@@ -1349,9 +1355,12 @@ body {
    300px lets 4 columns fit on ~1300px viewports, avoiding a 3-col orphan card. */
 .nt-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
     gap: 2rem;
     margin: 0 0 1.25rem;
+    /* Cards keep their own height: stretching them to the tallest in the row left
+       short cards half empty, and opening one list stretched all its neighbors. */
+    align-items: start;
 }
 /* Stretch a lone last card across all columns so it doesn't float at 1/3 width. */
 .nt-card-grid > .nt-card:last-child:nth-child(3n+1) {
@@ -1373,27 +1382,72 @@ body {
     .nt-results-wrap { padding: 1.5rem 1rem 2rem; }
 }
 
+/* Every expander shares one chevron in place of the browser's triangle, which
+   rendered differently per browser and never showed the open state clearly. */
+details > summary {
+    list-style: none;
+    cursor: pointer;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+    content: '';
+    display: inline-block;
+    width: 0.42em;
+    height: 0.42em;
+    margin: 0 0.55em 0.12em 0.1em;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 150ms ease;
+    vertical-align: middle;
+}
+details[open] > summary::before { transform: rotate(45deg); }
+
+/* Raw-data and "show all" toggles: one quiet label style, and the label says what
+   a click will do next ("Show ..." closed, "Hide ..." or "Show fewer" open). */
+.nt-toggle {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: rgba(148,163,184,.8);
+    transition: color 150ms ease;
+    user-select: none;
+}
+.nt-toggle:hover,
+.nt-toggle:focus-visible { color: var(--nt-blue-300); }
+.nt-toggle__open { display: none; }
+details[open] > .nt-toggle .nt-toggle__open { display: inline; }
+details[open] > .nt-toggle .nt-toggle__closed { display: none; }
+
+.nt-more { margin-top: 0.5rem; }
+.nt-more__body {
+    margin-top: 0.4rem;
+    max-height: 22rem;
+    overflow-y: auto;
+    border-top: 1px solid rgba(96,165,250,.10);
+}
+
 .nt-raw {
-    margin-top: 1.25rem;
+    position: relative;
+    margin-top: auto;
     padding-top: 1.25rem;
 }
-.nt-raw > summary {
+.nt-raw--card { margin-top: 1.5rem; }
+.nt-raw__copy {
+    position: absolute;
+    right: 0.5rem;
+    margin-top: 0.95rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.68rem;
+    color: #94a3b8;
+    background: rgba(15,22,36,.9);
+    border: 1px solid rgba(96,165,250,.18);
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(148,163,184,.7);
-    transition: color 150ms ease;
-    list-style: none;
 }
-.nt-raw > summary::before {
-    content: '▸';
-    display: inline-block;
-    margin-right: 0.4rem;
-    transition: transform 150ms ease;
-}
-.nt-raw[open] > summary::before { transform: rotate(90deg); }
-.nt-raw > summary:hover { color: var(--nt-blue-300); }
+.nt-raw__copy:hover { color: var(--nt-blue-300); border-color: rgba(96,165,250,.4); }
 .nt-raw pre {
     margin-top: 0.55rem;
     background: rgba(7,9,26,.85);
@@ -1463,3 +1517,125 @@ body {
     border: 1px solid rgba(37, 99, 235, 0.35);
     color: #93C5FD;
 }
+
+/* Admin console: section tabs, stat tiles, hourly bars and tables, built on the same
+   nt-card surface as the public pages. */
+.nt-admin-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.nt-admin-tab {
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    border: 1px solid transparent;
+}
+.nt-admin-tab:hover { color: #e2e8f0; background: rgba(30,41,59,.6); }
+.nt-admin-tab.is-active { color: #bfdbfe; background: rgba(29,78,216,.25); border-color: rgba(37,99,235,.5); }
+
+.nt-admin-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: #111a2e;
+    border: 1px solid #1f2d4a;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.nt-admin-chip:hover { color: #e2e8f0; border-color: #334155; }
+.nt-admin-chip.is-active { color: #bfdbfe; background: rgba(29,78,216,.3); border-color: rgba(37,99,235,.6); }
+.nt-admin-chip.is-danger { color: #fca5a5; border-color: rgba(239,68,68,.35); }
+.nt-admin-chip.is-danger:hover { background: rgba(127,29,29,.35); }
+summary.nt-admin-chip::before { display: none; }
+
+.nt-admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+    gap: 0.75rem;
+}
+.nt-admin-stat { padding: 0.9rem 1.1rem; gap: 0.2rem; }
+.nt-admin-stat__label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+.nt-admin-stat__value { font-size: 1.5rem; font-weight: 600; color: #e2e8f0; }
+
+.nt-admin-bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
+.nt-admin-bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+.nt-admin-bar__fill {
+    position: relative;
+    display: block;
+    min-height: 2px;
+    background: rgba(59,130,246,.55);
+    border-radius: 2px 2px 0 0;
+}
+.nt-admin-bar__err { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(248,113,113,.8); }
+.nt-admin-bar__label { height: 1rem; margin-top: 0.25rem; font-size: 0.65rem; color: #64748b; text-align: center; }
+
+.nt-admin-meter { height: 3px; margin-top: 0.25rem; background: #111a2e; border-radius: 2px; }
+.nt-admin-meter > span { display: block; height: 100%; background: rgba(59,130,246,.6); border-radius: 2px; }
+
+.nt-admin-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+.nt-admin-table th {
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    border-bottom: 1px solid #1f2d4a;
+}
+.nt-admin-table td { text-align: left; padding: 0.45rem 0.6rem; color: #cbd5e1; border-bottom: 1px solid #141e33; vertical-align: middle; }
+.nt-admin-table__path { max-width: 28rem; overflow-wrap: anywhere; }
+
+.nt-admin-kv { display: grid; grid-template-columns: minmax(9rem, auto) 1fr; gap: 0.5rem 1.25rem; font-size: 0.875rem; }
+.nt-admin-kv > span:nth-child(odd) { color: #64748b; }
+.nt-admin-kv > span:nth-child(even) { color: #e2e8f0; }
+
+.nt-admin-confirm { position: relative; }
+.nt-admin-confirm__form {
+    position: absolute;
+    right: 0;
+    z-index: 10;
+    margin-top: 0.4rem;
+    padding: 0.75rem;
+    width: 15rem;
+    background: #0f1624;
+    border: 1px solid #1f2d4a;
+    border-radius: 8px;
+}
+/* On result cards "positive" means a threat was detected (red). The console needs plain
+   good and bad states instead. */
+.nt-pill.is-ok { background: rgba(16,185,129,.16); color: #86efac; border-color: rgba(16,185,129,.35); }
+.nt-pill.is-bad { background: rgba(239,68,68,.16); color: #fca5a5; border-color: rgba(239,68,68,.45); }
+.nt-admin-grid3 { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+
+/* Tailwind utilities the prebuilt static/css/tailwind.css does not include, defined as
+   Tailwind would so a rebuild changes nothing. */
+.justify-end { justify-content: flex-end; }
+.text-right { text-align: right; }
+.pl-5 { padding-left: 1.25rem; }
+.pt-3 { padding-top: 0.75rem; }
+.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem; }
+.whitespace-pre-line { white-space: pre-line; }
+
+/* Account pages and flash messages. Their colors were Tailwind opacity variants the
+   prebuilt stylesheet does not contain, so they rendered unstyled. */
+.nt-narrow { max-width: 42rem; }
+.nt-btn-danger {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #fecaca;
+    background: rgba(127,29,29,.55);
+    border: 1px solid rgba(239,68,68,.35);
+    cursor: pointer;
+}
+.nt-btn-danger:hover { background: rgba(153,27,27,.8); }
+.nt-flash { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.875rem; border: 1px solid; }
+.nt-flash.is-error { color: #fca5a5; background: rgba(127,29,29,.3); border-color: rgba(153,27,27,.8); }
+.nt-flash.is-success { color: #86efac; background: rgba(20,83,45,.3); border-color: rgba(22,101,52,.8); }
+.nt-flash.is-info { color: #93c5fd; background: rgba(30,58,138,.3); border-color: rgba(30,64,175,.8); }
+/* .btn-primary is sized for the search bars; buttons inside a card use this instead. */
+.btn.btn-compact { font-size: 0.9rem; padding: 0.55rem 1rem; min-height: 0; }

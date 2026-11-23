@@ -330,7 +330,7 @@ def analyze_deeplink(indicator):
 
 @home_bp.route('/no_results')
 def no_results():
-    indicator = request.args.get('indicator', 'Unknown Indicator')
+    indicator = request.args.get('indicator', '')
     error_type = request.args.get('error_type', None)
     return render_template('no_results.html', indicator=indicator, error_type=error_type)
 

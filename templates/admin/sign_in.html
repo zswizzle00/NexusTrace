@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_page.html" import page_header %}
+
+{% block title %}Admin sign-in | NexusTrace{% endblock %}
+
+{# Reads nothing about activity, accounts or configuration: this page is what an
+   unauthenticated caller sees. #}
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-10">
+  {{ page_header('Admin sign-in', 'NexusTrace operator console.') }}
+  {% include "_account_flashes.html" %}
+  <div class="nt-card p-5">
+    {% if access_mode %}
+    <p class="text-sm text-gray-300">Sign in through Cloudflare Access to open the console.</p>
+    {% else %}
+    <form method="POST" action="{{ url_for('admin.admin_login') }}" class="space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="admin-token" class="text-xs text-gray-500 uppercase tracking-wide block">Admin token</label>
+      <input type="password" id="admin-token" name="token" required autocomplete="current-password"
+             class="form-input w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none">
+      <button type="submit" class="btn btn-primary btn-compact rounded-lg">Sign in</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

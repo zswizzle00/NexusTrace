@@ -1,75 +1,54 @@
 {% extends "base.html" %}
 {% from "_search_form.html" import search_form %}
+{% from "_page.html" import page_header %}
+
+{% block title %}IP Analysis | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-2">
-    <div class="w-full max-w-5xl mx-auto px-2 py-8 md:py-16">
-        <div class="card p-8 md:p-14 space-y-12">
-            <div class="text-center mb-4 md:mb-8">
-                <h1 class="text-4xl md:text-4xl font-extrabold mb-4 md:mb-8 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                    IP Address Analysis
-                </h1>
-                <p class="text-lg md:text-2xl text-gray-300">
-                    Analyze and investigate IP addresses for security insights.
-                </p>
-            </div>
+<div class="max-w-7xl mx-auto px-4 py-6">
+  {{ page_header('IP Address Analysis', 'Look up one IPv4 or IPv6 address across geolocation, anonymizer, reputation and abuse sources, or upload a list for a CSV report.') }}
 
-            <div>
-                <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Single IP Lookup</h3>
-                {{ search_form('Enter IPv4 or IPv6 address') }}
-            </div>
+  <div class="nt-card p-5 mb-5">
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Single address</p>
+    {{ search_form('IPv4 or IPv6 address', layout='panel') }}
+  </div>
 
-            <div class="relative">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-gray-600"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                    <span class="px-4 bg-gray-800 text-gray-400 uppercase tracking-wider">Or</span>
-                </div>
-            </div>
+  <div class="nt-card p-5 mb-5 bulk-analysis">
+    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Bulk lookup</p>
+    <p class="text-sm text-gray-400 mb-4">Upload a CSV, XLSX or TXT file with one address per line (or in the first column). The results download as a CSV.</p>
 
-            <div class="bulk-analysis">
-                <h3 class="text-xl font-semibold text-blue-400 mb-4 text-center">Bulk IP Analysis</h3>
-                <p class="text-gray-400 text-center mb-6">Upload a CSV, XLSX, or TXT file with IP addresses (one per line or in the first column) to analyze multiple IPs and download results as CSV.</p>
+    <form id="bulkIpForm" enctype="multipart/form-data" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                <form id="bulkIpForm" enctype="multipart/form-data" class="space-y-6">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                    <div class="flex flex-col items-center">
-                        <label for="ipFile" class="w-full max-w-md cursor-pointer">
-                            <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-gray-700/50 transition-all duration-200">
-                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <p class="text-gray-300 mb-2" id="fileLabel">Click to select or drag and drop</p>
-                                <p class="text-gray-500 text-sm">Supported formats: CSV, XLSX, TXT</p>
-                            </div>
-                        </label>
-                        <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
-                    </div>
-
-                    <div id="progressContainer" class="hidden w-full max-w-md mx-auto text-center">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        <p class="text-sm text-gray-400 mt-3">
-                            Querying providers at about 2 IPs per second,
-                            <span id="elapsedText" class="font-mono text-gray-300">0s</span> elapsed
-                        </p>
-                    </div>
-
-                    <div class="flex justify-center">
-                        <button type="submit" id="submitBtn" class="btn btn-primary text-lg py-4 px-8 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                            </svg>
-                            <span id="btnText">Analyze & Download CSV</span>
-                        </button>
-                    </div>
-                </form>
-
-                <div id="messageArea" class="hidden mt-6 p-4 rounded-lg text-center max-w-md mx-auto"></div>
-            </div>
+      <label for="ipFile" class="block cursor-pointer">
+        <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-gray-700/50 transition-all duration-200">
+          <svg class="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <p class="text-sm text-gray-300 mb-1" id="fileLabel">Click to select or drag and drop</p>
+          <p class="text-xs text-gray-500">CSV, XLSX or TXT</p>
         </div>
-    </div>
+      </label>
+      <input type="file" id="ipFile" name="file" accept=".csv,.xlsx,.txt" class="hidden" required>
+
+      <div id="progressContainer" class="hidden text-center">
+        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+        <p class="text-sm text-gray-400 mt-2">
+          Querying providers at about 2 addresses per second,
+          <span id="elapsedText" class="font-mono text-gray-300">0s</span> elapsed
+        </p>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-primary rounded-lg px-5 py-2.5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <span id="btnText">Analyze and download CSV</span>
+      </button>
+    </form>
+
+    <div id="messageArea" class="hidden mt-4 p-4 rounded-lg text-center"></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -184,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 progressContainer.classList.add('hidden');
                 submitBtn.disabled = false;
-                btnText.textContent = 'Analyze & Download CSV';
+                btnText.textContent = 'Analyze and download CSV';
             }, 2000);
         }
     });

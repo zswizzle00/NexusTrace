@@ -70,6 +70,8 @@ the result page shows VirusTotal as not queried, with a link to sign in.
 
 ## Limits
 
+- **Sessions:** a sign-in lasts 24 hours, however active the user is; after that they sign
+  in again. Accounts are optional: everyone can use every tool without signing in.
 - **Sign-ups:** `ACCOUNTS_MAX_USERS` (default 50) caps the number of accounts. Past the cap,
   new identities are refused and existing accounts can still sign in.
 - **Rate limits:** each user key gets its own limit of 4 lookups a minute, the VirusTotal
@@ -91,8 +93,9 @@ treated as not saved.
 
 ## Disable an account
 
-Accounts have no admin page; use the operator tool from the deployment directory. Pick the
-account by the ID that `list` prints, because a display name is not unique.
+Use the **Accounts** page of the [operator console](admin.md), or the operator tool from
+the deployment directory. Pick the account by its ID, because a display name is not
+unique.
 
 ```sh
 python3 scripts/manage_accounts.py list

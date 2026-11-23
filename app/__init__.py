@@ -35,10 +35,22 @@ def create_app():
 
     secure_cookies = os.getenv('SECURE_COOKIES', 'false').lower() == 'true'
 
+    # The admin console is reached over plain HTTP on the LAN or Tailscale, where an
+    # HTTPS-only cookie is never stored and sign-in silently fails, so it takes its own
+    # setting. Its own cookie name keeps a public-site sign-in or sign-out, which clears
+    # the whole session, from also ending an admin session on the same host.
+    from app.routes import ROLE_ADMIN as _ROLE_ADMIN, resolve_role
+    if resolve_role() == _ROLE_ADMIN:
+        secure_cookies = os.getenv('ADMIN_SECURE_COOKIES', 'false').lower() == 'true'
+        app.config['SESSION_COOKIE_NAME'] = 'nexustrace_admin'
+
     app.config['SESSION_COOKIE_SECURE'] = secure_cookies
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+    # Only an account sign-in makes the session permanent, so this is how long the cookie
+    # of a signed-in visitor lives; accounts.current_user() also ends the sign-in at 24 h.
+    from app.utils.accounts import SESSION_LIFETIME_SECONDS
+    app.config['PERMANENT_SESSION_LIFETIME'] = SESSION_LIFETIME_SECONDS
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
     app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max upload
