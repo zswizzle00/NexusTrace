@@ -1,0 +1,572 @@
+/* Console layout: the shell every page inherits (one container edge for header, content
+   and footer), the header search and menus, and the shared tokens for panels and
+   controls. Loaded after app.css so these rules win at equal specificity. */
+
+:root {
+    --nt-page: #0E141B;
+    --nt-surface: #151D27;
+    --nt-raised: #1B2531;
+    --nt-line: #25303D;
+    --nt-text: #D9E0E8;
+    --nt-muted: #8A98A9;
+    --nt-accent: #5B8DEF;
+    --nt-accent-strong: #4778DA;
+    --nt-danger: #ef4444;
+    --nt-radius: 6px;
+    --nt-gutter: 24px;
+    --nt-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+@media (max-width: 640px) {
+    :root { --nt-gutter: 16px; }
+}
+
+body {
+    background: var(--nt-page);
+    background-image: none;
+    color: var(--nt-text);
+    font-size: 15px;
+}
+
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible {
+    outline: 2px solid var(--nt-accent);
+    outline-offset: 2px;
+}
+
+/* One column for everything: header row, page content and footer row share these edges. */
+.nt-container {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: var(--nt-gutter);
+    box-sizing: border-box;
+}
+
+/* ---------- Header ---------- */
+
+.nt-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--nt-surface);
+    border-bottom: 1px solid var(--nt-line);
+}
+.nt-header__row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    min-height: 56px;
+}
+.nt-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    color: var(--nt-text);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+}
+.nt-brand svg { width: 22px; height: 22px; color: var(--nt-accent); }
+.nt-brand:hover { color: #fff; }
+
+.nt-omnibox {
+    position: relative;
+    flex: 1 1 auto;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+}
+.nt-omnibox > svg {
+    position: absolute;
+    left: 11px;
+    width: 16px;
+    height: 16px;
+    color: var(--nt-muted);
+    pointer-events: none;
+}
+.nt-omnibox input[type="text"] {
+    width: 100%;
+    height: 38px;
+    padding: 0 36px 0 34px;
+    background: var(--nt-page);
+    border: 1px solid var(--nt-line);
+    border-radius: var(--nt-radius);
+    color: var(--nt-text);
+    font-size: 14px;
+}
+.nt-omnibox input[type="text"]::placeholder { color: var(--nt-muted); }
+.nt-omnibox input[type="text"]:focus { border-color: var(--nt-accent); outline: none; }
+.nt-omnibox kbd {
+    position: absolute;
+    right: 9px;
+    min-width: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--nt-line);
+    border-radius: 4px;
+    color: var(--nt-muted);
+    font: 12px/18px var(--nt-mono);
+    text-align: center;
+    pointer-events: none;
+}
+.nt-omnibox input:focus ~ kbd { display: none; }
+
+.nt-header__end {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+/* Menus are <details>: they work without script; shell.js closes them on outside clicks. */
+.nt-menu { position: relative; }
+.nt-menu > summary { list-style: none; cursor: pointer; }
+.nt-menu > summary::-webkit-details-marker { display: none; }
+.nt-menu > summary::before,
+.nt-menu > summary::after { content: none !important; display: none !important; }
+.nt-menu__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: var(--nt-radius);
+    color: var(--nt-text);
+    font-size: 14px;
+    font-weight: 500;
+}
+.nt-menu__trigger svg { width: 14px; height: 14px; color: var(--nt-muted); transition: transform 150ms; }
+.nt-menu[open] .nt-menu__trigger svg { transform: rotate(180deg); }
+.nt-menu__trigger:hover, .nt-menu[open] .nt-menu__trigger { background: var(--nt-raised); }
+
+.nt-menu__panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    background: var(--nt-surface);
+    border: 1px solid var(--nt-line);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+    padding: 12px;
+    z-index: 60;
+}
+.nt-menu__panel ul { list-style: none; margin: 0 0 8px; padding: 0; }
+.nt-menu__panel li a, .nt-menu__item {
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    color: var(--nt-text);
+    font-size: 14px;
+    text-align: left;
+    text-decoration: none;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+.nt-menu__panel li a:hover, .nt-menu__item:hover { background: var(--nt-raised); color: #fff; }
+.nt-menu__group {
+    margin: 4px 8px 4px;
+    color: var(--nt-muted);
+    font-size: 12px;
+    font-weight: 500;
+}
+.nt-menu__external a { color: var(--nt-muted) !important; font-size: 13px !important; }
+.nt-tools__panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    width: 440px;
+}
+
+.nt-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--nt-accent);
+    color: #0b1220;
+    font-size: 14px;
+    font-weight: 700;
+}
+.nt-avatar:hover { background: #7aa4f3; }
+.nt-account__panel { width: 240px; }
+.nt-account__name { margin: 2px 8px 0; color: var(--nt-text); font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.nt-account__via { margin: 0 8px 8px; color: var(--nt-muted); font-size: 12px; }
+.nt-account__panel ul { border-top: 1px solid var(--nt-line); padding-top: 8px; margin-bottom: 4px; }
+.nt-signin {
+    color: var(--nt-text);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: var(--nt-radius);
+}
+.nt-signin:hover, .nt-signin.is-active { background: var(--nt-raised); color: #fff; }
+
+@media (max-width: 760px) {
+    .nt-header__row { flex-wrap: wrap; gap: 8px 12px; padding-block: 10px; }
+    .nt-omnibox { order: 3; flex-basis: 100%; max-width: none; }
+    .nt-omnibox kbd { display: none; }
+    /* The sticky header is the containing block, so the panel opens below the search row. */
+    .nt-tools { position: static; }
+    .nt-tools__panel { position: absolute; left: var(--nt-gutter); right: var(--nt-gutter); top: calc(100% + 4px); width: auto; }
+}
+@media (max-width: 420px) {
+    .nt-tools__panel { grid-template-columns: 1fr; max-height: 75vh; overflow-y: auto; }
+}
+
+/* ---------- Main ---------- */
+
+.main-content,
+.main-content.full-width {
+    flex: 1;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-top: 32px;
+    padding-bottom: 56px;
+}
+/* styles.css strips the padding from .full-width pages; the gutter has to survive it. */
+.main-content.full-width { padding-inline: var(--nt-gutter); }
+/* CyberChef fills the window below the header. */
+.main-content.max-w-none { max-width: none; padding: 0; }
+
+/* The page wrappers templates used to size themselves: the container does that now. */
+.nt-page { width: 100%; }
+.nt-page--narrow { max-width: 640px; }
+.nt-results-wrap { max-width: none; padding: 0; margin: 0; }
+
+.nt-page-title {
+    margin: 0 0 4px;
+    color: #F1F5F9;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+}
+.nt-page-desc { margin: 0; color: var(--nt-muted); font-size: 15px; line-height: 1.5; max-width: 72ch; }
+.nt-page-head { margin-bottom: 24px; }
+
+/* ---------- Panels ---------- */
+
+.nt-card {
+    background: var(--nt-surface);
+    border: 1px solid var(--nt-line);
+    border-left: 1px solid var(--nt-line);
+    border-radius: 8px;
+}
+.nt-card:hover { border-color: var(--nt-line); border-left-color: var(--nt-line); }
+
+/* Section labels inside panels read as sentence-case headings, not tracked capitals. */
+.nt-card p.uppercase,
+.nt-card label.uppercase,
+.nt-page p.uppercase {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--nt-text);
+}
+.nt-card table th { text-transform: none; letter-spacing: 0; font-size: 13px; }
+.nt-loc__item dt { text-transform: none; letter-spacing: 0; font-size: 12px; }
+
+/* ---------- Controls ---------- */
+
+.form-input {
+    font-size: 15px;
+    line-height: 1.4;
+    height: 42px;
+    padding: 0 14px;
+    background: var(--nt-page);
+    border: 1px solid var(--nt-line);
+    border-radius: var(--nt-radius);
+    color: var(--nt-text);
+}
+.form-input:focus { border-color: var(--nt-accent); }
+.btn { border-radius: var(--nt-radius); }
+.btn-primary {
+    font-size: 15px;
+    font-weight: 600;
+    height: 42px;
+    padding: 0 18px;
+    background: var(--nt-accent-strong);
+    color: #fff;
+}
+.btn-primary:hover { background: var(--nt-accent); }
+.btn-primary svg { width: 18px; height: 18px; }
+.btn.btn-compact { height: 38px; font-size: 14px; padding: 0 14px; }
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--nt-line);
+    color: var(--nt-text);
+}
+.btn-secondary:hover { background: var(--nt-raised); }
+.nt-btn-outline-danger {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid rgba(239, 68, 68, 0.55);
+    border-radius: var(--nt-radius);
+    background: transparent;
+    color: #fca5a5;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.nt-btn-outline-danger:hover { background: rgba(239, 68, 68, 0.12); color: #fecaca; }
+
+/* ---------- Footer ---------- */
+
+.nt-footer {
+    border-top: 1px solid var(--nt-line);
+    background: var(--nt-page);
+    color: var(--nt-muted);
+    font-size: 13px;
+}
+.nt-footer__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+    min-height: 56px;
+    padding-block: 12px;
+}
+.nt-footer__brand { color: var(--nt-text); font-weight: 600; }
+.nt-footer__links { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.nt-footer__links a { color: var(--nt-muted); text-decoration: none; }
+.nt-footer__links a:hover { color: var(--nt-text); text-decoration: underline; }
+.nt-footer__credit { margin-left: auto; }
+@media (max-width: 640px) {
+    .nt-footer__credit { margin-left: 0; width: 100%; }
+}
+
+/* ---------- Home ---------- */
+
+.nt-home .nt-page-desc { max-width: 68ch; }
+.nt-home__search { margin: 24px 0 12px; max-width: 760px; }
+.nt-home__examples { margin: 0 0 48px; color: var(--nt-muted); font-size: 14px; }
+.nt-example {
+    display: inline;
+    line-height: inherit;
+    vertical-align: baseline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--nt-accent);
+    font: inherit;
+    cursor: pointer;
+}
+.nt-example:hover { text-decoration: underline; }
+.nt-home__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    gap: 32px 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--nt-line);
+}
+.nt-home__heading { margin: 0 0 12px; color: var(--nt-text); font-size: 16px; font-weight: 600; }
+.nt-home__list { margin: 0; }
+.nt-home__list > div {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--nt-line);
+}
+.nt-home__list dt a { color: var(--nt-text); font-weight: 600; font-size: 14px; text-decoration: none; }
+.nt-home__list dt a:hover { color: var(--nt-accent); }
+.nt-home__list dd { margin: 0; color: var(--nt-muted); font-size: 14px; line-height: 1.5; }
+@media (max-width: 480px) {
+    .nt-home__list > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* ---------- Sign in ---------- */
+
+.nt-signin-page {
+    max-width: 380px;
+    margin: 32px auto 0;
+    text-align: center;
+}
+.nt-signin-page__mark { width: 36px; height: 36px; color: var(--nt-accent); margin: 0 auto 16px; }
+.nt-signin-page__title { margin: 0 0 8px; color: #F1F5F9; font-size: 22px; font-weight: 600; }
+.nt-signin-page__lead { margin: 0 0 24px; color: var(--nt-muted); font-size: 15px; line-height: 1.5; }
+.nt-signin-page__providers { display: flex; flex-direction: column; gap: 10px; }
+.nt-provider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 44px;
+    border-radius: var(--nt-radius);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--nt-line);
+    background: var(--nt-surface);
+    color: var(--nt-text);
+}
+.nt-provider svg { width: 18px; height: 18px; }
+.nt-provider:hover { border-color: var(--nt-muted); }
+.nt-provider.is-google { background: #fff; color: #1f1f1f; border-color: #dadce0; }
+.nt-provider.is-google:hover { background: #f2f4f7; }
+.nt-signin-page__fine { margin: 20px 0 0; color: var(--nt-muted); font-size: 13px; line-height: 1.55; }
+.nt-signin-page__fine a { color: var(--nt-accent); }
+.nt-signin-page .nt-flash { text-align: left; }
+
+/* ---------- Account settings ---------- */
+
+.nt-settings { max-width: 760px; }
+.nt-settings__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.nt-settings__who {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    color: var(--nt-text);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.nt-settings__rows { border-top: 1px solid var(--nt-line); }
+.nt-setting {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr) auto;
+    gap: 8px 24px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--nt-line);
+}
+.nt-setting__label { margin: 0; color: var(--nt-muted); font-size: 14px; font-weight: 500; }
+.nt-setting__value { margin: 0 0 2px; color: var(--nt-text); font-size: 15px; }
+.nt-setting__hint { margin: 0; color: var(--nt-muted); font-size: 13px; line-height: 1.5; }
+.nt-setting__form { display: flex; gap: 8px; margin: 14px 0 8px; }
+.nt-setting__form .form-input { flex: 1; min-width: 0; height: 38px; font-size: 14px; }
+.nt-setting__action { align-self: start; }
+.nt-mono { font-family: var(--nt-mono); color: var(--nt-text); }
+.nt-nowrap { white-space: nowrap; }
+.nt-danger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 40px;
+    padding: 16px 20px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 8px;
+}
+.nt-danger__title { margin: 0 0 2px; color: #fca5a5; font-size: 15px; font-weight: 600; }
+@media (max-width: 640px) {
+    .nt-settings__head { flex-direction: column; gap: 0; margin-bottom: 8px; }
+    .nt-setting { grid-template-columns: 1fr; gap: 6px; }
+    .nt-setting__form { flex-direction: column; }
+    .nt-danger { flex-direction: column; align-items: flex-start; }
+}
+
+/* ---------- Result page ---------- */
+
+/* Indicator first, its owner and location directly underneath, verdict beside it. The
+   colored left edge stays here only: on this panel it means the verdict. */
+.nt-verdict {
+    display: block;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    border-radius: 8px;
+    background: var(--nt-surface);
+    border: 1px solid var(--nt-line);
+    border-left: 3px solid var(--accent, var(--nt-accent));
+}
+.nt-verdict__main { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.nt-verdict__label { display: none; }
+/* Inter with tabular figures and a slashed zero: the system monospace fallback spaced an
+   address out like 8 . 8 . 8 . 8, and 0 versus O still reads unambiguously. */
+.nt-verdict__indicator {
+    font-family: 'Inter', sans-serif;
+    font-feature-settings: "tnum", "zero";
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: #F1F5F9;
+}
+.nt-verdict__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    margin-top: 12px;
+    padding: 0;
+    border: 0;
+}
+.nt-verdict__stat {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.nt-verdict__stat-label {
+    color: var(--nt-muted);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.nt-verdict__stat-value { font-size: 14px; color: var(--nt-text); white-space: normal; }
+
+/* IP results: findings in the main column, location and network facts in a rail. DOM
+   order is reputation, location, infrastructure, which is also the phone order. */
+.nt-split { display: block; }
+@media (min-width: 1024px) {
+    .nt-split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        grid-template-areas: "rep rail" "infra rail";
+        column-gap: 24px;
+        align-items: start;
+    }
+    .nt-split__rep { grid-area: rep; }
+    .nt-split__infra { grid-area: infra; }
+    .nt-split__rail { grid-area: rail; position: sticky; top: 76px; margin: 0; }
+    .nt-split__rail .nt-loc { grid-template-columns: 1fr; gap: 12px; }
+}
+.nt-split__rail { margin-bottom: 24px; }
+.nt-split .nt-card-grid { column-width: 340px; column-gap: 24px; margin-bottom: 0; }
+.nt-card-grid { column-gap: 24px; }
+.nt-card-grid > * { margin-bottom: 24px; }
+
+.nt-not-checked {
+    margin: 0 0 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--nt-line);
+    color: var(--nt-muted);
+    font-size: 14px;
+}
+
+.nt-verdict__badge {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.nt-card__source {
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--nt-muted);
+}
+.nt-toggle { letter-spacing: 0; font-size: 13px; }
+@media (min-width: 1024px) {
+    .nt-split__rail .nt-loc { gap: 0; }
+    .nt-split__rail .nt-loc__item {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 12px;
+        padding: 7px 0;
+        border-top: 1px solid var(--nt-line);
+    }
+    .nt-split__rail .nt-loc__item:first-child { border-top: 0; }
+    .nt-split__rail .nt-loc__item dt { margin: 0; font-size: 13px; color: var(--nt-muted); font-weight: 500; }
+    .nt-split__rail .nt-loc__item dd { font-size: 14px; overflow-wrap: break-word; word-break: normal; }
+    .nt-split__rail .nt-loc__item dd + dd { grid-column: 2; }
+}

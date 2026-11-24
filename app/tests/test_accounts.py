@@ -521,7 +521,7 @@ def test_routes():
         app = box.app()
         client = app.test_client()
         page = client.get('/account')
-        check(page.status_code == 200 and b'Sign in with GitHub' in page.data,
+        check(page.status_code == 200 and b'Continue with GitHub' in page.data,
               'the sign-in page is missing')
 
         start = client.get('/account/login/github')
@@ -592,19 +592,19 @@ def test_routes():
               'a 23-hour-old sign-in was ended early')
         with client.session_transaction() as session:
             session[accounts.SIGNED_IN_AT_KEY] = time.time() - 24 * 60 * 60 - 1
-        check(b'Sign in with GitHub' in client.get('/account').data,
+        check(b'Continue with GitHub' in client.get('/account').data,
               'a sign-in older than 24 hours was still accepted')
         with client.session_transaction() as session:
             session[accounts.SESSION_KEY] = 1
             session.pop(accounts.SIGNED_IN_AT_KEY, None)
-        check(b'Sign in with GitHub' in client.get('/account').data,
+        check(b'Continue with GitHub' in client.get('/account').data,
               'a session with no sign-in time (issued before the limit) was accepted')
         with client.session_transaction() as session:
             session[accounts.SESSION_KEY] = 1
             session[accounts.SIGNED_IN_AT_KEY] = signed_in_at
 
         client.post('/account/logout')
-        check(b'Sign in with GitHub' in client.get('/account').data, 'sign-out did not sign out')
+        check(b'Continue with GitHub' in client.get('/account').data, 'sign-out did not sign out')
 
         anonymous = app.test_client()
         anonymous.post('/account/keys/virustotal', data={'api_key': VT_KEY})

@@ -47,79 +47,6 @@
     animation: nt-spin 0.6s linear infinite;
 }
 
-.example-heading {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-muted, #6B7280);
-    text-align: center;
-    margin: 0 0 0.85rem 0;
-}
-
-.example-chips {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    justify-content: center;
-    gap: 0.6rem;
-}
-
-.example-chip {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 0.1rem;
-    min-width: 7.5rem;
-    padding: 0.55rem 1.1rem;
-    background: rgba(59, 130, 246, 0.14);
-    border: 1px solid rgba(96, 165, 250, 0.4);
-    border-radius: var(--radius-lg, 0.75rem);
-    cursor: pointer;
-    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
-}
-.example-chip:hover {
-    background: rgba(59, 130, 246, 0.26);
-    border-color: var(--color-primary, #3B82F6);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 18px -10px rgba(59, 130, 246, 0.9);
-}
-.example-chip:active {
-    transform: translateY(0);
-}
-.example-chip:focus-visible {
-    outline: 2px solid var(--color-secondary, #60A5FA);
-    outline-offset: 2px;
-}
-.example-chip__label {
-    font-size: 0.625rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-secondary, #60A5FA);
-}
-.example-chip__value {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-primary, #F3F4F6);
-}
-
-/* Visible keyboard focus. The nav uses Tailwind `focus:outline-none`, which strips the
-   ring; these rules out-specify it (.main-header descendant + :focus-visible) so the ring
-   returns for keyboard navigation only. */
-.main-header a:focus-visible,
-.main-header button:focus-visible {
-    outline: 2px solid var(--color-secondary, #60A5FA);
-    outline-offset: 2px;
-    border-radius: 6px;
-}
-.dropdown-menu a:focus-visible {
-    outline: 2px solid #fff;
-    outline-offset: -2px;
-}
-
 :root {
     --color-primary: #3B82F6;
     --color-primary-dark: #2563EB;
@@ -289,23 +216,6 @@ img {
     flex-direction: column;
 }
 
-/* Header & navigation */
-.main-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(17, 24, 39, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 0 var(--space-xl);
-    height: var(--header-height);
-    border-bottom: 1px solid var(--border-primary);
-    position: sticky;
-    top: 0;
-    z-index: var(--z-sticky);
-    box-shadow: var(--shadow-md);
-}
-
 .header-content {
     display: flex;
     align-items: center;
@@ -407,19 +317,6 @@ img {
 
 .dropdown:hover .dropdown-content {
     display: block;
-}
-
-.nav-link {
-    color: var(--text-secondary);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    transition: var(--transition-fast);
-}
-
-.nav-link:hover,
-.nav-link.active {
-    color: var(--color-primary);
-    background: rgba(59, 130, 246, 0.1);
 }
 
 /* Cards */
@@ -1858,12 +1755,7 @@ pre {
 }
 
 @media (max-width: 600px) {
-    .main-header {
-        flex-direction: column;
-        align-items: stretch;
-        height: auto;
-        padding: var(--space-md);
-    }
+    
 
     .header-nav {
         flex-direction: column;
@@ -1997,9 +1889,7 @@ pre {
         grid-template-columns: repeat(3, 1fr);
     }
 
-    .main-header {
-        padding: var(--space-md) var(--space-xl);
-    }
+    
 
     .main-content {
         padding: var(--space-xl);
@@ -2021,12 +1911,7 @@ pre {
 }
 
 @media (max-width: 900px) {
-    .main-header {
-        flex-direction: column;
-        align-items: flex-start;
-        height: auto;
-        padding: var(--space-md);
-    }
+    
 
     .header-nav {
         flex-wrap: wrap;
@@ -2095,9 +1980,7 @@ pre {
 }
 
 @media (max-height: 600px) and (orientation: landscape) {
-    .main-header {
-        padding: var(--space-sm) var(--space-md);
-    }
+    
 
     .main-content {
         padding: var(--space-sm) var(--space-md);

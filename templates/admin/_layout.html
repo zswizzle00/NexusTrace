@@ -4,7 +4,7 @@
 {% block title %}{{ admin_title }} | NexusTrace admin{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="nt-page">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <nav class="nt-admin-tabs" aria-label="Admin sections">
       {% for key, label, endpoint in [('activity', 'Activity', 'admin.admin_dashboard'),

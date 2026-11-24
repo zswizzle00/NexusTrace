@@ -2,54 +2,52 @@
 {% from "_search_form.html" import search_form %}
 
 {% block content %}
-<div class="flex flex-col items-center justify-center min-h-[80vh] px-4 py-8">
-    <div class="w-full max-w-2xl mx-auto">
-        <div class="card bg-[#181A20] border border-[#232946] rounded-2xl shadow-xl p-6 transition-all duration-200 space-y-6 text-gray-200 text-center">
-            <div class="mb-6 pb-6 border-b border-gray-700">
-                <h1 class="text-2xl md:text-4xl lg:text-5xl font-extrabold mb-3 md:mb-6 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent leading-tight flex items-center justify-center gap-2">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z"/>
-                      </svg>
-                    NexusTrace
-                </h1>
-                <p class="text-sm md:text-base lg:text-xl text-gray-400 px-2">
-                    A tool for analyzing IP addresses, domains, URLs, file hashes, phone numbers, email addresses, and user-agent strings, with additional support for Windows Event Log and Azure error code lookups.
-                </p>
-            </div>
-            {{ search_form('Enter IP, domain, URL, hash, phone number, email, or user agent...', form_id='analyze-form', input_id='indicator-input') }}
+<div class="nt-page nt-home">
+  <h1 class="nt-page-title">Look up an indicator</h1>
+  <p class="nt-page-desc">Paste an IP address, domain, URL, file hash, email address, phone number or user-agent string. NexusTrace works out what it is, checks it against threat intelligence and network sources, and shows which ones answered.</p>
 
-            <div class="pt-2">
-                <p class="example-heading">Try an example</p>
-                <div class="example-chips">
-                    <button type="button" class="example-chip" data-indicator="8.8.8.8" aria-label="Analyze example IP 8.8.8.8">
-                        <span class="example-chip__label">IP</span>
-                        <span class="example-chip__value">8.8.8.8</span>
-                    </button>
-                    <button type="button" class="example-chip" data-indicator="github.com" aria-label="Analyze example domain github.com">
-                        <span class="example-chip__label">Domain</span>
-                        <span class="example-chip__value">github.com</span>
-                    </button>
-                    <button type="button" class="example-chip" data-indicator="44d88612fea8a8f36de82e1278abb02f" aria-label="Analyze example MD5 hash">
-                        <span class="example-chip__label">Hash</span>
-                        <span class="example-chip__value">MD5</span>
-                    </button>
-                    <button type="button" class="example-chip" data-indicator="+18002752273" aria-label="Analyze example phone number">
-                        <span class="example-chip__label">Phone</span>
-                        <span class="example-chip__value">+1 800 275 2273</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+  <div class="nt-home__search">
+    {{ search_form('IP, domain, URL, hash, email or phone', form_id='analyze-form', input_id='indicator-input', layout='panel') }}
+  </div>
+
+  <p class="nt-home__examples">Try
+    <button type="button" class="nt-example" data-indicator="8.8.8.8">8.8.8.8</button>,
+    <button type="button" class="nt-example" data-indicator="github.com">github.com</button>,
+    <button type="button" class="nt-example" data-indicator="44d88612fea8a8f36de82e1278abb02f">an MD5 hash</button> or
+    <button type="button" class="nt-example" data-indicator="+18002752273">+1 800 275 2273</button>.
+  </p>
+
+  <div class="nt-home__grid">
+    <section>
+      <h2 class="nt-home__heading">Dedicated tools</h2>
+      <dl class="nt-home__list">
+        <div><dt><a href="/ip_search">IP address</a></dt><dd>One address, or a file of them returned as a CSV report.</dd></div>
+        <div><dt><a href="/url_scan">URL scan</a></dt><dd>Loads the page in a headless browser: redirects, requests, TLS, headers and a screenshot.</dd></div>
+        <div><dt><a href="/hash_analysis">File hash</a></dt><dd>MD5, SHA-1 or SHA-256 against VirusTotal, MalwareBazaar, ThreatFox and OTX.</dd></div>
+        <div><dt><a href="/file_analysis">File</a></dt><dd>Static triage of a sample: format, entropy, macros, PDF structure and YARA.</dd></div>
+        <div><dt><a href="/email_analysis">E-mail</a></dt><dd>Authentication, spoofing signals and indicators from a raw message or .eml file.</dd></div>
+        <div><dt><a href="/phone_analysis">Phone number</a></dt><dd>Number metadata, original range allocation and reported spam status.</dd></div>
+      </dl>
+    </section>
+    <section>
+      <h2 class="nt-home__heading">Reference and utilities</h2>
+      <dl class="nt-home__list">
+        <div><dt><a href="/ad_event_search">Windows event IDs</a></dt><dd>What a Windows or Active Directory event records and the fields it logs.</dd></div>
+        <div><dt><a href="/azure_error_search">Azure error codes</a></dt><dd>Microsoft's description and fixes for an Entra ID sign-in error (AADSTS).</dd></div>
+        <div><dt><a href="/user_agent_search">User agent</a></dt><dd>Browser, operating system and device, with known bots and automation flagged.</dd></div>
+        <div><dt><a href="/identity_scan">Identity</a></dt><dd>Public accounts and infostealer exposure for a username or e-mail address.</dd></div>
+        <div><dt><a href="/cyberchef">CyberChef</a></dt><dd>Decode, convert and transform data in the browser.</dd></div>
+      </dl>
+    </section>
+  </div>
 </div>
 
 <script>
-    document.querySelectorAll('.example-chip').forEach(function (chip) {
-        chip.addEventListener('click', function () {
-            var input = document.getElementById('indicator-input');
-            input.value = this.getAttribute('data-indicator');
-            document.getElementById('analyze-form').requestSubmit();
-        });
+  document.querySelectorAll('.nt-example').forEach(function (example) {
+    example.addEventListener('click', function () {
+      document.getElementById('indicator-input').value = this.getAttribute('data-indicator');
+      document.getElementById('analyze-form').requestSubmit();
     });
+  });
 </script>
 {% endblock %}
