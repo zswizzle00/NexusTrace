@@ -6,7 +6,7 @@
 {% block title %}E-mail: {{ headers.get('subject') or analysis.get('id') }} | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="nt-page">
 
   <div class="mb-5 flex items-start gap-2 flex-wrap">
     <a href="{{ url_for('email.email_analysis_form') }}" class="text-xs text-gray-500 hover:text-gray-300 transition-colors mr-2 mt-0.5">← New analysis</a>

@@ -1,28 +1,41 @@
 {% extends "base.html" %}
-{% from "_page.html" import page_header %}
 
 {% block title %}Sign in | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-6">
- <div class="nt-narrow">
-  {{ page_header('Sign in', 'Sign in to save your own VirusTotal API key. Hash, file and e-mail lookups then use your key and your quota.') }}
+<div class="nt-signin-page">
+  <svg class="nt-signin-page__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" />
+  </svg>
+  <h1 class="nt-signin-page__title">Sign in to NexusTrace</h1>
+  <p class="nt-signin-page__lead">An account is optional. Sign in to save your own VirusTotal key, so hash, file and e-mail lookups use your quota.</p>
 
   {% include "_account_flashes.html" %}
 
-  <div class="nt-card p-5">
+  <div class="nt-signin-page__providers">
     {% for name, label in providers %}
-    <a href="{{ url_for('account.login', provider=name) }}"
-       class="btn btn-primary btn-compact rounded-lg mb-3 mr-2 inline-flex">
-      Sign in with {{ label }}
+    <a href="{{ url_for('account.login', provider=name) }}" class="nt-provider is-{{ name }}">
+      {% if name == 'google' %}
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      {% elif name == 'github' %}
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 007.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 015.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0023.5 12C23.5 5.65 18.35.5 12 .5z"/>
+      </svg>
+      {% endif %}
+      <span>Continue with {{ label }}</span>
     </a>
     {% endfor %}
-    <p class="text-xs text-gray-500 mt-2">
-      NexusTrace stores only your {{ providers | map('last') | join(' or ') }} user ID and
-      display name, plus any key you save. It never sees your password or e-mail address.
-      Saved keys are encrypted and are never shown again after you save them.
-    </p>
   </div>
- </div>
+
+  <p class="nt-signin-page__fine">
+    NexusTrace stores only your {{ providers | map('last') | join(' or ') }} user ID and display
+    name, plus any key you save, encrypted. It never sees your password or e-mail address.
+    <a href="/privacy">Privacy</a>
+  </p>
 </div>
 {% endblock %}

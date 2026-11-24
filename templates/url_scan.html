@@ -3,10 +3,10 @@
 {% block title %}URL Scan | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 py-10">
-  <div class="mb-8">
-    <h1 class="text-2xl font-semibold text-gray-100 mb-1">URL Scan</h1>
-    <p class="text-sm text-gray-400">Enter a domain or URL. Loads the page in a headless Chromium browser and reports HTTP transactions, redirects, DNS records, TLS certificate, WHOIS, ASN, security headers, cookies, technologies, and a full-page screenshot.</p>
+<div class="nt-page">
+  <div class="nt-page-head">
+    <h1 class="nt-page-title">URL Scan</h1>
+    <p class="nt-page-desc">Enter a domain or URL. Loads the page in a headless Chromium browser and reports HTTP transactions, redirects, DNS records, TLS certificate, WHOIS, ASN, security headers, cookies, technologies, and a full-page screenshot.</p>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -29,7 +29,7 @@
         placeholder="example.com or https://example.com/path"
         spellcheck="false"
         autocomplete="off"
-        class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm font-mono"
+        class="form-input flex-1"
         required
       />
       <div class="flex gap-2 items-center">

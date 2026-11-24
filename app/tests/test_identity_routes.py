@@ -209,7 +209,8 @@ def test_negative_rows_are_collapsed_not_rendered():
         scan_id = box.seed_record('22222222-2222-2222-2222-222222222222', findings)
 
         body = build().test_client().get(f'/identity_scan/{scan_id}').get_data(as_text=True)
-        head = body.split('<details')[0]
+        # The header's menus are <details> too; the collapsed rows are the first in <main>.
+        head = body[body.find('<main'):].split('<details')[0]
 
         check('GitHub' in head, 'a confirmed account was not shown by default')
         check('Reddit' in head,

@@ -46,20 +46,12 @@
 {% block content %}
 <div class="nt-results-wrap">
 
-  <p class="nt-results-title">Threat Intelligence Report</p>
-
-  <div class="nt-results-search">
-    <form action="/analyze" method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="text" name="indicator"
-             placeholder="Pivot to another IP, domain, URL, hash, or user agent..."
-             required autocomplete="off" spellcheck="false"
-             aria-label="Pivot to another indicator">
-      <button type="submit">Analyze</button>
-    </form>
-  </div>
+  <h1 class="sr-only">Results for {{ indicator }}</h1>
 
   {% set has_domain_cards = domain_info or url_analysis or whois_info %}
+  {# Sources that were asked nothing (no key) or failed get one line after the findings
+     instead of a card each, so every card on the page carries information. #}
+  {% set not_checked = [] %}
 
   {# abuse.ch envelopes come from a third-party client: a missing or non-mapping `summary` must render an empty card, never raise. #}
   {% set tf_env = threatfox if (threatfox is defined and threatfox is mapping) else none %}
@@ -259,8 +251,9 @@
   {% endif %}
 
   {% if has_ip_cards %}
+  <div class="nt-split">
   {# Reputation first: the cards that answer "is this address bad?" #}
-  <div class="nt-card-grid">
+  <div class="nt-card-grid nt-split__rep">
     {% if abuseipdb %}
       <div class="nt-card is-abuse">
         <div class="nt-card__head">
@@ -326,8 +319,8 @@
     {% if alienvault and has_ip_cards %}
       {{ render_alienvault(alienvault) }}
     {% endif %}
-    {% if tf_env %}{{ render_threatfox(tf_env) }}{% endif %}
-    {% if uh_env %}{{ render_urlhaus(uh_env) }}{% endif %}
+    {% if tf_env %}{% if tf_state in ('found', 'no_record') %}{{ render_threatfox(tf_env) }}{% else %}{% set _ = not_checked.append('ThreatFox') %}{% endif %}{% endif %}
+    {% if uh_env %}{% if uh_state in ('found', 'no_record') %}{{ render_urlhaus(uh_env) }}{% else %}{% set _ = not_checked.append('URLhaus') %}{% endif %}{% endif %}
     {% if greynoise %}{{ render_greynoise(greynoise) }}{% endif %}
     {% if stopforumspam %}{{ render_stopforumspam(stopforumspam) }}{% endif %}
     {% if vpnapi %}
@@ -420,7 +413,7 @@
   {% set loc_rows = location_summary(ipinfo=ipinfo, ip2location=ip2location, vpnapi=vpnapi,
                                      proxycheck=proxycheck, shodan=shodan, abuseipdb=abuseipdb) %}
   {% if loc_rows or ipinfo or ip2location %}
-  <div class="nt-card nt-card--wide is-location">
+  <div class="nt-card is-location nt-split__rail">
     <div class="nt-card__head">
       <span class="nt-card__icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -429,14 +422,14 @@
       </span>
       <h3 class="nt-card__title">Location and Network</h3>
       {% set loc_sources = location_sources(ipinfo=ipinfo, ip2location=ip2location, vpnapi=vpnapi, proxycheck=proxycheck, shodan=shodan, abuseipdb=abuseipdb) %}
-      <span class="nt-card__source" title="{{ loc_sources | join(', ') }}">{{ loc_sources | length }} source{{ 's' if loc_sources | length != 1 }}</span>
+      <span class="nt-card__source" title="{{ loc_sources | join(', ') }}">{{ loc_sources[0] if loc_sources | length == 1 else (loc_sources | length) ~ ' sources' }}</span>
     </div>
     <dl class="nt-loc">
       {% for row in loc_rows %}
       <div class="nt-loc__item{% if not row.agree %} is-split{% endif %}">
         <dt>{{ row.label }}{% if not row.agree %} <span class="nt-loc__differ">sources differ</span>{% endif %}</dt>
         {% for group in row['values'] %}
-        <dd>{{ group.value }} <span class="nt-loc__src">{{ group.sources | join(', ') }}</span></dd>
+        <dd>{{ group.value }}{% if loc_sources | length > 1 %} <span class="nt-loc__src">{{ group.sources | join(', ') }}</span>{% endif %}</dd>
         {% endfor %}
       </div>
       {% endfor %}
@@ -455,7 +448,7 @@
       {% for label, value, source in extras %}
       <div class="nt-loc__item">
         <dt>{{ label }}</dt>
-        <dd>{{ value }} <span class="nt-loc__src">{{ source }}</span></dd>
+        <dd>{{ value }}{% if loc_sources | length > 1 %} <span class="nt-loc__src">{{ source }}</span>{% endif %}</dd>
       </div>
       {% endfor %}
     </dl>
@@ -468,7 +461,7 @@
   {% endif %}
 
   {% if shodan or internetdb or ripestat %}
-  <div class="nt-card-grid">
+  <div class="nt-card-grid nt-split__infra">
     {% if shodan %}
       <div class="nt-card is-shodan">
         <div class="nt-card__head">
@@ -530,6 +523,7 @@
     {% if ripestat %}{{ render_ripestat(ripestat) }}{% endif %}
   </div>
   {% endif %}
+  </div>
   {% endif %}
 
   {% if (alienvault and not has_ip_cards) or domain_info or url_analysis or whois_info or registration or archive %}
@@ -538,8 +532,8 @@
       {{ render_alienvault(alienvault) }}
     {% endif %}
 
-    {% if tf_env and not has_ip_cards %}{{ render_threatfox(tf_env) }}{% endif %}
-    {% if uh_env and not has_ip_cards %}{{ render_urlhaus(uh_env) }}{% endif %}
+    {% if tf_env and not has_ip_cards %}{% if tf_state in ('found', 'no_record') %}{{ render_threatfox(tf_env) }}{% else %}{% set _ = not_checked.append('ThreatFox') %}{% endif %}{% endif %}
+    {% if uh_env and not has_ip_cards %}{% if uh_state in ('found', 'no_record') %}{{ render_urlhaus(uh_env) }}{% else %}{% set _ = not_checked.append('URLhaus') %}{% endif %}{% endif %}
 
     {% if registration or archive %}{{ render_domain_age(registration, archive) }}{% endif %}
 
@@ -1023,14 +1017,9 @@
   </div>
   {% endif %}
 
-  <div class="flex justify-center mt-12 mb-6">
-    <a href="/" class="nt-back-home">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M19 12H5M12 19l-7-7 7-7"/>
-      </svg>
-      Back to Home
-    </a>
-  </div>
+  {% if not_checked %}
+  <p class="nt-not-checked">Not checked: {{ not_checked | join(' and ') }}. {{ 'It is' if not_checked | length == 1 else 'They are' }} not set up on this server or did not answer, so {{ 'it says' if not_checked | length == 1 else 'they say' }} nothing either way.</p>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -1145,7 +1134,7 @@
   {% elif state == 'skipped' %}
     <div class="nt-otx-empty is-muted">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 17h.01M3.3 19h17.4L12 4z"/></svg>
-      <span>ABUSECH_AUTH_KEY not configured, so this source was never queried</span>
+      <span>Not checked: this source is not available on this server</span>
     </div>
   {% elif state != 'found' %}
     <div class="nt-otx-empty is-warn">

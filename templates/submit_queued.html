@@ -3,11 +3,11 @@
 {% block title %}Submission queued | NexusTrace{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="nt-page">
 
   {% if error %}
   <div class="nt-card p-5">
-    <h1 class="text-2xl font-semibold text-gray-100 mb-2">Submission rejected</h1>
+    <h1 class="nt-page-title mb-2">Submission rejected</h1>
     <div class="mb-4 px-4 py-3 rounded text-sm bg-red-900/30 text-red-300 border border-red-800">
       {{ error }}
     </div>
@@ -18,7 +18,7 @@
   </div>
   {% else %}
   <div class="nt-card p-5">
-    <h1 class="text-2xl font-semibold text-gray-100 mb-2">Queued for operator review</h1>
+    <h1 class="nt-page-title mb-2">Queued for operator review</h1>
 
     <div class="mb-4 px-4 py-3 rounded text-sm bg-yellow-900/40 text-yellow-300 border border-yellow-800/60">
       Nothing has been sent to abuse.ch. This submission is held locally with status
